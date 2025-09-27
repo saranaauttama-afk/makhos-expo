@@ -55,6 +55,15 @@ export function iterativeDeepening(root: Position, timeMs: number, tt = new TT()
   return { best, score: bestScore, nodes, depth: reached };
 }
 
+
+function clampDepth(parentDepth: number, childDepth: number): number {
+  if (parentDepth <= 0) return 0;
+  const maxChild = parentDepth - 1;
+  if (childDepth > maxChild) return maxChild;
+  if (childDepth < 0) return 0;
+  return childDepth;
+}
+
 function searchRoot(pos: Position, depth: number, alpha: number, beta: number, tt: TT, deadline: number, acc: {nodes: number}, ply: number) {
   const moves = generateMoves(pos);
   if (moves.length === 0) return { move: undefined as Move | undefined, score: -999999 + ply };
@@ -90,6 +99,7 @@ function searchRoot(pos: Position, depth: number, alpha: number, beta: number, t
     let depthToUse = d;
     const lateQuiet = (i >= 3 && d >= 2 && m.captured.length === 0);
     if (lateQuiet) depthToUse = d - 1;
+    depthToUse = clampDepth(depth, depthToUse);
 
     let sc: number;
     if (i === 0) {
@@ -120,6 +130,7 @@ function searchRoot(pos: Position, depth: number, alpha: number, beta: number, t
 }
 
 function alphabeta(pos: Position, depth: number, alpha: number, beta: number, tt: TT, deadline: number, acc: {nodes: number}, ply: number): number {
+  if (ply >= MAX_PLY - 1) return evaluate(pos);
   if (Date.now() > deadline) return evaluate(pos);
   if (depth <= 0) return quiesce(pos, alpha, beta, deadline, acc, ply);
 
@@ -159,6 +170,7 @@ function alphabeta(pos: Position, depth: number, alpha: number, beta: number, tt
     let depthToUse = d;
     const lateQuiet = (i >= 3 && d >= 2 && m.captured.length === 0);
     if (lateQuiet) depthToUse = d - 1;
+    depthToUse = clampDepth(depth, depthToUse);
 
     let sc: number;
     if (i === 0) {
@@ -190,6 +202,7 @@ function alphabeta(pos: Position, depth: number, alpha: number, beta: number, tt
 }
 
 function quiesce(pos: Position, alpha: number, beta: number, deadline: number, acc: {nodes: number}, ply: number): number {
+  if (ply >= MAX_PLY - 1) return evaluate(pos);
   if (Date.now() > deadline) return evaluate(pos);
 
   let stand = evaluate(pos);

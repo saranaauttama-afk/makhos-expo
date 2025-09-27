@@ -1,8 +1,8 @@
 // src/core/movegen.ts
 // Thai Checkers movegen:
 // - Men: step 1 forward diag; capture forward; forced capture; multi-capture chains
-// - Kings (Hos): fly any distance along diagonals; forced capture; landing on any empty
-//   square beyond the captured piece; multi-capture chains.
+// - Kings (Hos): fly any distance onto captures but must land immediately behind the captured piece;
+//   forced capture; multi-capture chains.
 
 import { BB, B1, bits, STEPS } from './bitboards';
 import { Position, occupied, sideMen, sideKings } from './position';
@@ -232,9 +232,8 @@ function genKingCapturesFrom(p: Position, from: number, out: Move[]) {
             break;
           }
         } else {
-          // already saw exactly one enemy; now squares must be empty to land
+          // already saw exactly one enemy; landing must be the first empty square behind it
           if (!isEmpty) break; // blocked after enemy
-          // candidate landing square
           const landing = sq;
           const fromBit = B1(cur);
           const landingBit = B1(landing);
@@ -256,8 +255,7 @@ function genKingCapturesFrom(p: Position, from: number, out: Move[]) {
           caps.pop();
 
           extended = true;
-          // keep scanning further empties along the same ray to allow different landing squares
-          continue;
+          break; // only the immediate landing square is legal
         }
       }
     }
