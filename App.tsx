@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, Button, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Board } from './src/ui/Board';
-import { initialPosition, Position } from './src/core/position';
+import { initialPosition, Position, isDrawByInactivity } from './src/core/position';
 import { generateMoves, applyMove } from './src/core/movegen';
 import { useEngine } from './src/ui/useEngine';
 
@@ -13,6 +13,7 @@ export default function App() {
 
   // คำนวณ moves ปัจจุบัน (ไว้เช็คแพ้/จบเกม และโชว์สถานะ)
   const myMoves = useMemo(() => generateMoves(pos), [pos]);
+  const isDraw = useMemo(() => isDrawByInactivity(pos), [pos]);
 
   function onNewGame() {
     setPos(initialPosition());
@@ -20,11 +21,15 @@ export default function App() {
 
   function onAIMove() {
     // จบเกมแล้ว
+    if (isDraw) {
+      Alert.alert('Game over', 'Draw by inactivity (20 turns without capture)');
+      return;
+    }
     if (myMoves.length === 0) {
       Alert.alert('Game over', pos.side === 1 ? 'P1 ไม่มีทางเดิน' : 'P2 ไม่มีทางเดิน');
       return;
     }
-    const best = think(pos, 900); // ปรับเวลาได้ตามต้องการ
+    const best = think(pos, 1200); // ปรับเวลาได้ตามต้องการ
     if (!best) return;
     const next = applyMove(pos, best);
     setPos(next);
@@ -35,7 +40,7 @@ export default function App() {
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Makhos (Thai Checkers) – AI vs AI</Text>
       <Text style={{ opacity: 0.85 }}>
         Turn: {pos.side === 1 ? 'P1' : 'P2'} {thinking ? '• thinking…' : ''}
-        {myMoves.length === 0 ? ' • Game Over' : ''}
+        {myMoves.length === 0 ? ' • Game Over' : isDraw ? ' • Draw' : ''}
       </Text>
       {lastInfo && (
         <Text style={{ fontSize: 12, opacity: 0.7 }}>
@@ -55,7 +60,7 @@ export default function App() {
 
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
         <Button title="New Game" onPress={onNewGame} />
-        <Button title={thinking ? 'Thinking…' : 'AI Move'} onPress={onAIMove} />
+        <Button title={thinking ? 'Thinking…' : 'AI Move'} onPress={onAIMove} disabled={thinking || myMoves.length === 0 || isDraw} />
       </View>
     </SafeAreaView>
   );

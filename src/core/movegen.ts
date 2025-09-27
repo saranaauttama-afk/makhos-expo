@@ -1,4 +1,4 @@
-// src/core/movegen.ts
+﻿// src/core/movegen.ts
 // Thai Checkers movegen:
 // - Men: step 1 forward diag; capture forward; forced capture; multi-capture chains
 // - Kings (Hos): fly any distance onto captures but must land immediately behind the captured piece;
@@ -75,6 +75,7 @@ export function applyMove(p: Position, m: Move): Position {
   }
 
   q.side = (p.side === 1 ? -1 : 1);
+  q.halfmoveClock = m.captured.length > 0 ? 0 : p.halfmoveClock + 1;
   return q;
 }
 
@@ -138,8 +139,8 @@ function genMenCapturesFrom(p: Position, from: number, out: Move[]) {
     // adjacent jumps: look at next step, then step after (landing)
     for (const st of STEPS[cur]) {
       // men capture forward only
-      if (p.side === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue;
-      if (p.side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
+      if (p.side === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue; // P1 up only
+      if (p.side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue; // P2 down only
 
       const over = st.to;
       if (over < 0) continue;
@@ -274,3 +275,5 @@ function genKingCapturesFrom(p: Position, from: number, out: Move[]) {
 
   dfs(from, myMen0, myKings0, opMen0, opKings0);
 }
+
+

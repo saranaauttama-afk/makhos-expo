@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { SafeAreaView, View, Text, Button, Alert } from 'react-native';
 import { Board } from '../src/ui/Board';
-import { initialPosition, Position } from '../src/core/position';
+import { initialPosition, Position, isDrawByInactivity } from '../src/core/position';
 import { generateMoves, applyMove, Move } from '../src/core/movegen';
 import { useEngine } from '../src/ui/useEngine';
 
@@ -13,6 +13,7 @@ export default function App() {
   const { think, thinking } = useEngine();
 
   const myMoves = useMemo(() => generateMoves(pos), [pos]);
+  const isDraw = useMemo(() => isDrawByInactivity(pos), [pos]);
 
   function onTapSquare(i: number) {
     const candidates = myMoves.filter(m => m.from === (sel ?? i));
@@ -34,18 +35,29 @@ export default function App() {
     }
   }
 
-  const highlights = sel !== null ? myMoves.filter(m => m.from === sel).map(m => m.to) : [];
+  const fromSquares = sel !== null ? [sel] : [];
+  const destSquares = sel !== null ? myMoves.filter(m => m.from === sel).map(m => ({ to: m.to, caps: m.captured.length })) : [];
 
   return (
     <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <Text style={{ fontSize: 20, fontWeight: '600' }}>Makhos (Thai Checkers)</Text>
-      <Board pos={pos} onTapSquare={onTapSquare} highlights={highlights} />
+      <Board
+        pos={pos}
+        onTapSquare={onTapSquare}
+        fromSquares={fromSquares}
+        selectedFrom={sel}
+        destSquares={destSquares}
+      />
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
         <Button title="New Game" onPress={() => { setPos(initialPosition()); setSel(null); }} />
         <Button title={thinking ? 'Thinking…' : 'AI Move'} onPress={() => {
+          if (isDraw) {
+            Alert.alert('Game over', 'Draw by inactivity (20 turns without capture)');
+            return;
+          }
           const best = think(pos, 600);
           if (best) setPos(applyMove(pos, best));
-        }} />
+        }} disabled={thinking || isDraw} />
       </View>
     </SafeAreaView>
   );

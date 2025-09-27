@@ -1,7 +1,7 @@
 // src/core/search/alphabeta.ts
 // PVS + Aspiration + LMR + TT + Quiescence + Extensions (Endgame/Threat)
 import { Move, generateMoves, applyMove } from '../movegen';
-import { Position } from '../position';
+import { Position, isDrawByInactivity } from '../position';
 import { evaluate } from '../eval';
 import { TT, Bound } from './tt';
 import { hashPosition } from './zobrist';
@@ -65,6 +65,7 @@ function clampDepth(parentDepth: number, childDepth: number): number {
 }
 
 function searchRoot(pos: Position, depth: number, alpha: number, beta: number, tt: TT, deadline: number, acc: {nodes: number}, ply: number) {
+  if (isDrawByInactivity(pos)) return { move: undefined as Move | undefined, score: 0 };
   const moves = generateMoves(pos);
   if (moves.length === 0) return { move: undefined as Move | undefined, score: -999999 + ply };
 
@@ -130,6 +131,7 @@ function searchRoot(pos: Position, depth: number, alpha: number, beta: number, t
 }
 
 function alphabeta(pos: Position, depth: number, alpha: number, beta: number, tt: TT, deadline: number, acc: {nodes: number}, ply: number): number {
+  if (isDrawByInactivity(pos)) return 0;
   if (ply >= MAX_PLY - 1) return evaluate(pos);
   if (Date.now() > deadline) return evaluate(pos);
   if (depth <= 0) return quiesce(pos, alpha, beta, deadline, acc, ply);
@@ -202,6 +204,7 @@ function alphabeta(pos: Position, depth: number, alpha: number, beta: number, tt
 }
 
 function quiesce(pos: Position, alpha: number, beta: number, deadline: number, acc: {nodes: number}, ply: number): number {
+  if (isDrawByInactivity(pos)) return 0;
   if (ply >= MAX_PLY - 1) return evaluate(pos);
   if (Date.now() > deadline) return evaluate(pos);
 
