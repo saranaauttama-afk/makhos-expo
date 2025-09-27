@@ -1,5 +1,6 @@
 // src/core/eval.ts
 import { BB, bitCount, B1, STEPS, toRC, bits } from './bitboards';
+import { generateMoves } from './movegen';
 import { Position } from './position';
 
 const START_TOTAL = 16; // 8 ต่อฝั่ง
@@ -7,7 +8,7 @@ const START_TOTAL = 16; // 8 ต่อฝั่ง
 // น้ำหนักพื้นฐาน (จะผสมตาม phase เกม)
 const W_BASE = {
   man: 100,
-  king: 220,
+  king: 210,            // เดิม 220 → ลดค่าคิงฐานลงเล็กน้อย
   mobilityMen: 2,
   mobilityKing: 3,
   center: 2,
@@ -15,15 +16,12 @@ const W_BASE = {
   backRankGuard: 3,
   kingProximity: 2,
   trappedKing: -12,
-  simplification: 3, // ชอบเทรดเมื่อได้เปรียบ (ช่วยปิดเกม)
+  simplification: 6,    // เดิม 3 → เพิ่มแรงผลัก "ยอมแลกเมื่อได้เปรียบ"
+  captureSwing: 90,      // Immediate capture swing weight (discourage hanging pieces)
+  captureTargets: 45,   // Count of pieces immediately capturable
 };
 
 // phase: 1 = ต้นเกม, 0 = ปลายเกม
-function gamePhase(p: Position) {
-  const total = bitCount(p.p1Men | p.p1Kings | p.p2Men | p.p2Kings);
-  const t = Math.max(0, Math.min(1, total / START_TOTAL));
-  return t;
-}
 function occupied(p: Position): BB {
   return (p.p1Men | p.p1Kings | p.p2Men | p.p2Kings) >>> 0;
 }
@@ -120,20 +118,29 @@ function kingProximityGain(p: Position, side: 1 | -1): number {
   return Math.max(0, 6 - avg);
 }
 
+
+interface CaptureInfo { maxChain: number; targets: number; }
+
+function captureInfo(p: Position, side: 1 | -1): CaptureInfo {
+  const view = (p.side === side ? p : { ...p, side } as Position);
+  const moves = generateMoves(view);
+  if (!moves.length || moves[0].captured.length === 0) {
+    return { maxChain: 0, targets: 0 };
+  }
+  let maxChain = 0;
+  let mask = 0;
+  for (const m of moves) {
+    const len = m.captured.length;
+    if (len > maxChain) maxChain = len;
+    for (const sq of m.captured) mask = (mask | B1(sq)) >>> 0;
+  }
+  return { maxChain, targets: bitCount(mask) };
+}
+
 export function evaluate(p: Position): number {
-  const gp = gamePhase(p), eg = 1 - gp;
-  const W = {
-    man: W_BASE.man,
-    king: Math.round(W_BASE.king + 40 * eg),
-    mobilityMen: W_BASE.mobilityMen,
-    mobilityKing: Math.round(W_BASE.mobilityKing + 1 * eg),
-    center: W_BASE.center,
-    promoteProgress: Math.round(W_BASE.promoteProgress + 4 * eg),
-    backRankGuard: W_BASE.backRankGuard,
-    kingProximity: Math.round(W_BASE.kingProximity + 3 * eg),
-    trappedKing: W_BASE.trappedKing,
-    simplification: W_BASE.simplification,
-  };
+  const gpTotal = bitCount(p.p1Men | p.p1Kings | p.p2Men | p.p2Kings);
+  const gp = Math.max(0, Math.min(1, gpTotal / START_TOTAL));
+  const eg = 1 - gp; // 1 = ปลายเกม
 
   const myMen   = p.side === 1 ? p.p1Men : p.p2Men;
   const myKings = p.side === 1 ? p.p1Kings : p.p2Kings;
@@ -145,36 +152,69 @@ export function evaluate(p: Position): number {
   const opMenN   = bitCount(opMen);
   const opKingsN = bitCount(opKings);
 
+  const myAll = myMenN + myKingsN;
+  const opAll = opMenN + opKingsN;
+
+  // สถานะ “นำ” แบบหยาบ (คิงนับ 2)
+  const leadSimple = (myMenN - opMenN) + 2 * (myKingsN - opKingsN);
+  const leading = leadSimple > 0;
+
+  // ==== Dynamic Weights (ไม่แตะ movegen/search) ====
+
+  // 1) ลดค่าคิง "เมื่อปลายเกมและเรานำ" → กล้าแลกเพื่อปิด
+  let W_KING = W_BASE.king;
+  if (eg >= 0.5 && leading) W_KING -= 60;         // ปลายเกมครึ่งหลัง
+  if (eg >= 0.8 && leading && opAll <= 2) W_KING -= 90; // จะจบแล้ว ยิ่งลด
+
+  // 2) เร่งโปรโมตในปลายเกม → ดันให้เดินที่ส่งเสริมเม็ด
+  const W_PROM = W_BASE.promoteProgress + Math.round(6 * eg); // 6 → 12 เมื่อ eg=1
+
+  // 3) Simplification bias: เมื่อ "นำ" และอีกฝ่ายเหลือน้อย → อยากลดชิ้นรวม
+  let SIMP = W_BASE.simplification;
+  if (leading) SIMP += Math.round(8 * eg); // ปลายเกมเพิ่มแรง
+  if (leading && opAll <= 2) SIMP += 10;   // จะปิดแล้ว เพิ่มพิเศษ
+
+  // ==== คะแนนจริง ====
   let score = 0;
 
-  // material
-  score += W.man  * (myMenN   - opMenN);
-  score += W.king * (myKingsN - opKingsN);
+  // Material
+  score += W_BASE.man  * (myMenN   - opMenN);
+  score += W_KING      * (myKingsN - opKingsN);
 
-  // mobility
+  // Mobility (เบา ๆ)
   const mMob = mobility(p, p.side);
   const oMob = mobility({ ...p, side: (p.side === 1 ? -1 : 1) } as Position, (p.side === 1 ? -1 : 1));
-  score += W.mobilityMen  * (mMob.men  - oMob.men);
-  score += W.mobilityKing * (mMob.king - oMob.king);
+  score += W_BASE.mobilityMen  * (mMob.men  - oMob.men);
+  score += W_BASE.mobilityKing * (mMob.king - oMob.king);
 
-  // center
-  score += W.center * (centerScore(p, p.side) - centerScore(p, (p.side === 1 ? -1 : 1)));
-
-  // promotion / back rank
+  // Center / Back rank / King proximity / Trapped king (เดิม)
+  score += W_BASE.center * (centerScore(p, p.side) - centerScore(p, (p.side === 1 ? -1 : 1)));
   const myProm  = promotionDistanceSum(p, p.side);
   const opProm  = promotionDistanceSum(p, (p.side === 1 ? -1 : 1));
-  score += W.promoteProgress * (opProm - myProm) / 10;
-  score += W.backRankGuard * (backRankGuards(p, p.side) - backRankGuards(p, (p.side === 1 ? -1 : 1)));
+  score += W_PROM * (opProm - myProm) / 10;
+  score += W_BASE.backRankGuard * (backRankGuards(p, p.side) - backRankGuards(p, (p.side === 1 ? -1 : 1)));
+  score += W_BASE.kingProximity * (kingProximityGain(p, p.side) - kingProximityGain(p, (p.side === 1 ? -1 : 1)));
+  score += W_BASE.trappedKing   * (trappedKings(p, p.side) - trappedKings(p, (p.side === 1 ? -1 : 1)));
 
-  // endgame pressure
-  score += W.kingProximity * (kingProximityGain(p, p.side) - kingProximityGain(p, (p.side === 1 ? -1 : 1)));
-  score += W.trappedKing   * (trappedKings(p, p.side) - trappedKings(p, (p.side === 1 ? -1 : 1)));
+  const myCap = captureInfo(p, p.side);
+  const opCap = captureInfo(p, (p.side === 1 ? -1 : 1));
+  if (myCap.maxChain || opCap.maxChain) {
+    let capWeight = W_BASE.captureSwing;
+    if (eg >= 0.7) capWeight += 20;
+    score += capWeight * (myCap.maxChain - opCap.maxChain);
+  }
+  if (myCap.targets || opCap.targets) {
+    const threatWeight = W_BASE.captureTargets + Math.round(4 * eg);
+    score += threatWeight * (myCap.targets - opCap.targets);
+  }
+  // Simplification (อยากให้ชิ้นรวมน้อยลงเมื่อเรานำ) — ไม่แตะตัวเลขมโหฬาร
+  score += SIMP * (START_TOTAL - (myAll + opAll));
 
-  // simplification bias (ชอบเทรดเมื่อ “นำ”)
-  const totalNow = myMenN + myKingsN + opMenN + opKingsN;
-  const leadSimple = (myMenN - opMenN) + 2 * (myKingsN - opKingsN); // นับ king = 2
-  const leadSign = leadSimple > 0 ? 1 : leadSimple < 0 ? -1 : 0;
-  score += W.simplification * leadSign * (START_TOTAL - totalNow);
+  // Endgame boosters เล็กน้อย (ทั่วไป ไม่ผูกกับรูปเฉพาะ)
+  if (leading && opAll === 1) score += 140;   // เขาเหลือ 1 ตัว → ผลักให้ยอมแลกเพื่อจบ
+  if (leading && opAll <= 2) score += 70;
 
   return score | 0;
 }
+
+
