@@ -55,14 +55,26 @@ def run_game_generator_batch(batch_idx: int, num_games: int, time_per_move: int,
     print(f"  Script: {script_path}")
     print(f"  Output: {output_file}")
 
-    # Run TypeScript using tsx (or ts-node)
-    cmd = ["npx", "tsx", script_path, str(num_games), str(time_per_move), output_file]
+    # Run TypeScript using tsx
+    # For Colab: use full path to avoid /tools/node conflict
+    home = os.path.expanduser("~")
+    node_bin = f"{home}/.nvm/versions/node/v20.19.5/bin"
+    tsx_cmd = f"{node_bin}/npx tsx {script_path} {num_games} {time_per_move} {output_file}"
 
     start_time = time.time()
     try:
-        # Run from project root directory
-        result = subprocess.run(cmd, check=True, cwd=project_root,
-                               capture_output=True, text=True)
+        # Run from project root directory with modified PATH
+        env = os.environ.copy()
+        env["PATH"] = f"{node_bin}:{env.get('PATH', '')}"
+
+        result = subprocess.run(
+            ["bash", "-c", tsx_cmd],
+            check=True,
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            env=env
+        )
         elapsed = time.time() - start_time
         print(f"✓ Batch {batch_idx} complete in {elapsed/60:.1f} minutes")
         print(f"  Saved to: {output_file}")

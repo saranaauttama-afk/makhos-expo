@@ -17,10 +17,13 @@ drive.mount('/content/drive')
 # Install PyTorch
 !pip install torch numpy -q
 
-# Install Node.js
-!apt-get update > /dev/null 2>&1
-!apt-get install -y nodejs npm > /dev/null 2>&1
-!npm install -g tsx > /dev/null 2>&1
+# Install Node.js v20 using nvm
+!cd /content && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+!bash -c "cd /content && source ~/.nvm/nvm.sh && nvm install 20 && nvm use 20 && npm install -g tsx"
+
+# Verify installation
+!bash -c "source ~/.nvm/nvm.sh && nvm use 20 && node --version"
+!bash -c "source ~/.nvm/nvm.sh && nvm use 20 && npm --version"
 
 print("✓ Setup complete!")
 ```
@@ -32,12 +35,17 @@ print("✓ Setup complete!")
 ```python
 import os
 
+# Fix directory after nvm installation
+%cd /content
+
 # Clone repo (เปลี่ยน YOUR_USERNAME)
 !rm -rf /content/makhos-expo
 !git clone https://github.com/YOUR_USERNAME/makhos-expo.git
 
 %cd /content/makhos-expo
-!npm install > /dev/null 2>&1
+
+# Install dependencies (use full path to ensure nvm node is used)
+!bash -c "source ~/.nvm/nvm.sh && nvm use 20 && npm install"
 
 print("✓ Repository ready!")
 ```
@@ -86,7 +94,7 @@ print("\n✓ Full dataset saved to Google Drive!")
 
 ---
 
-## 📋 Cell 4: Inspect Data
+## 📋 Cell 5: Inspect Data
 
 ```python
 import numpy as np
@@ -125,15 +133,24 @@ print("=" * 60)
 
 ---
 
-## 📋 Cell 5: Train Model
+## 📋 Cell 6: Train Model
 
-**Copy ทั้งหมดจาก `ml/COLAB_TRAIN.py` มาวางใน cell นี้**
+```python
+import sys
+sys.path.insert(0, '/content/makhos-expo/ml')
 
-จากนั้นเพิ่มคำสั่งนี้ท้าย cell:
+from train import train_model
+
+# สร้าง output directory ถ้ายังไม่มี
+import os
+os.makedirs("/content/drive/MyDrive/makhos_ml/checkpoints", exist_ok=True)
+```
+
+จากนั้นเลือกรันแบบใดแบบหนึ่ง:
 
 ```python
 # Quick test: Simple model, 30 epochs (~30-60 นาที)
-train_makhos_model(
+train_model(
     data_path="/content/drive/MyDrive/makhos_ml/training_data.npz",
     model_type="simple",
     hidden_size=512,
@@ -148,7 +165,7 @@ print("\n✓ Training complete! Models saved to Google Drive!")
 
 **สำหรับ production:** ใช้ ResNet model และ 50 epochs:
 ```python
-train_makhos_model(
+train_model(
     data_path="/content/drive/MyDrive/makhos_ml/training_data.npz",
     model_type="resnet",
     num_channels=128,
@@ -161,15 +178,17 @@ train_makhos_model(
 
 ---
 
-## 📋 Cell 6: Test Trained Model
-
-**หมายเหตุ:** ใช้ฟังก์ชัน `create_model()` ที่โหลดจาก Cell 5 แล้ว
+## 📋 Cell 7: Test Trained Model
 
 ```python
+import sys
+sys.path.insert(0, '/content/makhos-expo/ml')
+
 import torch
 import numpy as np
+from model import create_model
 
-# Load model (ใช้ create_model จาก Cell 5)
+# Load model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
@@ -238,7 +257,7 @@ print("=" * 60)
 
 ---
 
-## 📋 Cell 7: Download from Drive (Optional)
+## 📋 Cell 8: Download from Drive (Optional)
 
 หากต้องการ download มาเก็บที่เครื่อง:
 
@@ -259,29 +278,24 @@ print("✓ Download complete!")
 
 ## 🎯 Quick Summary
 
-**ไม่ต้อง clone GitHub! แค่ copy-paste 2 ไฟล์:**
+**Clone repo และใช้ TypeScript (เร็วกว่า 10 เท่า!):**
 
-1. **Cell 1**: Setup Drive + PyTorch (1 นาที)
-2. **Cell 2**: Copy `COLAB_PURE_PYTHON.py` → Gen 100 games (5-10 นาที)
-   - หรือ **Cell 3**: Gen 5,000 games (2-3 ชั่วโมง)
-4. **Cell 4**: Check data
-5. **Cell 5**: Copy `COLAB_TRAIN.py` → Train model (30-60 นาที)
-6. **Cell 6**: Test model
-7. **Cell 7**: Download (optional)
-
----
-
-## 📁 ไฟล์ที่ต้อง copy
-
-- **`ml/COLAB_PURE_PYTHON.py`** → สำหรับ gen data (Cell 2/3)
-- **`ml/COLAB_TRAIN.py`** → สำหรับ train model (Cell 5)
+1. **Cell 1**: Setup Drive + PyTorch + Node.js v20 (3-5 นาที)
+2. **Cell 2**: Clone repo และ npm install (1 นาที)
+3. **Cell 3**: Gen 100 games (5-10 นาที)
+   - หรือ **Cell 4**: Gen 5,000 games (2-3 ชั่วโมง)
+4. **Cell 5**: Check data
+5. **Cell 6**: Train model (30-60 นาที)
+6. **Cell 7**: Test model
+7. **Cell 8**: Download (optional)
 
 ---
 
 ## ⚠️ หมายเหตุ
 
-- **ไม่ต้อง clone GitHub!** แค่ copy-paste 2 ไฟล์ข้างบน
+- **Node.js v20**: ใช้ nvm เพื่อติดตั้ง Node.js เวอร์ชันใหม่ที่รองรับ `tsx`
+- **ทุกคำสั่งที่เกี่ยวกับ Node.js** ต้องใช้ `!source ~/.nvm/nvm.sh && <command>` เพื่อโหลด nvm ก่อน
 - **Colab disconnect**: ไฟล์ปลอดภัย (เก็บใน Drive แล้ว)
 - **GPU**: Enable GPU ที่ Runtime → Change runtime type → GPU (training เร็วขึ้น 5-10 เท่า!)
-- **Quick test**: Cell 2 (100 games) + Cell 5 (30 epochs) ใช้เวลารวม 30-40 นาที
-- **Production**: Cell 3 (5000 games) + Cell 5 (50 epochs) ใช้เวลารวม 3-4 ชั่วโมง
+- **Quick test**: 100 games + 30 epochs ใช้เวลารวม 35-45 นาที
+- **Production**: 5000 games + 50 epochs ใช้เวลารวม 3-4 ชั่วโมง
