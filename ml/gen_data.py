@@ -37,20 +37,43 @@ def run_game_generator_batch(batch_idx: int, num_games: int, time_per_move: int,
     print(f"Batch {batch_idx}: Generating {num_games} games...")
     print(f"{'='*60}")
 
-    script_path = os.path.join("..", "scripts", "generate_games.ts")
+    # Find project root (parent of ml directory)
+    try:
+        script_dir = os.path.dirname(__file__)
+        project_root = os.path.dirname(script_dir)
+    except NameError:
+        # In notebook: go up from current directory
+        script_dir = os.getcwd()
+        project_root = os.path.dirname(script_dir) if os.path.basename(script_dir) == 'ml' else script_dir
+
+    script_path = os.path.join(project_root, "scripts", "generate_games.ts")
+
+    # Make output_file absolute
+    if not os.path.isabs(output_file):
+        output_file = os.path.abspath(output_file)
+
+    print(f"  Script: {script_path}")
+    print(f"  Output: {output_file}")
 
     # Run TypeScript using tsx (or ts-node)
     cmd = ["npx", "tsx", script_path, str(num_games), str(time_per_move), output_file]
 
     start_time = time.time()
     try:
-        subprocess.run(cmd, check=True, cwd=os.path.dirname(__file__) or ".")
+        # Run from project root directory
+        result = subprocess.run(cmd, check=True, cwd=project_root,
+                               capture_output=True, text=True)
         elapsed = time.time() - start_time
         print(f"✓ Batch {batch_idx} complete in {elapsed/60:.1f} minutes")
         print(f"  Saved to: {output_file}")
         return output_file
     except subprocess.CalledProcessError as e:
-        print(f"✗ Error running batch {batch_idx}: {e}")
+        print(f"✗ Error running batch {batch_idx}:")
+        print(f"  Exit code: {e.returncode}")
+        if e.stdout:
+            print(f"  stdout: {e.stdout}")
+        if e.stderr:
+            print(f"  stderr: {e.stderr}")
         return None
 
 def generate_in_batches(total_games: int, batch_size: int, time_per_move: int, output_dir: str = "."):
