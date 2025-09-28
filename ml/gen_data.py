@@ -67,24 +67,40 @@ def run_game_generator_batch(batch_idx: int, num_games: int, time_per_move: int,
         env = os.environ.copy()
         env["PATH"] = f"{node_bin}:{env.get('PATH', '')}"
 
-        result = subprocess.run(
+        # Run with real-time output (no capture)
+        process = subprocess.Popen(
             ["bash", "-c", tsx_cmd],
-            check=True,
             cwd=project_root,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
+            bufsize=1,
             env=env
         )
+
+        # Stream output in real-time
+        print(f"\n{'─'*60}")
+        for line in process.stdout:
+            print(f"  {line.rstrip()}")
+
+        # Wait for completion
+        process.wait()
+
+        if process.returncode != 0:
+            stderr = process.stderr.read()
+            raise subprocess.CalledProcessError(process.returncode, tsx_cmd, stderr=stderr)
+
         elapsed = time.time() - start_time
+        print(f"{'─'*60}")
         print(f"✓ Batch {batch_idx} complete in {elapsed/60:.1f} minutes")
         print(f"  Saved to: {output_file}")
         return output_file
     except subprocess.CalledProcessError as e:
         print(f"✗ Error running batch {batch_idx}:")
         print(f"  Exit code: {e.returncode}")
-        if e.stdout:
+        if hasattr(e, 'stdout') and e.stdout:
             print(f"  stdout: {e.stdout}")
-        if e.stderr:
+        if hasattr(e, 'stderr') and e.stderr:
             print(f"  stderr: {e.stderr}")
         return None
 
