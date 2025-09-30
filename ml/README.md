@@ -4,22 +4,24 @@ Machine Learning pipeline สำหรับ train neural network เล่น�
 
 ## 🚀 เริ่มต้นที่นี่!
 
-**👉 อ่าน `COLAB_QUICKSTART.md` ก่อน** - มีคำสั่ง copy-paste พร้อมใช้ทุก cell
+**👉 อ่าน `colab_quickstart.md` ก่อน** - มีคำสั่ง copy-paste พร้อมใช้ทุก cell
 
 ## 📋 ภาพรวม 3 Steps
 
-1. **Generate Data** (2-3 ชม.) - AI vs AI self-play → 5,000 games → `training_data.npz`
+1. **Generate Data** (~11 ชม.) - AI vs AI self-play → 500 games → `training_data_500_t1000.npz`
 2. **Train Model** (30-60 นาที) - Neural network training → `best_model.pt`
-3. **Export** - Download model มาใช้งาน
+3. **Test & Export** - ทดสอบและ download model มาใช้งาน
 
-**เวลารวม**: ~3-4 ชั่วโมงบน Google Colab (มี GPU ฟรี!)
+**เวลารวม**: ~12 ชั่วโมงบน Google Colab (รันข้ามคืน)
 
-## ⚡ สำคัญ: TypeScript vs Pure Python
+## ⚡ ความเร็วจริง
 
-- **TypeScript** (แนะนำ): 2-3 วิ/เกมส์ → 5000 games = **2-3 ชม.** ✅
-- **Pure Python**: 20 วิ/เกมส์ → 5000 games = **27+ ชม.** ❌
+- **TypeScript** (time=1000ms): ~50-80 วินาที/เกม
+  - 100 เกม = **1.4 ชั่วโมง** (ทดสอบ)
+  - 500 เกม = **11 ชั่วโมง** (แนะนำ) ✅
+  - 5,000 เกม = **110 ชั่วโมง** (production)
 
-→ **ใช้ TypeScript version เท่านั้น!**
+→ **เริ่มจาก 500 เกมก่อน เพื่อทดสอบ model!**
 
 ---
 
@@ -27,9 +29,9 @@ Machine Learning pipeline สำหรับ train neural network เล่น�
 
 ```
 ml/
-├── COLAB_QUICKSTART.md   # 📘 คู่มือหลัก - อ่านไฟล์นี้!
+├── colab_quickstart.md   # 📘 คู่มือหลัก - อ่านไฟล์นี้!
 ├── README.md             # ไฟล์นี้ - สรุปภาพรวม
-├── gen_data.py           # Step 1: Gen data (call TypeScript)
+├── gen_data.py           # Step 1: Gen data (call TypeScript via nvm)
 ├── model.py              # Neural networks (SimpleMakhosNet, MakhosNet)
 ├── train.py              # Step 2-3: Train & save
 └── requirements.txt      # Dependencies (torch, numpy)
@@ -39,12 +41,14 @@ ml/
 
 ## 📖 วิธีใช้
 
-อ่านใน **`COLAB_QUICKSTART.md`** มีทุกอย่างครบ:
-- Setup (1 นาที)
-- Clone repo & install (1 นาที)
-- Gen data (2-3 ชม.)
-- Train model (30-60 นาที)
-- Test & download
+อ่านใน **`colab_quickstart.md`** มีทุกอย่างครบ:
+- **Cell 1**: Setup Drive + PyTorch + Node.js v20 via nvm (3-5 นาที)
+- **Cell 2**: Clone repo & npm install (1 นาที)
+- **Cell 3-4**: Gen data (1.4-11 ชม.)
+- **Cell 5**: Inspect data
+- **Cell 6**: Train model (30-60 นาที)
+- **Cell 7**: Test model
+- **Cell 8**: Download (optional)
 
 **อย่าลืมเปลี่ยน `YOUR_USERNAME` ตอน clone!**
 
@@ -61,10 +65,13 @@ ml/
 - Policy: (32×32) move probabilities
 - Value: [-1, 1] position evaluation
 
-### Dataset (5,000 games @ 1000ms/move)
-- ~200,000 positions
-- 1.2-1.5 GB compressed
-- 2-3 ชม. gen time บน Colab
+### Dataset ขนาดต่างๆ
+
+| เกม | Time/move | Positions | Size | Gen time |
+|-----|-----------|-----------|------|----------|
+| 100 | 500ms | ~5,000 | ~100 MB | 1.4 ชม. |
+| 500 | 1000ms | ~25,000 | ~500 MB | 11 ชม. |
+| 5,000 | 1000ms | ~250,000 | ~5 GB | 110 ชม. |
 
 ### Model Architectures
 
@@ -89,56 +96,99 @@ ml/
 | 1000 | ดี | **แนะนำ** |
 | 1200 | ดีมาก | เหมือน manual AI |
 
-### Gen data
-```bash
-# ทดสอบ (100 games, 5 นาที)
-python gen_data.py --total_games 100 --batch_size 100 --time_per_move 500
+### Gen data (ใน Colab)
 
-# แนะนำ (5000 games, 2-3 ชม.)
-python gen_data.py --total_games 5000 --batch_size 1000 --time_per_move 1000
+```python
+# ทดสอบ (100 games, 1.4 ชม.)
+generate_data(
+    total_games=100,
+    batch_size=100,
+    time_per_move=500,
+    output="/content/drive/MyDrive/makhos_ml/training_data_100.npz"
+)
 
-# Production (10k games, 5-6 ชม.)
-python gen_data.py --total_games 10000 --batch_size 2000 --time_per_move 1000
+# แนะนำสำหรับครั้งแรก (500 games, 11 ชม.)
+generate_data(
+    total_games=500,
+    batch_size=50,
+    time_per_move=1000,
+    output="/content/drive/MyDrive/makhos_ml/training_data_500_t1000.npz",
+    batch_dir="/content/drive/MyDrive/makhos_ml/batches_500"  # เก็บ batch ใน Drive
+)
+
+# Production (5000 games, 110+ ชม. - แบ่งทำหลายวัน)
+generate_data(
+    total_games=5000,
+    batch_size=100,
+    time_per_move=1000,
+    output="/content/drive/MyDrive/makhos_ml/training_data_5000.npz",
+    batch_dir="/content/drive/MyDrive/makhos_ml/batches_5000"
+)
 ```
 
-### Resume หาก disconnect
-```bash
-# รันคำสั่งเดิมอีกรอบ แล้วเลือก 'y'
-python gen_data.py --total_games 5000 --batch_size 1000 --time_per_move 1000
+### Resume หาก Colab disconnect
+
+```python
+# รันคำสั่งเดิมอีกรอบ
+# โค้ดจะเจอ batch ที่เซฟไว้ใน Drive แล้วถาม:
+# "Resume from checkpoint? (y/n)"
+# ตอบ 'y' → เล่นต่อจาก batch ถัดไป!
 ```
 
 ---
 
 ## 💡 Tips
 
-1. **เริ่มจากเล็ก**: ทดสอบ 100 games ก่อน
-2. **เปิด GPU**: Runtime → Change runtime type → GPU (เร็วขึ้น 5-10x)
-3. **ดู overfitting**: เช็ค val_loss vs train_loss
-4. **Resume ได้**: Disconnect แล้วรันคำสั่งเดิมอีกรอบ
+1. **เริ่มจาก 500 เกม**: เพื่อทดสอบ model ก่อน (11 ชม.)
+2. **เก็บ batch ใน Drive**: เพื่อ resume ได้ถ้า disconnect
+3. **เปิด GPU สำหรับ training**: Runtime → Change runtime type → GPU (เร็วขึ้น 5-10x)
+4. **ดู overfitting**: เช็ค val_loss vs train_loss
+5. **รันข้ามคืน**: เปิดเครื่อง + browser ทิ้งไว้
 
 ## 🐛 แก้ปัญหา
 
+**"Cannot find module 'node:path'"**
+- Node.js เวอร์ชันเก่า → ใช้ nvm ติดตั้ง v20 (ดูใน Cell 1)
+- เช็ค: `!bash -c "source ~/.nvm/nvm.sh && node --version"` ควรได้ v20.x.x
+
 **"No games were generated"**
-- เช็ค Node.js: `node --version`
-- เช็ค tsx: `npx tsx --version`
-- รัน `npm install` ที่ root
+- เช็คว่า npm install เสร็จหรือยัง
+- Reload module: `del sys.modules['gen_data']`
+- ลอง restart runtime
 
 **"Out of memory" ตอน train**
-- ลด `--batch_size` (ลอง 16 หรือ 32)
-- ใช้ SimpleMakhosNet แทน MakhosNet
+- ลด `batch_size=32` หรือ `16`
+- ใช้ SimpleMakhosNet แทน MakhosNet (ResNet)
 
 **Train ช้า**
-- เปิด GPU ใน Colab
-- ใช้ SimpleMakhosNet
+- เปิด GPU ใน Colab (Runtime → GPU)
+- ใช้ SimpleMakhosNet (~30 นาที แทน 1 ชม.)
 
 ---
 
-## 🎯 Next Steps
+## 🎯 Status & Next Steps
 
-พรุ่งนี้:
-1. Push code ขึ้น GitHub
-2. เปิด Colab
-3. รัน COLAB_QUICKSTART.md ตามลำดับ
-4. รอ 3-4 ชม. → ได้ trained model!
+### 📅 วันนี้ (เสร็จแล้ว):
+- ✅ Setup Colab pipeline (Node.js v20 via nvm)
+- ✅ ทดสอบ gen data 100 เกม (1.4 ชม.)
+- ✅ แก้ปัญหา Node.js compatibility
+- ✅ แสดง real-time progress
 
-**สนุกกับการ train! 🚀**
+### 🌙 คืนนี้ (กำลังรัน):
+- ⏳ **Gen 500 games (time=1000ms)**
+- ⏳ รอ ~11 ชั่วโมง (ตอนนี้เกม ~70/500 แล้ว)
+- 📁 เซฟ batch ใน Drive ทุก 50 เกม
+
+### 🌅 พรุ่งนี้ (To-do):
+1. ✅ เช็คว่า 500 เกมเสร็จหรือยัง
+2. 📊 Inspect data (Cell 5)
+3. 🧠 Train model 30 epochs (~30-40 นาที)
+4. 🧪 Test model (Cell 7)
+5. 📈 ประเมินผล → ตัดสินใจว่าจะเพิ่มข้อมูลหรือไม่
+6. 💾 Download model (ถ้าดี)
+
+### 🚀 แผนระยะยาว:
+- ถ้า model 500 เกมดี → พอใช้ได้แล้ว
+- ถ้าต้องการ model แกร่งกว่า → เพิ่มเป็น 1,000-5,000 เกม (แบ่งทำหลายวัน)
+
+**สนุกกับการ train! 🎮🤖**

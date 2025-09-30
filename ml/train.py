@@ -217,7 +217,8 @@ def save_model_for_inference(model, filepath):
 
     # Also save as TorchScript for deployment
     model.eval()
-    example_input = torch.randn(1, 6, 32)
+    device = next(model.parameters()).device
+    example_input = torch.randn(1, 6, 32).to(device)
     traced_model = torch.jit.trace(model, example_input)
     torchscript_path = filepath.replace('.pt', '_scripted.pt')
     traced_model.save(torchscript_path)
