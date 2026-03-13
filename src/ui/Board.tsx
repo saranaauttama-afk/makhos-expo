@@ -3,8 +3,8 @@ import React from 'react';
 import { View } from 'react-native';
 import Svg, { Rect, Circle, G, Text as SvgText } from 'react-native-svg';
 import { COLORS, SIZE } from './theme';
-import { Position } from '../core/position';
-import { bits, toRC, toIndex } from '../core/bitboards';
+import { Position } from '../coreCodex/position';
+import { bits, toRC, toIndex } from '../coreCodex/bitboards';
 
 interface Dest { to: number; caps: number }
 interface Props {
