@@ -1,3 +1,3 @@
-import HumanVsCodexScreen from '../src/ui/HumanVsCodexScreen';
+import HumanVsCodexArenaScreen from '../src/ui/HumanVsCodexArenaScreen';
 
-export default HumanVsCodexScreen;
+export default HumanVsCodexArenaScreen;

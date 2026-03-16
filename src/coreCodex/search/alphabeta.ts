@@ -6,7 +6,6 @@ import { evaluate } from '../eval';
 import { isDrawByInactivity, Position } from '../position';
 import { Bound, TT } from './tt';
 import { probeSmallEndgame, probeSmallEndgameFromCounts } from './endgameTablebase';
-import { lookupOpeningBook } from './openingBook';
 import {
   buildRepetitionCounts,
   getRepetitionCount,
@@ -43,6 +42,14 @@ interface ExtensionArgs {
   oppHasCapture: boolean;
   parentHasSingle: boolean;
   childHasSingle: boolean;
+}
+
+function isLandingExposed(replyMoves: Move[], landing: number): boolean {
+  for (const move of replyMoves) {
+    if (!move.captured.length) continue;
+    if (move.captured.includes(landing)) return true;
+  }
+  return false;
 }
 
 function keyMove(m: Move) {
@@ -228,13 +235,6 @@ export function iterativeDeepening(
     return { best: endgameHit.best, score: endgameHit.score, nodes: 0, depth: endgameHit.dtm };
   }
 
-  const bookHit = lookupOpeningBook(root);
-  if (bookHit) {
-    const bookScore = -evaluate(applyMove(root, bookHit.move));
-    onInfo?.({ depth: 0, score: bookScore, nodes: 0, pv: [bookHit.move] });
-    return { best: bookHit.move, score: bookScore, nodes: 0, depth: 0 };
-  }
-
   let best: Move | undefined;
   let bestScore = 0;
   let nodes = 0;
@@ -315,7 +315,9 @@ function searchRoot(
       const child = applyMove(pos, move);
       const childHash = hashPosition(child);
       const mobilityScore = mobilityDropScore(child);
-      const oppHasCaptureNow = generateMoves(child).some((m) => m.captured.length > 0);
+      const replyMoves = generateMoves(child);
+      const oppHasCaptureNow = replyMoves.some((m) => m.captured.length > 0);
+      const landingExposed = isLandingExposed(replyMoves, move.to);
       const winInTwo = finisherScan && isRootForcedWinInTwo(pos, move);
       const winInThree = finisherScan && !winInTwo && isRootForcedWinInThree(pos, move);
 
@@ -326,6 +328,7 @@ function searchRoot(
       priority += finisherBoost;
 
       if (!finisherBoost && oppHasCaptureNow) priority -= 200;
+      if (landingExposed) priority -= move.captured.length ? 120 : 320;
       if (getRepetitionCount(repetitionCounts, childHash) >= 2) priority -= 800;
       priority += (key ^ keyMove(move)) & 7;
 

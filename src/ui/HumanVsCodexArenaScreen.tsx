@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Button, SafeAreaView, Text, View } from 'react-native';
 import { applyMove, generateMoves, Move } from '../coreCodex/movegen';
 import { initialPosition, isDrawByInactivity, Position } from '../coreCodex/position';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../coreCodex/search/repetition';
@@ -10,7 +9,7 @@ import { useCodexEngine } from './useCodexEngine';
 
 const HUMAN_SIDE = 1 as const;
 const AI_SIDE = -1 as const;
-const AI_THINK_MS = 1200;
+const AI_THINK_MS = 1800;
 const ALGORITHM_NAME = 'Codex algor';
 
 function positionKey(p: Position) {
@@ -21,7 +20,7 @@ function noMoveMessage(p: Position) {
   return p.side === HUMAN_SIDE ? 'Player 1 has no legal moves' : 'Player 2 (AI) has no legal moves';
 }
 
-export default function HumanVsCodexScreen() {
+export default function HumanVsCodexArenaScreen() {
   const [pos, setPos] = useState<Position>(() => initialPosition());
   const [hashHistory, setHashHistory] = useState<number[]>(() => [hashPosition(initialPosition())]);
   const [sel, setSel] = useState<number | null>(null);

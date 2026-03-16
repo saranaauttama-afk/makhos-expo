@@ -23,6 +23,8 @@ const W_BASE = {
 interface CaptureInfo {
   maxChain: number;
   targets: number;
+  menMask: BB;
+  kingMask: BB;
 }
 
 function occupied(p: Position): BB {
@@ -127,6 +129,32 @@ function supportScore(p: Position, side: 1 | -1): number {
   return score;
 }
 
+function defendedMenNearPromotion(p: Position, side: 1 | -1): number {
+  const men = side === 1 ? p.p1Men : p.p2Men;
+  const mine = side === 1 ? (p.p1Men | p.p1Kings) : (p.p2Men | p.p2Kings);
+  const supportRowDelta = side === 1 ? 1 : -1;
+  let score = 0;
+
+  for (const square of bits(men)) {
+    const { r, c } = toRC(square);
+    const dist = side === 1 ? r : 7 - r;
+    if (dist > 2) continue;
+
+    const supportRow = r + supportRowDelta;
+    if (supportRow < 0 || supportRow > 7) continue;
+
+    for (const dc of [-1, 1]) {
+      const idx = toIndex(supportRow, c + dc);
+      if (idx >= 0 && (mine & B1(idx))) {
+        score += dist === 0 ? 6 : dist === 1 ? 5 : 3;
+        break;
+      }
+    }
+  }
+
+  return score;
+}
+
 function edgeMenPenalty(p: Position, side: 1 | -1): number {
   const men = side === 1 ? p.p1Men : p.p2Men;
   let penalty = 0;
@@ -139,6 +167,19 @@ function edgeMenPenalty(p: Position, side: 1 | -1): number {
   }
 
   return penalty;
+}
+
+function kingCentralization(p: Position, side: 1 | -1): number {
+  const kings = side === 1 ? p.p1Kings : p.p2Kings;
+  let score = 0;
+
+  for (const square of bits(kings)) {
+    const { r, c } = toRC(square);
+    const dist = Math.abs(r - 3.5) + Math.abs(c - 3.5);
+    score += Math.max(0, Math.round(8 - dist * 2));
+  }
+
+  return score;
 }
 
 function mobility(p: Position, side: 1 | -1): { men: number; king: number } {
@@ -228,19 +269,63 @@ function captureInfo(p: Position, side: 1 | -1): CaptureInfo {
   const view = p.side === side ? p : ({ ...p, side } as Position);
   const moves = generateMoves(view);
   if (!moves.length || moves[0].captured.length === 0) {
-    return { maxChain: 0, targets: 0 };
+    return { maxChain: 0, targets: 0, menMask: 0, kingMask: 0 };
   }
 
   let maxChain = 0;
   let capturedMask = 0;
+  let menMask = 0;
+  let kingMask = 0;
+  const enemyMen = side === 1 ? p.p2Men : p.p1Men;
+  const enemyKings = side === 1 ? p.p2Kings : p.p1Kings;
   for (const move of moves) {
     if (move.captured.length > maxChain) maxChain = move.captured.length;
     for (const square of move.captured) {
-      capturedMask = (capturedMask | B1(square)) >>> 0;
+      const bit = B1(square);
+      capturedMask = (capturedMask | bit) >>> 0;
+      if (enemyKings & bit) kingMask = (kingMask | bit) >>> 0;
+      else if (enemyMen & bit) menMask = (menMask | bit) >>> 0;
     }
   }
 
-  return { maxChain, targets: bitCount(capturedMask) };
+  return {
+    maxChain,
+    targets: bitCount(capturedMask),
+    menMask,
+    kingMask,
+  };
+}
+
+function shapeBalance(p: Position, side: 1 | -1): number {
+  const mine = side === 1 ? (p.p1Men | p.p1Kings) : (p.p2Men | p.p2Kings);
+  let left = 0;
+  let right = 0;
+
+  for (const square of bits(mine)) {
+    const { c } = toRC(square);
+    if (c <= 2) left++;
+    else if (c >= 5) right++;
+  }
+
+  return -Math.abs(left - right);
+}
+
+function exposedPiecesPenalty(p: Position, side: 1 | -1, enemyThreat: CaptureInfo): number {
+  const myMen = side === 1 ? p.p1Men : p.p2Men;
+  const myKings = side === 1 ? p.p1Kings : p.p2Kings;
+  const threatenedMen = bitCount(enemyThreat.menMask & myMen);
+  const threatenedKings = bitCount(enemyThreat.kingMask & myKings);
+  let penalty = threatenedMen * 38 + threatenedKings * 82;
+
+  if (threatenedMen > 0) {
+    for (const square of bits(enemyThreat.menMask & myMen)) {
+      const { r } = toRC(square);
+      const dist = side === 1 ? r : 7 - r;
+      if (dist <= 2) penalty += 16;
+    }
+  }
+
+  return penalty;
 }
 
 export function evaluate(p: Position): number {
@@ -287,7 +372,10 @@ export function evaluate(p: Position): number {
   score += W_BASE.center * (centerScore(p, p.side) - centerScore(p, opSide));
   score += 10 * (runnerLaneBonus(p, p.side) - runnerLaneBonus(p, opSide));
   score += 8 * (supportScore(p, p.side) - supportScore(p, opSide));
+  score += 12 * (defendedMenNearPromotion(p, p.side) - defendedMenNearPromotion(p, opSide));
   score += 6 * (edgeMenPenalty(p, opSide) - edgeMenPenalty(p, p.side));
+  score += 6 * (kingCentralization(p, p.side) - kingCentralization(p, opSide));
+  score += 4 * (shapeBalance(p, p.side) - shapeBalance(p, opSide));
 
   const myProm = promotionDistanceSum(p, p.side);
   const opProm = promotionDistanceSum(p, opSide);
@@ -300,6 +388,7 @@ export function evaluate(p: Position): number {
   if (totalPieces <= 10 || eg >= 0.35) {
     const myCap = captureInfo(p, p.side);
     const opCap = captureInfo(p, opSide);
+    score += exposedPiecesPenalty(p, opSide, myCap) - exposedPiecesPenalty(p, p.side, opCap);
     if (myCap.maxChain || opCap.maxChain) {
       let captureWeight = W_BASE.captureSwing;
       if (eg >= 0.7) captureWeight += 20;
