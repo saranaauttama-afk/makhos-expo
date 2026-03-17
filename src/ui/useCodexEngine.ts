@@ -11,6 +11,7 @@ import { TT } from '../coreCodex/search/tt';
 import { CancelToken, iterativeDeepening, SearchInfo } from '../coreCodex/search/alphabeta';
 import { Position } from '../coreCodex/position';
 import { Move } from '../coreCodex/movegen';
+import { lookupOpeningBook } from '../coreCodex/search/openingBook';
 
 export function useCodexEngine() {
   const [thinking, setThinking]   = useState(false);
@@ -34,6 +35,18 @@ export function useCodexEngine() {
     const token: CancelToken = { cancelled: false };
     cancelRef.current = token;
     setThinking(true);
+
+    // Opening book — instant reply for known opening positions
+    const bookHit = lookupOpeningBook(pos);
+    if (bookHit) {
+      return new Promise<Move | undefined>(resolve => {
+        // Small delay so "thinking" indicator flashes briefly (avoids jarring instant moves)
+        setTimeout(() => {
+          setThinking(false);
+          resolve(token.cancelled ? undefined : bookHit.move);
+        }, 120);
+      });
+    }
 
     return iterativeDeepening(
       pos, ms, ttRef.current,

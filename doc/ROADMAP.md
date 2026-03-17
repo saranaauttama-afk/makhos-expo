@@ -43,9 +43,8 @@
   เมื่อไม่มี TT hit ที่ deep node (depth ≥ 4) → ทำ shallow search depth-2 ก่อนเพื่อหา best move → move ordering ดีขึ้นมากใน deep nodes
   `File: src/coreCodex/search/alphabeta.ts`
 
-- [ ] **Opening book** *(ยาก)*
-  บันทึก opening ที่ดีของหมากไทย 10–15 ตาแรก → ไม่เสียเวลา search ช่วง opening เลย
-  `File: src/coreCodex/search/openingBook.ts` *(new)*
+- [x] **Opening book** — 533 entries (BFS self-play, MAX_PLY=10), O(1) Map lookup, wired into `think()` with 120 ms fake-think delay
+  `File: src/coreCodex/search/openingBook.ts`, `src/ui/useCodexEngine.ts`
 
 ### Speed / UX
 

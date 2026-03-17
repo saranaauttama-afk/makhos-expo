@@ -251,7 +251,7 @@ function solveNodeBudgeted(
 // onProgress(done, total) — optional callback for loading indicators.
 
 const SQUARES = 32;
-const BATCH   = 200; // positions per yield
+const BATCH   = 20; // positions per yield — keep UI frame budget small
 
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = [];
@@ -286,7 +286,10 @@ export async function precomputeEndgameTablebase(
     const hasP1 = (p1m + p1k) > 0;
     const hasP2 = (p2m + p2k) > 0;
     if (!hasP1 || !hasP2) continue;
-    if ((total <= 3) || (total <= 4 && men === 0)) configs.push([p1m, p1k, p2m, p2k]);
+    // Only precompute ≤3-piece positions — fast to solve, highest practical value.
+    // 4-king (total=4, men=0) positions are too numerous (71k+) and complex; they
+    // are handled on-demand by probeSmallEndgame with a 3 s budget instead.
+    if (total <= 3) configs.push([p1m, p1k, p2m, p2k]);
   }
 
   // Count total positions to enumerate (for progress reporting)
@@ -321,8 +324,8 @@ export async function precomputeEndgameTablebase(
 
         const pos: Position = { side, p1Men: p1Men >>> 0, p1Kings: p1Kings >>> 0, p2Men: p2Men >>> 0, p2Kings: p2Kings >>> 0, halfmoveClock: 0 };
 
-        // Warm up sharedMemo — result discarded, memo fills as side effect
-        solveNode(pos, rep0, new Set<string>());
+        // Warm up sharedMemo — 5 ms budget is plenty for ≤3-piece positions.
+        solveNodeBudgeted(pos, rep0, new Set<string>(), 0, Date.now() + 5);
 
         done++;
         if (done % BATCH === 0) {
