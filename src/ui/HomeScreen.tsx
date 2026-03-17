@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   label:            { fontSize: 12, fontWeight: '700', opacity: 0.45, textTransform: 'uppercase', letterSpacing: 1.2 },
   row:              { flexDirection: 'row', gap: 8 },
   choiceBtn:        { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 2, borderColor: '#ddd', alignItems: 'center' },
-  choiceBtnActive:  { borderColor: ACCENT, backgroundColor: ACCENT + '1a' },
+  choiceBtnActive:  { borderColor: ACCENT, backgroundColor: 'rgba(85,170,51,0.1)' },
   choiceText:       { fontSize: 14, fontWeight: '600', color: '#888' },
   choiceTextActive: { color: ACCENT },
   startBtn:         { marginTop: 4, backgroundColor: ACCENT, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 52 },

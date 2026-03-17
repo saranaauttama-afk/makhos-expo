@@ -314,9 +314,15 @@ export async function iterativeDeepening(
   if (isThreefoldRepetition(rep, rootHash))
     return { best: undefined, score: 0, nodes: 0, depth: 0 };
 
-  const eg = probeSmallEndgame(root, normHist);
-  if (eg) {
-    onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: eg.best ? [eg.best] : [] });
+  // Cap probe so it never eats into the search budget.
+  // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
+  const probeMs = Math.min(500, Math.floor(timeMs * 0.3));
+  const eg = probeSmallEndgame(root, normHist, probeMs);
+  // Only shortcut when we have an actual move — draw positions at the depth
+  // limit store bestMoveKey = NO_MOVE_KEY so eg.best would be undefined.
+  // Fall through to regular search so the engine still picks a legal move.
+  if (eg?.best) {
+    onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
     return { best: eg.best, score: eg.score, nodes: 0, depth: eg.dtm };
   }
 
@@ -407,6 +413,14 @@ export async function iterativeDeepening(
     const newBestKey = result.move ? key(result.move) : -1;
     if (newBestKey === lastBestKey) { stableDepths++; } else { stableDepths = 0; lastBestKey = newBestKey; }
     if (stableDepths >= 3 && Date.now() > startTime + timeMs * 0.5) break;
+  }
+
+  // Safety fallback: if the search somehow produced no best move (e.g. time
+  // expired before depth-1 completed, or threefold detected mid-search) but
+  // legal moves exist, return the first one so the game never stalls.
+  if (!best) {
+    const fallback = generateMoves(root);
+    if (fallback.length) best = fallback[0];
   }
 
   return { best, score: bestScore, nodes, depth: reached };

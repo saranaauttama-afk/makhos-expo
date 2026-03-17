@@ -12,6 +12,11 @@ import { CancelToken, iterativeDeepening, SearchInfo } from '../coreCodex/search
 import { Position } from '../coreCodex/position';
 import { Move } from '../coreCodex/movegen';
 import { lookupOpeningBook } from '../coreCodex/search/openingBook';
+import { Difficulty } from './types';
+
+// Probability of skipping the book to add opening variety.
+// Easy: high skip → more random; Hard: low skip → mostly follows book.
+const BOOK_SKIP_RATE: Record<Difficulty, number> = { easy: 0.7, medium: 0.35, hard: 0.15 };
 
 export function useCodexEngine() {
   const [thinking, setThinking]   = useState(false);
@@ -29,6 +34,7 @@ export function useCodexEngine() {
     ms = 1800,
     historyHashes: number[] = [],
     onInfo?: (info: SearchInfo) => void,
+    difficulty: Difficulty = 'medium',
   ): Promise<Move | undefined> => {
     cancel();
 
@@ -36,11 +42,12 @@ export function useCodexEngine() {
     cancelRef.current = token;
     setThinking(true);
 
-    // Opening book — instant reply for known opening positions
+    // Opening book — instant reply for known opening positions.
+    // Randomly skip to create variety (higher skip rate for easier levels).
     const bookHit = lookupOpeningBook(pos);
-    if (bookHit) {
+    const skipBook = Math.random() < BOOK_SKIP_RATE[difficulty];
+    if (bookHit && !skipBook) {
       return new Promise<Move | undefined>(resolve => {
-        // Small delay so "thinking" indicator flashes briefly (avoids jarring instant moves)
         setTimeout(() => {
           setThinking(false);
           resolve(token.cancelled ? undefined : bookHit.move);

@@ -51,11 +51,11 @@ const KING_PST   = new Int16Array(32);
 })();
 
 // ── Material ──────────────────────────────────────────────────────────────────
-function materialScore(p: Position): number {
+function materialScore(p: Position, kingVal: number): number {
   const s = p.side;
   return (
     VAL_MAN  * (bitCount(s === 1 ? p.p1Men   : p.p2Men)   - bitCount(s === 1 ? p.p2Men   : p.p1Men)) +
-    VAL_KING * (bitCount(s === 1 ? p.p1Kings : p.p2Kings) - bitCount(s === 1 ? p.p2Kings : p.p1Kings))
+    kingVal  * (bitCount(s === 1 ? p.p1Kings : p.p2Kings) - bitCount(s === 1 ? p.p2Kings : p.p1Kings))
   );
 }
 
@@ -101,7 +101,7 @@ function mobilityScore(p: Position): number {
     for (const st of STEPS[sq])
       if (!(occ & B1(st.to))) op++;
 
-  return 3 * (my - op);
+  return 5 * (my - op);
 }
 
 // ── Back rank guard ───────────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ function simplificationBonus(p: Position): number {
   const myN  = bitCount(side === 1 ? p.p1Men | p.p1Kings : p.p2Men | p.p2Kings);
   const opN  = bitCount(side === 1 ? p.p2Men | p.p2Kings : p.p1Men | p.p1Kings);
   if (myN <= opN) return 0;
-  return (START_TOTAL - (myN + opN)) * 2;
+  return (START_TOTAL - (myN + opN)) * 3;
 }
 
 // ── Main evaluation ───────────────────────────────────────────────────────────
@@ -192,9 +192,11 @@ export function evaluate(p: Position): number {
   const total = bitCount(p.p1Men | p.p1Kings | p.p2Men | p.p2Kings);
   // eg: 0 = opening/midgame (16 pieces), 1 = pure endgame (≤8 pieces)
   const eg = total <= 8 ? (8 - total) / 8 : 0;
+  // King value scales 280 (opening) → 380 (pure endgame)
+  const kingVal = (VAL_KING + eg * 100) | 0;
 
   let score = 0;
-  score += materialScore(p);
+  score += materialScore(p, kingVal);
   score += psqtScore(p);
   score += mobilityScore(p);
   score += protectedMenBonus(p);

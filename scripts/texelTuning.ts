@@ -22,10 +22,10 @@ import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreCodex/s
 import { hashPosition } from '../src/coreCodex/search/zobrist';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const NUM_GAMES  = 60;   // self-play games to generate training data
+const NUM_GAMES  = 300;  // self-play games to generate training data
 const THINK_MS   = 250;  // ms per move during self-play (low = fast, less accurate)
 const MAX_PLIES  = 150;  // draw if game exceeds this
-const ITERS      = 80;   // coordinate descent iterations
+const ITERS      = 120;  // coordinate descent iterations
 const STEP       = 2;    // initial parameter adjustment step (cp)
 const MIN_STEP   = 1;    // stop when step shrinks below this
 
@@ -49,11 +49,11 @@ const defaultParams: EvalParams = {
   colBonus:   [0,  1,  3,  6,  6, 3, 1, 0],
   kingCentre: 8,
   valMan:     100,
-  valKing:    280,
-  mobilityW:  3,
+  valKing:    280,  // base king value (endgame adds 100 via phase factor)
+  mobilityW:  5,
   backRank:   5,
-  protected:  5,
-  simplify:   8,
+  protected:  9,
+  simplify:   3,
   kegDistW:   3,
   kegMaxDist: 12,
 };
@@ -79,10 +79,13 @@ function evalWithParams(pos: Position, ep: EvalParams): number {
   const { P1, P2, K } = buildPST(ep);
   const s = pos.side;
 
-  // material
+  // material (phase-aware king value: scales from valKing in opening to valKing+100 in endgame)
+  const total = bitCount(pos.p1Men | pos.p1Kings | pos.p2Men | pos.p2Kings);
+  const eg = total <= 8 ? (8 - total) / 8 : 0;
+  const kingVal = (ep.valKing + eg * 100) | 0;
   let score =
-    ep.valMan  * (bitCount(s === 1 ? pos.p1Men   : pos.p2Men)   - bitCount(s === 1 ? pos.p2Men   : pos.p1Men)) +
-    ep.valKing * (bitCount(s === 1 ? pos.p1Kings : pos.p2Kings) - bitCount(s === 1 ? pos.p2Kings : pos.p1Kings));
+    ep.valMan * (bitCount(s === 1 ? pos.p1Men   : pos.p2Men)   - bitCount(s === 1 ? pos.p2Men   : pos.p1Men)) +
+    kingVal   * (bitCount(s === 1 ? pos.p1Kings : pos.p2Kings) - bitCount(s === 1 ? pos.p2Kings : pos.p1Kings));
 
   // PSQT
   const myMPST = s === 1 ? P1 : P2, opMPST = s === 1 ? P2 : P1;
@@ -142,7 +145,6 @@ function evalWithParams(pos: Position, ep: EvalParams): number {
     }
 
   // simplification
-  const total = bitCount(pos.p1Men | pos.p1Kings | pos.p2Men | pos.p2Kings);
   const myN = bitCount(s === 1 ? pos.p1Men | pos.p1Kings : pos.p2Men | pos.p2Kings);
   const opN = bitCount(s === 1 ? pos.p2Men | pos.p2Kings : pos.p1Men | pos.p1Kings);
   if (myN > opN) score += (16 - total) * ep.simplify;
@@ -151,7 +153,6 @@ function evalWithParams(pos: Position, ep: EvalParams): number {
   const myKings = s === 1 ? pos.p1Kings : pos.p2Kings;
   const opMen2  = s === 1 ? pos.p2Men   : pos.p1Men;
   if (myKings && opMen2 && myN > opN) {
-    const eg = total <= 8 ? (8 - total) / 8 : 0;
     if (eg > 0) {
       let keg = 0;
       for (const kSq of bits(myKings)) {

@@ -19,9 +19,9 @@ import { TT } from '../src/coreCodex/search/tt';
 // ── Config ────────────────────────────────────────────────────────────────────
 // AI plays as P2 (side = -1) in the default app setup.
 const AI_SIDE      = -1 as const;
-const MAX_PLY      = 10;   // plies from start (5 rounds each)
-const TOP_N        = 4;    // opponent's top-N responses to cover (captures + first quiet)
-const AI_THINK_MS  = 1200; // ms for AI's book move — use high value for quality
+const MAX_PLY      = 14;   // plies from start (7 rounds each)
+const TOP_N        = 3;    // opponent's top-N responses to cover (captures + first quiet)
+const AI_THINK_MS  = 1000; // ms for AI's book move — use high value for quality
 
 // ── BFS ──────────────────────────────────────────────────────────────────────
 interface QueueItem { pos: ReturnType<typeof initialPosition>; ply: number; }

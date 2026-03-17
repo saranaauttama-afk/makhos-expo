@@ -9,7 +9,7 @@ import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
 import { Difficulty, GameConfig } from './types';
 
-const THINK_MS: Record<Difficulty, number> = { easy: 300, medium: 800, hard: 1500 };
+const THINK_MS: Record<Difficulty, number> = { easy: 300, medium: 1000, hard: 2000 };
 const ALGORITHM_NAME = 'Codex v2';
 
 function posKey(p: Position) {
@@ -98,7 +98,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     const posSnapshot  = pos;
     const histSnapshot = hashHistory;
 
-    think(posSnapshot, thinkMs, histSnapshot).then(best => {
+    think(posSnapshot, thinkMs, histSnapshot, undefined, difficulty).then(best => {
       if (pendingRef.current !== k) return;
       const move = best ?? generateMoves(posSnapshot)[0];
       if (move) commitPosition(applyMove(posSnapshot, move));
