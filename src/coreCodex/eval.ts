@@ -31,10 +31,11 @@ const KING_PST   = new Int16Array(32);
   // Row advancement bonus for P1 men:
   //   row 0 = about to promote (won't have a man there, included for completeness)
   //   row 7 = P1's starting back rank
-  const rowBonus = [42, 34, 24, 15, 8, 4, 1, 0]; // index = row 0..7
+  // Texel-tuned (300 games, 18k positions): row 1 near-promotion gets big bonus
+  const rowBonus = [42, 80, 0, 20, 8, 0, 0, 0]; // index = row 0..7
 
-  // Column safety: edges (0, 7) offer fewer escape routes; centre (3, 4) best
-  const colBonus = [0, 1, 3, 6, 6, 3, 1, 0]; // index = col 0..7
+  // Texel-tuned: col 2/5 are structurally strong; edges modestly rewarded
+  const colBonus = [11, 28, 51, 20, 24, 29, 12, 0]; // index = col 0..7
 
   for (let sq = 0; sq < 32; sq++) {
     const { r, c } = toRC(sq);
@@ -101,7 +102,7 @@ function mobilityScore(p: Position): number {
     for (const st of STEPS[sq])
       if (!(occ & B1(st.to))) op++;
 
-  return 5 * (my - op);
+  return 1 * (my - op); // Texel-tuned: 5→1
 }
 
 // ── Back rank guard ───────────────────────────────────────────────────────────
@@ -184,7 +185,7 @@ function simplificationBonus(p: Position): number {
   const myN  = bitCount(side === 1 ? p.p1Men | p.p1Kings : p.p2Men | p.p2Kings);
   const opN  = bitCount(side === 1 ? p.p2Men | p.p2Kings : p.p1Men | p.p1Kings);
   if (myN <= opN) return 0;
-  return (START_TOTAL - (myN + opN)) * 3;
+  return (START_TOTAL - (myN + opN)) * 6; // Texel-tuned: 3→6
 }
 
 // ── Main evaluation ───────────────────────────────────────────────────────────
@@ -199,10 +200,10 @@ export function evaluate(p: Position): number {
   score += materialScore(p, kingVal);
   score += psqtScore(p);
   score += mobilityScore(p);
-  score += protectedMenBonus(p);
-  score += backRankGuard(p)      * (1 - eg);  // less critical in endgame
+  // protectedMenBonus: Texel tuning found weight 0 — omitted
+  score += backRankGuard(p) * (1 - eg); // less critical in endgame
   score += simplificationBonus(p);
-  if (eg > 0) score += kingEndgameScore(p) * eg; // hunt enemy men in endgame
+  // kingEndgameScore: Texel tuning found kegDistW=0 — omitted
 
   return score | 0;
 }
