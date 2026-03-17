@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HumanVsCodexArenaScreen from './src/ui/HumanVsCodexArenaScreen';
+import { precomputeEndgameTablebase } from './src/coreCodex/search/endgameTablebase';
 
 type ErrorBoundaryState = {
   error: Error | null;
@@ -39,6 +40,10 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBounda
 }
 
 export default function App() {
+  // Warm up the endgame tablebase in the background so probes during a game
+  // are instant Map lookups instead of on-the-fly retrograde analysis.
+  useEffect(() => { precomputeEndgameTablebase(); }, []);
+
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
       <ErrorBoundary>

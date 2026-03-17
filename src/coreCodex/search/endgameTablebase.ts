@@ -1,4 +1,4 @@
-import { bitCount } from '../bitboards';
+import { B1, bitCount } from '../bitboards';
 import { applyMove, generateMoves, Move } from '../movegen';
 import { isDrawByInactivity, Position } from '../position';
 import {
@@ -29,6 +29,10 @@ export interface EndgameProbe {
 const TABLEBASE_WIN = 500_000;
 const NO_MOVE_KEY = -1;
 const sharedMemo = new Map<string, SolveResult>();
+
+// Precompute status — true once background precomputation finishes
+let _tablebaseReady = false;
+export function isEndgameTablebaseReady(): boolean { return _tablebaseReady; }
 
 function keyMove(move: Move) {
   return (move.from << 5) | move.to;
@@ -141,7 +145,15 @@ function findBestMove(pos: Position, bestMoveKey: number): Move | undefined {
   return generateMoves(pos).find((move) => move.from === from && move.to === to);
 }
 
-export function probeSmallEndgame(pos: Position, historyHashes: number[] = []): EndgameProbe | undefined {
+// ── Root-level probe (called once per think(), not in search hot path) ────────
+// maxMs: give up and return undefined if computation exceeds this budget.
+// After background precompute finishes the budget is irrelevant — every hit is
+// an instant Map.get() on sharedMemo.
+export function probeSmallEndgame(
+  pos: Position,
+  historyHashes: number[] = [],
+  maxMs = 3000,
+): EndgameProbe | undefined {
   if (!canProbe(pos)) return undefined;
 
   const hash = hashPosition(pos);
@@ -151,13 +163,179 @@ export function probeSmallEndgame(pos: Position, historyHashes: number[] = []): 
     repetitionCounts.set(hash, 1);
   }
 
-  const result = solveNode(pos, repetitionCounts, new Set<string>());
+  // Fast path: if precompute already cached this exact state, return instantly
+  const repCount = Math.min(3, getRepetitionCount(repetitionCounts, hash));
+  const fastKey = stateKey(pos, repCount);
+  const cached = sharedMemo.get(fastKey);
+  if (cached) {
+    return { score: scoreFromSolve(cached), best: findBestMove(pos, cached.bestMoveKey), dtm: cached.dtm, exact: true };
+  }
+
+  // Slow path: compute with time budget so we never hang mid-game
+  const deadline = Date.now() + maxMs;
+  const result = solveNodeBudgeted(pos, repetitionCounts, new Set<string>(), 0, deadline);
+  if (!result) return undefined; // budget exceeded
+
   return {
     score: scoreFromSolve(result),
     best: findBestMove(pos, result.bestMoveKey),
     dtm: result.dtm,
     exact: true,
   };
+}
+
+// solveNode variant that aborts when the deadline fires.
+// Returns undefined if time ran out (caller falls through to regular search).
+function solveNodeBudgeted(
+  pos: Position,
+  repetitionCounts: RepetitionCounts,
+  visiting: Set<string>,
+  depth: number,
+  deadline: number,
+): SolveResult | undefined {
+  if (Date.now() > deadline) return undefined;
+  if (depth >= SOLVE_MAX_DEPTH) return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+
+  const hash = hashPosition(pos);
+  const repCount = Math.min(3, getRepetitionCount(repetitionCounts, hash));
+  const key = stateKey(pos, repCount);
+
+  if (isDrawByInactivity(pos) || isThreefoldRepetition(repetitionCounts, hash))
+    return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+
+  const cached2 = sharedMemo.get(key);
+  if (cached2) return cached2;
+  if (visiting.has(key)) return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+
+  const moves = generateMoves(pos);
+  if (moves.length === 0) {
+    const terminal: SolveResult = { outcome: -1, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    sharedMemo.set(key, terminal);
+    return terminal;
+  }
+
+  visiting.add(key);
+  let best: SolveResult | undefined;
+
+  for (const move of moves) {
+    const child = applyMove(pos, move);
+    const childHash = hashPosition(child);
+    pushRepetition(repetitionCounts, childHash);
+    const childResult = solveNodeBudgeted(child, repetitionCounts, visiting, depth + 1, deadline);
+    popRepetition(repetitionCounts, childHash);
+
+    if (!childResult) { visiting.delete(key); return undefined; } // budget blown
+
+    const candidate: SolveResult = {
+      outcome: (-childResult.outcome) as Outcome,
+      dtm: childResult.dtm + 1,
+      bestMoveKey: keyMove(move),
+    };
+    best = chooseBetter(best, candidate);
+    if (best.outcome === 1 && best.dtm === 1) break;
+  }
+
+  visiting.delete(key);
+  const resolved = best ?? { outcome: 0 as Outcome, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+  sharedMemo.set(key, resolved);
+  return resolved;
+}
+
+// ── Background precomputation ─────────────────────────────────────────────────
+// Enumerate all positions satisfying canProbe() and warm up sharedMemo so that
+// every probe during a game is an instant Map.get().
+//
+// Runs as an async background task — yields every BATCH positions so the JS
+// event loop stays responsive.  Typical runtime: 1–3 s on a mid-range device.
+//
+// onProgress(done, total) — optional callback for loading indicators.
+
+const SQUARES = 32;
+const BATCH   = 200; // positions per yield
+
+function combinations(n: number, k: number): number[][] {
+  const result: number[][] = [];
+  const combo: number[] = [];
+  function pick(start: number) {
+    if (combo.length === k) { result.push([...combo]); return; }
+    for (let i = start; i <= n - (k - combo.length); i++) {
+      combo.push(i); pick(i + 1); combo.pop();
+    }
+  }
+  pick(0);
+  return result;
+}
+
+export async function precomputeEndgameTablebase(
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  if (_tablebaseReady) return;
+
+  // Piece configurations satisfying canProbe():
+  //   (a) totalPieces ≤ 3, both sides have ≥ 1 piece
+  //   (b) totalPieces ≤ 4, totalMen = 0 (kings only)
+  type Cfg = [p1m: number, p1k: number, p2m: number, p2k: number];
+  const configs: Cfg[] = [];
+
+  for (let p1m = 0; p1m <= 3; p1m++)
+  for (let p1k = 0; p1k <= 3; p1k++)
+  for (let p2m = 0; p2m <= 3; p2m++)
+  for (let p2k = 0; p2k <= 3; p2k++) {
+    const total = p1m + p1k + p2m + p2k;
+    const men   = p1m + p2m;
+    const hasP1 = (p1m + p1k) > 0;
+    const hasP2 = (p2m + p2k) > 0;
+    if (!hasP1 || !hasP2) continue;
+    if ((total <= 3) || (total <= 4 && men === 0)) configs.push([p1m, p1k, p2m, p2k]);
+  }
+
+  // Count total positions to enumerate (for progress reporting)
+  function countPositions(cfg: Cfg): number {
+    const [p1m, p1k, p2m, p2k] = cfg;
+    const n = p1m + p1k + p2m + p2k;
+    if (n > SQUARES) return 0;
+    // C(32, n) * 2 sides (we'll enumerate per-side inside the loop)
+    let c = 1;
+    for (let i = 0; i < n; i++) c = c * (SQUARES - i) / (i + 1);
+    return Math.round(c) * 2;
+  }
+
+  const totalEstimate = configs.reduce((s, cfg) => s + countPositions(cfg), 0);
+  let done = 0;
+
+  const rep0 = buildRepetitionCounts([]);
+
+  for (const [p1m, p1k, p2m, p2k] of configs) {
+    const n = p1m + p1k + p2m + p2k;
+    const allCombos = combinations(SQUARES, n);
+
+    for (const squares of allCombos) {
+      for (const side of [1, -1] as const) {
+        // Assign squares: first p1m to P1 men, next p1k to P1 kings, etc.
+        let idx = 0;
+        let p1Men = 0, p1Kings = 0, p2Men = 0, p2Kings = 0;
+        for (let i = 0; i < p1m; i++) p1Men   |= B1(squares[idx++]);
+        for (let i = 0; i < p1k; i++) p1Kings |= B1(squares[idx++]);
+        for (let i = 0; i < p2m; i++) p2Men   |= B1(squares[idx++]);
+        for (let i = 0; i < p2k; i++) p2Kings |= B1(squares[idx++]);
+
+        const pos: Position = { side, p1Men: p1Men >>> 0, p1Kings: p1Kings >>> 0, p2Men: p2Men >>> 0, p2Kings: p2Kings >>> 0, halfmoveClock: 0 };
+
+        // Warm up sharedMemo — result discarded, memo fills as side effect
+        solveNode(pos, rep0, new Set<string>());
+
+        done++;
+        if (done % BATCH === 0) {
+          onProgress?.(done, totalEstimate);
+          // Yield to event loop so UI stays responsive
+          await new Promise<void>(r => setTimeout(r, 0));
+        }
+      }
+    }
+  }
+
+  _tablebaseReady = true;
+  onProgress?.(done, done);
 }
 
 export function probeSmallEndgameFromCounts(pos: Position, repetitionCounts: RepetitionCounts): EndgameProbe | undefined {
