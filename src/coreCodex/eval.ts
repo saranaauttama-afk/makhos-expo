@@ -164,14 +164,14 @@ function protectedMenBonus(p: Position): number {
     for (const st of STEPS[sq]) {
       if (side === 1  && (st.dir === 'UL' || st.dir === 'UR')) continue; // skip forward
       if (side === -1 && (st.dir === 'DL' || st.dir === 'DR')) continue;
-      if (myAll & B1(st.to)) { score += 5; break; } // friendly piece behind → protected
+      if (myAll & B1(st.to)) { score += 9; break; } // friendly piece behind → protected
     }
   }
   for (const sq of bits(opMen)) {
     for (const st of STEPS[sq]) {
       if (side === 1  && (st.dir === 'DL' || st.dir === 'DR')) continue; // opponent's behind
       if (side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
-      if (opAll & B1(st.to)) { score -= 5; break; }
+      if (opAll & B1(st.to)) { score -= 9; break; }
     }
   }
   return score;
@@ -184,7 +184,7 @@ function simplificationBonus(p: Position): number {
   const myN  = bitCount(side === 1 ? p.p1Men | p.p1Kings : p.p2Men | p.p2Kings);
   const opN  = bitCount(side === 1 ? p.p2Men | p.p2Kings : p.p1Men | p.p1Kings);
   if (myN <= opN) return 0;
-  return (START_TOTAL - (myN + opN)) * 8;
+  return (START_TOTAL - (myN + opN)) * 2;
 }
 
 // ── Main evaluation ───────────────────────────────────────────────────────────
