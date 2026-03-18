@@ -23,6 +23,11 @@ export interface SearchResult { best?: Move; score: number; nodes: number; depth
 export interface CancelToken  { cancelled: boolean; }
 type OnInfo = (info: SearchInfo) => void;
 
+// Eval override — allows A/B testing without changing all call sites
+let _eval: (p: Position) => number = evaluate;
+export function setEvalFn(fn: (p: Position) => number): void { _eval = fn; }
+export function resetEvalFn(): void { _eval = evaluate; }
+
 const INF        = 1_000_000;
 const MAX_PLY    = 64;
 const TC_MASK    = 511; // check time every 512 nodes
@@ -92,11 +97,11 @@ function quiesce(
   pos: Position, alpha: number, beta: number,
   deadline: number, acc: {n:number}, ply: number
 ): number {
-  if (stop.flag) return evaluate(pos);
+  if (stop.flag) return _eval(pos);
   if (isDrawByInactivity(pos)) return 0;
-  if (ply >= MAX_PLY) return evaluate(pos);
+  if (ply >= MAX_PLY) return _eval(pos);
 
-  const stand = evaluate(pos);
+  const stand = _eval(pos);
   if (stand >= beta) return beta;
   if (stand + 300 < alpha) return alpha; // delta pruning
   if (stand > alpha) alpha = stand;
@@ -129,9 +134,9 @@ function negamax(
   // in king endgames, causing catastrophic slowness (226s+ per move).
   // The root-level probe in iterativeDeepening handles endgame positions.
 
-  if (ply >= MAX_PLY) return evaluate(pos);
-  if (stop.flag) return evaluate(pos);
-  if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) { stop.flag = true; return evaluate(pos); }
+  if (ply >= MAX_PLY) return _eval(pos);
+  if (stop.flag) return _eval(pos);
+  if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) { stop.flag = true; return _eval(pos); }
   if (depth <= 0) return quiesce(pos, alpha, beta, deadline, acc, ply);
 
   // TT probe
@@ -155,7 +160,7 @@ function negamax(
   if (ply > 0 && getRepetitionCount(rep, h) <= 1) {
 
     if (isQuiet) {
-      const se = evaluate(pos);
+      const se = _eval(pos);
 
       // Reverse Futility Pruning (Static Null Move):
       // If static eval is way above beta even after subtracting a depth-scaled
