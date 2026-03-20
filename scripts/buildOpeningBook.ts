@@ -10,11 +10,11 @@
 //
 // When done, paste the printed BOOK constant into openingBook.ts.
 
-import { initialPosition } from '../src/coreCodex/position';
-import { generateMoves, applyMove } from '../src/coreCodex/movegen';
-import { hashPosition } from '../src/coreCodex/search/zobrist';
-import { iterativeDeepening } from '../src/coreCodex/search/alphabeta';
-import { TT } from '../src/coreCodex/search/tt';
+import { initialPosition } from '../src/coreClaude/position';
+import { generateMoves, applyMove } from '../src/coreClaude/movegen';
+import { hashPosition } from '../src/coreClaude/search/zobrist';
+import { iterativeDeepening } from '../src/coreClaude/search/alphabeta';
+import { TT } from '../src/coreClaude/search/tt';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 // AI plays as P2 (side = -1) in the default app setup.
@@ -84,7 +84,7 @@ async function buildBook() {
   console.log(`\n\nDone — ${book.size} entries in ${elapsed}s\n`);
 
   // ── Output TypeScript ─────────────────────────────────────────────────────
-  console.log('// Paste this into src/coreCodex/search/openingBook.ts');
+  console.log('// Paste this into src/coreClaude/search/openingBook.ts');
   console.log('// [hash, from, to]');
   console.log('const BOOK: [number, number, number][] = [');
   for (const [hash, move] of book) {

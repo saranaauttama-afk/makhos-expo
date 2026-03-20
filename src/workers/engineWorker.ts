@@ -11,10 +11,10 @@
 //   { type: 'info',   gen, depth, score, nodes, pv }
 //   { type: 'result', gen, best, score, nodes, depth }
 
-import { iterativeDeepening, CancelToken } from '../coreCodex/search/alphabeta';
-import { TT } from '../coreCodex/search/tt';
-import { Position } from '../coreCodex/position';
-import { Move } from '../coreCodex/movegen';
+import { iterativeDeepening, CancelToken } from '../coreClaude/search/alphabeta';
+import { TT } from '../coreClaude/search/tt';
+import { Position } from '../coreClaude/position';
+import { Move } from '../coreClaude/movegen';
 
 // One TT instance lives for the entire worker lifetime (reused across searches)
 const tt = new TT();

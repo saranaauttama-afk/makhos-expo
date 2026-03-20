@@ -33,24 +33,24 @@
 
 - [x] **Countermove heuristic**
   จำ move ที่ทำให้เกิด beta cutoff เป็น response ต่อ move ก่อนหน้า → move ordering ดีขึ้น ~10% nodes
-  `File: src/coreCodex/search/alphabeta.ts`
+  `File: src/coreClaude/search/alphabeta.ts`
 
 - [x] **Protected men bonus**
   ให้ bonus หมากที่มีหมากฝ่ายเดียวกันคุ้มกัน (friendly piece อยู่ทิศ "behind") → AI เล่นหมากหมู่ดีขึ้น
-  `File: src/coreCodex/eval.ts`
+  `File: src/coreClaude/eval.ts`
 
 - [x] **Internal Iterative Deepening (IID)**
   เมื่อไม่มี TT hit ที่ deep node (depth ≥ 4) → ทำ shallow search depth-2 ก่อนเพื่อหา best move → move ordering ดีขึ้นมากใน deep nodes
-  `File: src/coreCodex/search/alphabeta.ts`
+  `File: src/coreClaude/search/alphabeta.ts`
 
 - [x] **Opening book** — 533 entries (BFS self-play, MAX_PLY=10), O(1) Map lookup, wired into `think()` with 120 ms fake-think delay
-  `File: src/coreCodex/search/openingBook.ts`, `src/ui/useCodexEngine.ts`
+  `File: src/coreClaude/search/openingBook.ts`, `src/ui/useCodexEngine.ts`
 
 ### Speed / UX
 
 - [x] **Adaptive time management**
   หยุด search เร็วขึ้นเมื่อ best move เดิม 3 depth ติดต่อกัน + ใช้เวลา ≥50% → ประหยัดเวลาในตำแหน่งที่ชัดเจน
-  `File: src/coreCodex/search/alphabeta.ts`
+  `File: src/coreClaude/search/alphabeta.ts`
 
 - [x] **Web Worker**
   Engine ย้ายไปรันใน Worker thread แยก → UI ไม่กระตุกเลยระหว่าง AI คิด; มี fallback กลับ async main-thread สำหรับ Expo Go

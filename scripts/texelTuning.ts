@@ -13,13 +13,13 @@
 //
 // Typical runtime: ~5–15 min (depends on NUM_GAMES and ITERS).
 
-import { applyMove, generateMoves, Move } from '../src/coreCodex/movegen';
-import { B1, bitCount, bits, STEPS, toRC } from '../src/coreCodex/bitboards';
-import { initialPosition, isDrawByInactivity, Position } from '../src/coreCodex/position';
-import { iterativeDeepening } from '../src/coreCodex/search/alphabeta';
-import { TT } from '../src/coreCodex/search/tt';
-import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreCodex/search/repetition';
-import { hashPosition } from '../src/coreCodex/search/zobrist';
+import { applyMove, generateMoves, Move } from '../src/coreClaude/movegen';
+import { B1, bitCount, bits, STEPS, toRC } from '../src/coreClaude/bitboards';
+import { initialPosition, isDrawByInactivity, Position } from '../src/coreClaude/position';
+import { iterativeDeepening } from '../src/coreClaude/search/alphabeta';
+import { TT } from '../src/coreClaude/search/tt';
+import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreClaude/search/repetition';
+import { hashPosition } from '../src/coreClaude/search/zobrist';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const NUM_GAMES  = 300;  // self-play games to generate training data
@@ -318,7 +318,7 @@ async function main() {
   console.log(`  Base  MSE: ${baseMSE.toFixed(6)}`);
   console.log(`  Tuned MSE: ${tunedMSE.toFixed(6)}  (${improvement}% improvement)`);
 
-  console.log('\n[3/3] Results — paste into src/coreCodex/eval.ts:\n');
+  console.log('\n[3/3] Results — paste into src/coreClaude/eval.ts:\n');
   console.log(`  const rowBonus = [${tuned.rowBonus.join(', ')}];`);
   console.log(`  const colBonus = [${tuned.colBonus.join(', ')}];`);
   console.log(`  kingCentre max = ${tuned.kingCentre}`);

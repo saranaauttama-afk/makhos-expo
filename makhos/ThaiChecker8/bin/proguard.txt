@@ -1,0 +1,22 @@
+# view AndroidManifest.xml #generated:43
+-keep class com.apptracker.android.module.AppModuleActivity { <init>(...); }
+
+# view AndroidManifest.xml #generated:36
+-keep class com.bheugyiqywscgscae.ReEngagement { <init>(...); }
+
+# view AndroidManifest.xml #generated:35
+-keep class com.bheugyiqywscgscae.ReEngagementService { <init>(...); }
+
+# view AndroidManifest.xml #generated:37
+-keep class com.duckprog.makhos.BootReceiver { <init>(...); }
+
+# view AndroidManifest.xml #generated:22
+-keep class com.duckprog.makhos.MainActivity { <init>(...); }
+
+# view AndroidManifest.xml #generated:27
+-keep class com.duckprog.makhos.MenuActivity { <init>(...); }
+
+# view res/layout/activity_main.xml #generated:6
+# view res/layout/activity_menu.xml #generated:6
+-keep class org.andengine.opengl.view.RenderSurfaceView { <init>(...); }
+

@@ -3,13 +3,13 @@
 // Run with:
 //   npx tsx --tsconfig tsconfig.test.json scripts/matchup.ts
 
-import { iterativeDeepening } from '../src/coreCodex/search/alphabeta';
-import { TT } from '../src/coreCodex/search/tt';
-import { generateMoves, applyMove, Move } from '../src/coreCodex/movegen';
-import { initialPosition, isDrawByInactivity, Position } from '../src/coreCodex/position';
-import { hashPosition } from '../src/coreCodex/search/zobrist';
-import { lookupOpeningBook } from '../src/coreCodex/search/openingBook';
-import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreCodex/search/repetition';
+import { iterativeDeepening } from '../src/coreClaude/search/alphabeta';
+import { TT } from '../src/coreClaude/search/tt';
+import { generateMoves, applyMove, Move } from '../src/coreClaude/movegen';
+import { initialPosition, isDrawByInactivity, Position } from '../src/coreClaude/position';
+import { hashPosition } from '../src/coreClaude/search/zobrist';
+import { lookupOpeningBook } from '../src/coreClaude/search/openingBook';
+import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreClaude/search/repetition';
 
 const THINK_MS  = 600;   // ms per move (same budget for both)
 const NUM_GAMES = 10;    // play N games, alternating who goes first

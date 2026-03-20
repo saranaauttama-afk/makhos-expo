@@ -3,13 +3,13 @@
 // Run with:
 //   npx tsx --tsconfig tsconfig.test.json scripts/evalAB.ts
 
-import { iterativeDeepening, setEvalFn, resetEvalFn } from '../src/coreCodex/search/alphabeta';
-import { TT } from '../src/coreCodex/search/tt';
-import { generateMoves, applyMove, Move } from '../src/coreCodex/movegen';
-import { initialPosition, isDrawByInactivity, Position } from '../src/coreCodex/position';
-import { hashPosition } from '../src/coreCodex/search/zobrist';
-import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreCodex/search/repetition';
-import { B1, BB, bitCount, bits, STEPS, toRC } from '../src/coreCodex/bitboards';
+import { iterativeDeepening, setEvalFn, resetEvalFn } from '../src/coreClaude/search/alphabeta';
+import { TT } from '../src/coreClaude/search/tt';
+import { generateMoves, applyMove, Move } from '../src/coreClaude/movegen';
+import { initialPosition, isDrawByInactivity, Position } from '../src/coreClaude/position';
+import { hashPosition } from '../src/coreClaude/search/zobrist';
+import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreClaude/search/repetition';
+import { B1, BB, bitCount, bits, STEPS, toRC } from '../src/coreClaude/bitboards';
 
 const THINK_MS  = 600;
 const NUM_GAMES = 20;

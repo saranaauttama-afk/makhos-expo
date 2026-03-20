@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Alert, Button, Text, View } from 'react-native';
-import { applyMove, generateMoves, Move } from '../coreCodex/movegen';
-import { initialPosition, isDrawByInactivity, Position } from '../coreCodex/position';
-import { buildRepetitionCounts, isThreefoldRepetition } from '../coreCodex/search/repetition';
-import { hashPosition } from '../coreCodex/search/zobrist';
+import { applyMove, generateMoves, Move } from '../coreClaude/movegen';
+import { initialPosition, isDrawByInactivity, Position } from '../coreClaude/position';
+import { buildRepetitionCounts, isThreefoldRepetition } from '../coreClaude/search/repetition';
+import { hashPosition } from '../coreClaude/search/zobrist';
 import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
 import { Difficulty, GameConfig } from './types';

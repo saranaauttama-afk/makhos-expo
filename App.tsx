@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './src/ui/HomeScreen';
 import HumanVsCodexArenaScreen from './src/ui/HumanVsCodexArenaScreen';
-import { precomputeEndgameTablebase } from './src/coreCodex/search/endgameTablebase';
+import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTablebase';
 import { GameConfig } from './src/ui/types';
 
 type ErrorBoundaryState = { error: Error | null };

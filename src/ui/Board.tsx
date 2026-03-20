@@ -5,8 +5,8 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Circle, G, Rect, Text as SvgText } from 'react-native-svg';
-import { bits, toIndex, toRC } from '../coreCodex/bitboards';
-import { Position } from '../coreCodex/position';
+import { bits, toIndex, toRC } from '../coreClaude/bitboards';
+import { Position } from '../coreClaude/position';
 import { COLORS, SIZE } from './theme';
 
 interface Dest { to: number; caps: number }

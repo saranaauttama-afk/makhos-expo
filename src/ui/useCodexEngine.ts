@@ -7,11 +7,11 @@
 //  separate ESM entry point, which is out of scope for now.)
 
 import { useCallback, useRef, useState } from 'react';
-import { TT } from '../coreCodex/search/tt';
-import { CancelToken, iterativeDeepening, SearchInfo } from '../coreCodex/search/alphabeta';
-import { Position } from '../coreCodex/position';
-import { Move } from '../coreCodex/movegen';
-import { lookupOpeningBook } from '../coreCodex/search/openingBook';
+import { TT } from '../coreClaude/search/tt';
+import { CancelToken, iterativeDeepening, SearchInfo } from '../coreClaude/search/alphabeta';
+import { Position } from '../coreClaude/position';
+import { Move } from '../coreClaude/movegen';
+import { lookupOpeningBook } from '../coreClaude/search/openingBook';
 import { Difficulty } from './types';
 
 // Probability of skipping the book to add opening variety.

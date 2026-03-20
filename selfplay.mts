@@ -1,10 +1,10 @@
 // selfplay.mts — AI vs AI self-play test (run with: npx tsx selfplay.mts)
-import { iterativeDeepening } from './src/coreCodex/search/alphabeta';
-import { TT } from './src/coreCodex/search/tt';
-import { generateMoves } from './src/coreCodex/movegen';
-import { applyMove, initialPosition, isDrawByInactivity } from './src/coreCodex/position';
-import { hashPosition } from './src/coreCodex/search/zobrist';
-import { bitCount } from './src/coreCodex/bitboards';
+import { iterativeDeepening } from './src/coreClaude/search/alphabeta';
+import { TT } from './src/coreClaude/search/tt';
+import { generateMoves } from './src/coreClaude/movegen';
+import { applyMove, initialPosition, isDrawByInactivity } from './src/coreClaude/position';
+import { hashPosition } from './src/coreClaude/search/zobrist';
+import { bitCount } from './src/coreClaude/bitboards';
 
 const THINK_MS  = 600;   // ms per move
 const MAX_PLIES = 300;   // safety cap
