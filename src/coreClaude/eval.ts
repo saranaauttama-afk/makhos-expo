@@ -9,6 +9,8 @@
 
 import { B1, BB, bitCount, bits, STEPS, toRC } from './bitboards';
 import { Position } from './position';
+import { nnEvaluate } from './nnEval';
+import { NN_TRAINED } from './nnWeights';
 
 const START_TOTAL = 16;
 const VAL_MAN     = 100;
@@ -190,6 +192,7 @@ function simplificationBonus(p: Position): number {
 
 // ── Main evaluation ───────────────────────────────────────────────────────────
 export function evaluate(p: Position): number {
+  if (NN_TRAINED) return nnEvaluate(p);
   const total = bitCount(p.p1Men | p.p1Kings | p.p2Men | p.p2Kings);
   // eg: 0 = opening/midgame (16 pieces), 1 = pure endgame (≤8 pieces)
   const eg = total <= 8 ? (8 - total) / 8 : 0;
