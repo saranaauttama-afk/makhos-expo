@@ -1,0 +1,36 @@
+
+A/B Test: New eval (Texel-tuned) vs Old eval (pre-Texel)
+Think: 600ms/move  |  Games: 20
+
+  Game  1: New=P1 → new wins at ply 84 (no moves)
+  Game  2: New=P2 → old wins at ply 68 (no moves)
+  Game  3: New=P1 → old wins at ply 77 (no moves)
+  Game  4: New=P2 → old wins at ply 62 (no moves)
+  Game  5: New=P1 → old wins at ply 59 (no moves)
+  Game  6: New=P2 → old wins at ply 44 (no moves)
+  Game  7: New=P1 → old wins at ply 61 (no moves)
+  Game  8: New=P2 → new wins at ply 91 (no moves)
+  Game  9: New=P1 → draw (threefold)
+  Game 10: New=P2 → old wins at ply 56 (no moves)
+  Game 11: New=P1 → new wins at ply 46 (no moves)
+  Game 12: New=P2 → old wins at ply 78 (no moves)
+  Game 13: New=P1 → new wins at ply 46 (no moves)
+  Game 14: New=P2 → old wins at ply 70 (no moves)
+  Game 15: New=P1 → new wins at ply 46 (no moves)
+  Game 16: New=P2 → new wins at ply 65 (no moves)
+  Game 17: New=P1 → old wins at ply 57 (no moves)
+  Game 18: New=P2 → draw (threefold)
+  Game 19: New=P1 → draw (inactivity)
+  Game 20: New=P2 → draw (inactivity)
+
+════════════════════════════════════════════════════
+RESULTS
+────────────────────────────────────────────────────
+New eval (Texel-tuned) :   6 wins  (30%)
+Old eval (pre-Texel)   :  10 wins  (50%)
+Draws                  :   4        (20%)
+────────────────────────────────────────────────────
+Verdict: ✗ Old eval is stronger — consider reverting
+════════════════════════════════════════════════════
+
+DONE:0
