@@ -43,24 +43,24 @@ for fname in ['makhos_engine.py', 'mcts.py', 'network.py', 'self_play.py']:
 # CELL 3 — Config
 # ─────────────────────────────────────────────────────────────────────────────
 # ── Self-play ──────────────────────────────────────────────────────────────
-NUM_ITERATIONS   = 200
-GAMES_PER_ITER   = 30      # เกม self-play ต่อ iteration
-SIMULATIONS      = 300     # MCTS simulations per move
+NUM_ITERATIONS   = 120     # ~20 ชั่วโมงบน A100
+GAMES_PER_ITER   = 50      # เพิ่มความหลากหลาย
+SIMULATIONS      = 800     # A100 เร็วพอ → policy targets ดีขึ้นมาก
 
 # ── Training ───────────────────────────────────────────────────────────────
 BATCH_SIZE       = 512     # 256 supervised + 256 self-play
-TRAIN_STEPS      = 20      # gradient steps per iteration (แทน epochs)
-LR               = 5e-4    # ต่ำกว่า v1 เพื่อป้องกัน forgetting
+TRAIN_STEPS      = 30      # train มากขึ้นต่อ iter
+LR               = 3e-4    # ลดเพิ่มเติมเพื่อ stability
 SUP_RATIO        = 0.5     # สัดส่วน supervised ใน batch (0.5 = 50/50)
 
 # ── Buffer ─────────────────────────────────────────────────────────────────
-SELFPLAY_BUFFER  = 50_000  # max self-play samples
+SELFPLAY_BUFFER  = 100_000 # buffer ใหญ่ขึ้น
 
 # ── Evaluation ─────────────────────────────────────────────────────────────
-EVAL_EVERY       = 5
-EVAL_GAMES       = 30
+EVAL_EVERY       = 10      # eval ทุก 10 (แต่ละ eval ช้ากว่าเพราะ sim มาก)
+EVAL_GAMES       = 50      # มากขึ้น → win rate แม่นขึ้น
 WIN_THRESHOLD    = 0.0     # เริ่มด้วย 0 → update ทุกครั้ง
-THRESHOLD_SWITCH = 20      # เปิด 0.52 หลัง iter นี้
+THRESHOLD_SWITCH = 30      # เปิด 0.52 หลัง iter นี้
 SAVE_EVERY       = 10
 
 # ── Paths ──────────────────────────────────────────────────────────────────

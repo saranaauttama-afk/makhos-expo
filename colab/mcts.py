@@ -38,20 +38,38 @@ DIR_IDX = {'UL': 0, 'UR': 1, 'DL': 2, 'DR': 3}
 from makhos_engine import STEPS   # STEPS[sq] = list of (to_sq, dir_name)
 
 def move_to_action(m: Move) -> int:
-    """Encode move as integer 0..127  (from_sq × 4 + dir_idx)."""
+    """Encode move as integer 0..127  (from_sq × 4 + dir_idx).
+
+    For simple moves: direction from from_sq → to_sq.
+    For multi-captures: direction from from_sq toward first captured piece,
+    which is always unambiguous and avoids action collisions.
+    """
+    from makhos_engine import _ray
     from_sq = m.from_sq
     to_sq   = m.to_sq
-    # find the direction from from_sq toward to_sq
-    # for multi-step captures `to_sq` may not be adjacent — use captured chain start
+
+    # Simple move: to_sq is adjacent
     for (step_sq, dname) in STEPS[from_sq]:
         if step_sq == to_sq:
             return from_sq * 4 + DIR_IDX[dname]
-    # multi-capture: find the first step direction that eventually reaches to_sq
-    # we approximate with the direction of the first captured piece
-    # (good enough for policy prior — exact move chosen by visit-count)
-    for (step_sq, dname) in STEPS[from_sq]:
-        return from_sq * 4 + DIR_IDX[dname]   # fallback: first available dir
-    return from_sq * 4   # absolute fallback
+
+    # Multi-capture: use direction toward first captured piece
+    if m.captured:
+        first_cap = m.captured[0]
+        # Check adjacent (men captures)
+        for (step_sq, dname) in STEPS[from_sq]:
+            if step_sq == first_cap:
+                return from_sq * 4 + DIR_IDX[dname]
+        # Check along ray (king captures — first_cap may not be adjacent)
+        for dname in ('UL', 'UR', 'DL', 'DR'):
+            for sq in _ray(from_sq, dname):
+                if sq == first_cap:
+                    return from_sq * 4 + DIR_IDX[dname]
+
+    # Last resort: first available direction (should not happen)
+    if STEPS[from_sq]:
+        return from_sq * 4 + DIR_IDX[STEPS[from_sq][0][1]]
+    return from_sq * 4
 
 def _legal_mask(moves: List[Move]) -> np.ndarray:
     """Binary mask of shape (128,) with 1 at each legal action slot."""
