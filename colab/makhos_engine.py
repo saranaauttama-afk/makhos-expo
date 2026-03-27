@@ -384,11 +384,14 @@ def generate_moves(p: Position) -> List[Move]:
 
 def get_features(p: Position) -> np.ndarray:
     """
-    128-dim one-hot feature vector (side-to-move relative).
-      x[  0.. 31] = 1 if my man at square i
+    128-dim one-hot feature vector (side-to-move relative, board flipped for P2).
+      x[  0.. 31] = 1 if my man at square i      (flipped: 31-sq for P2)
       x[ 32.. 63] = 1 if my king at square i
       x[ 64.. 95] = 1 if enemy man at square i
       x[ 96..127] = 1 if enemy king at square i
+
+    Flipping ensures the model always sees "my pieces at the bottom, moving up"
+    regardless of which side is to move.
     """
     x = np.zeros(128, dtype=np.float32)
     my_men   = p.p1_men   if p.side == 1 else p.p2_men
@@ -396,10 +399,16 @@ def get_features(p: Position) -> np.ndarray:
     op_men   = p.p2_men   if p.side == 1 else p.p1_men
     op_kings = p.p2_kings if p.side == 1 else p.p1_kings
 
-    for sq in bits(my_men):   x[sq]       = 1.0
-    for sq in bits(my_kings): x[32 + sq]  = 1.0
-    for sq in bits(op_men):   x[64 + sq]  = 1.0
-    for sq in bits(op_kings): x[96 + sq]  = 1.0
+    if p.side == 1:
+        for sq in bits(my_men):   x[sq]            = 1.0
+        for sq in bits(my_kings): x[32 + sq]       = 1.0
+        for sq in bits(op_men):   x[64 + sq]       = 1.0
+        for sq in bits(op_kings): x[96 + sq]       = 1.0
+    else:
+        for sq in bits(my_men):   x[31 - sq]       = 1.0
+        for sq in bits(my_kings): x[32 + 31 - sq]  = 1.0
+        for sq in bits(op_men):   x[64 + 31 - sq]  = 1.0
+        for sq in bits(op_kings): x[96 + 31 - sq]  = 1.0
     return x
 
 # ─────────────────────────────────────────────────────────────────────────────

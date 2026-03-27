@@ -8,4 +8,7 @@ const config = getDefaultConfig(__dirname);
 config.transformer ??= {};
 config.transformer.unstable_allowRequireContext = true;
 
+// Allow bundling .onnx model files as static assets
+config.resolver.assetExts.push('onnx');
+
 module.exports = config;

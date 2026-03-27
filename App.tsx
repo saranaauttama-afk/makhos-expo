@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './src/ui/HomeScreen';
 import HumanVsCodexArenaScreen from './src/ui/HumanVsCodexArenaScreen';
+import ArenaScreen from './src/ui/ArenaScreen';
 import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTablebase';
 import { GameConfig } from './src/ui/types';
 
@@ -36,15 +37,18 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBounda
 
 export default function App() {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+  const [showArena, setShowArena]   = useState(false);
 
   useEffect(() => { precomputeEndgameTablebase(); }, []);
 
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
       <ErrorBoundary>
-        {gameConfig
-          ? <HumanVsCodexArenaScreen config={gameConfig} onBack={() => setGameConfig(null)} />
-          : <HomeScreen onStart={setGameConfig} />
+        {showArena
+          ? <ArenaScreen onBack={() => setShowArena(false)} />
+          : gameConfig
+            ? <HumanVsCodexArenaScreen config={gameConfig} onBack={() => setGameConfig(null)} />
+            : <HomeScreen onStart={setGameConfig} onArena={() => setShowArena(true)} />
         }
       </ErrorBoundary>
     </SafeAreaProvider>

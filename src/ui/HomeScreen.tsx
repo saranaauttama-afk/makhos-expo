@@ -5,6 +5,7 @@ import { Difficulty, GameConfig, GameMode } from './types';
 
 interface Props {
   onStart: (config: GameConfig) => void;
+  onArena: () => void;
 }
 
 function ChoiceBtn({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) {
@@ -15,7 +16,7 @@ function ChoiceBtn({ title, active, onPress }: { title: string; active: boolean;
   );
 }
 
-export default function HomeScreen({ onStart }: Props) {
+export default function HomeScreen({ onStart, onArena }: Props) {
   const [mode, setMode] = useState<GameMode>('vs-ai');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
 
@@ -48,6 +49,10 @@ export default function HomeScreen({ onStart }: Props) {
       <Pressable style={styles.startBtn} onPress={() => onStart({ mode, difficulty, humanSide: 1 })}>
         <Text style={styles.startText}>▶  เริ่มเกม</Text>
       </Pressable>
+
+      <Pressable style={styles.arenaBtn} onPress={onArena}>
+        <Text style={styles.arenaText}>🔬  Arena (ทดสอบ AI)</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -68,4 +73,6 @@ const styles = StyleSheet.create({
   choiceTextActive: { color: ACCENT },
   startBtn:         { marginTop: 4, backgroundColor: ACCENT, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 52 },
   startText:        { fontSize: 18, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  arenaBtn:         { borderRadius: 14, paddingVertical: 12, paddingHorizontal: 32, borderWidth: 2, borderColor: '#ddd' },
+  arenaText:        { fontSize: 14, fontWeight: '600', color: '#888' },
 });

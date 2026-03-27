@@ -1,8 +1,0 @@
-Generating 300 games → D:\My App\makhos-v2\data\positions.jsonl
-Think: 50ms/move  |  Clip: ±800cp
-
-  game 20/300  positions: 1239  game 40/300  positions: 2693  game 60/300  positions: 3958  game 80/300  positions: 5221  game 100/300  positions: 6569  game 120/300  positions: 7787  game 140/300  positions: 9103  game 160/300  positions: 10371  game 180/300  positions: 11711  game 200/300  positions: 12839  game 220/300  positions: 14076  game 240/300  positions: 15379  game 260/300  positions: 16590  game 280/300  positions: 17807  game 300/300  positions: 19009
-
-Done — 19009 positions saved to data/positions.jsonl
-File size: 4.9 MB — ready to upload to Google Drive
-DONE:0
