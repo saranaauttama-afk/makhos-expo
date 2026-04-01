@@ -30,13 +30,13 @@ export function initialPosition(): Position {
 export function occupied(p: Position): BB {
   return (p.p1Men | p.p1Kings | p.p2Men | p.p2Kings) >>> 0;
 }
-const DRAW_PIECE_THRESHOLD = 2; // inactivity window opens only when each side has ≤2 pieces left
-
 export function isDrawByInactivity(p: Position): boolean {
-  const p1Count = bitCount(p.p1Men | p.p1Kings);
-  const p2Count = bitCount(p.p2Men | p.p2Kings);
-  const fewPieces = p1Count <= DRAW_PIECE_THRESHOLD && p2Count <= DRAW_PIECE_THRESHOLD;
-  return fewPieces && p.halfmoveClock >= 20;
+  // กฎไม่มีการกิน: ไม่จับ 32 ตา → เสมอ
+  if (p.halfmoveClock >= 32) return true;
+  // กฎฮอสล้วน: เหลือแต่ king ทั้งกระดาน + ไม่จับ 16 ตา → เสมอ
+  const allKings = p.p1Men === 0 && p.p2Men === 0;
+  if (allKings && p.halfmoveClock >= 16) return true;
+  return false;
 }
 
 export function sideMen(p: Position): BB { return p.side === 1 ? p.p1Men : p.p2Men; }

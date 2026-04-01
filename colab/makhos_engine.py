@@ -106,7 +106,6 @@ def _ray(sq: int, dname: str):
 
 LAST_RANK_P1 = frozenset([0, 1, 2, 3])
 LAST_RANK_P2 = frozenset([28, 29, 30, 31])
-DRAW_PIECE_THRESHOLD = 2
 
 @dataclass(frozen=True)
 class Position:
@@ -135,10 +134,14 @@ def _opp_men(p: Position)    -> int: return p.p2_men   if p.side == 1 else p.p1_
 def _opp_kings(p: Position)  -> int: return p.p2_kings if p.side == 1 else p.p1_kings
 
 def is_draw_by_inactivity(p: Position) -> bool:
-    p1_count = bit_count(p.p1_men | p.p1_kings)
-    p2_count = bit_count(p.p2_men | p.p2_kings)
-    few = (p1_count <= DRAW_PIECE_THRESHOLD) and (p2_count <= DRAW_PIECE_THRESHOLD)
-    return few and p.halfmove_clock >= 20
+    # กฎไม่มีการกิน: ไม่จับ 32 ตา → เสมอ
+    if p.halfmove_clock >= 32:
+        return True
+    # กฎฮอสล้วน: เหลือแต่ king ทั้งกระดาน + ไม่จับ 16 ตา → เสมอ
+    all_kings = (p.p1_men == 0) and (p.p2_men == 0)
+    if all_kings and p.halfmove_clock >= 16:
+        return True
+    return False
 
 def is_terminal(p: Position) -> bool:
     my_count  = bit_count(_side_men(p) | _side_kings(p))
@@ -357,7 +360,8 @@ def generate_moves(p: Position) -> List[Move]:
         captures.extend(_gen_king_captures(p, from_sq, my_men0, my_kings0, op_men0, op_kings0))
 
     if captures:
-        return captures
+        max_caps = max(len(m.captured) for m in captures)
+        return [m for m in captures if len(m.captured) == max_caps]
 
     # Quiet moves
     quiet: List[Move] = []

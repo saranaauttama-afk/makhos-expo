@@ -140,7 +140,10 @@ export function generateMoves(p: Position): Move[] {
   for (const from of bits(myKingsBB)) {
     genKingCapturesFrom(p, from, captures);
   }
-  if (captures.length) return captures;
+  if (captures.length) {
+    const maxCaps = Math.max(...captures.map(m => m.captured.length));
+    return captures.filter(m => m.captured.length === maxCaps);
+  }
 
   // 2) quiet moves — Men (forward one step)
   const quiet: Move[] = [];

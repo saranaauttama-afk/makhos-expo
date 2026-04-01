@@ -9,7 +9,7 @@ import { bits }                                          from '../src/coreClaude
 
 const N_GAMES = 100;
 const AZ_SIMS = 200;
-const C_PUCT  = 1.0;
+const C_PUCT  = 1.5;
 
 // ── Feature extractors ────────────────────────────────────────────────────────
 function getFeaturesFlip(pos: Position): Float32Array {
@@ -100,9 +100,9 @@ async function makeAZPlayer(modelPath: string, useFlip: boolean) {
 }
 
 async function main() {
-  console.log(`\n=== NEW iter_0049 (flip) vs OLD iter_0059 (no flip)  [${N_GAMES} games] ===\n`);
-  const newAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0049.onnx'), true);
-  const oldAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0059.onnx'), false);
+  console.log(`\n=== iter_0079 vs iter_0059  [${N_GAMES} games] ===\n`);
+  const newAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0079.onnx'), true);
+  const oldAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0059.onnx'), true);
   console.log('Models loaded\n');
 
   let newW=0, oldW=0, draws=0;
@@ -129,7 +129,7 @@ async function main() {
     process.stdout.write(' ');
   }
 
-  console.log(`\n\nNEW (iter_0049) wins : ${newW}/${N_GAMES}`);
+  console.log(`\n\nNEW (iter_0079) wins : ${newW}/${N_GAMES}`);
   console.log(`OLD (iter_0059) wins : ${oldW}/${N_GAMES}`);
   console.log(`Draws               : ${draws}/${N_GAMES}`);
 }

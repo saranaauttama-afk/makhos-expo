@@ -2,7 +2,7 @@
 train_az.py — AlphaZero Training Loop for Thai Checkers (Makhos)
 =================================================================
 
-Upload to Drive/makhos_az_v2/:
+Upload to Drive/makhos_az_v3/:
   makhos_engine.py  network_az.py  mcts_az.py  train_az.py
 
 Run cells 1 → 2 → 3 → 4 (main loop).
@@ -23,7 +23,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-DRIVE_DIR  = '/content/drive/MyDrive/makhos_az_v2'
+DRIVE_DIR  = '/content/drive/MyDrive/makhos_az_v3'
 MODELS_DIR = f'{DRIVE_DIR}/models'
 LOG_FILE   = f'{DRIVE_DIR}/training_log.jsonl'
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -59,22 +59,23 @@ N_RES     = 4
 
 # Self-play
 N_SELFPLAY   = 100    # games per iteration
-N_SIMS       = 200    # MCTS simulations per move
-TEMP_CUTOFF  = 12     # plies before switching to argmax selection
+N_SIMS       = 200    # MCTS simulations per move (self-play)
+TEMP_CUTOFF  = 16     # plies before switching to argmax selection
 MAX_GAME_LEN = 250    # hard cap per game (safety)
 
 # Training
-REPLAY_SIZE  = 100_000  # max replay buffer size
+REPLAY_SIZE  = 350_000  # max replay buffer size
 BATCH_SIZE   = 256
 TRAIN_STEPS  = 500      # optimizer steps per iteration
-LR           = 1e-3
+LR           = 3e-4
 WD           = 1e-4
 
 # Evaluation
 EVAL_INTERVAL   = 10    # eval every N iterations
-N_EVAL_GAMES    = 20    # new-net vs best-net
+N_EVAL_GAMES    = 60    # new-net vs best-net (more games = lower variance)
 WIN_THRESHOLD   = 0.55  # win-rate needed to replace best net
-N_MINIMAX_GAMES = 20    # games vs minimax at each checkpoint
+N_MINIMAX_GAMES = 40    # games vs minimax at each checkpoint
+N_EVAL_SIMS     = 400   # MCTS sims during eval (stronger play than self-play)
 MINIMAX_DEPTH   = 3
 MINIMAX_DEPTH_5 = 5
 
@@ -219,7 +220,7 @@ def eval_net_vs_net(new_net: AZNetwork, best_net: AZNetwork, n_games: int) -> fl
             if result is not None: break
             is_new = (pos.side == 1) == new_is_p1
             net    = new_net if is_new else best_net
-            out_moves, visit_probs = mcts(pos, net, n_sims=N_SIMS // 2, add_noise=False)
+            out_moves, visit_probs = mcts(pos, net, n_sims=N_EVAL_SIMS, add_noise=False)
             if not out_moves: break
             pos = apply_move(pos, out_moves[int(np.argmax(visit_probs))])
         result = result if result is not None else (game_result(pos, generate_moves(pos)) or 0.0)
@@ -244,7 +245,7 @@ def eval_net_vs_minimax(net: AZNetwork, n_games: int, mm_depth: int) -> float:
             if result is not None: break
             is_net = (pos.side == 1) == net_is_p1
             if is_net:
-                out_moves, vp = mcts(pos, net, N_SIMS // 2, add_noise=False)
+                out_moves, vp = mcts(pos, net, N_EVAL_SIMS, add_noise=False)
                 move = out_moves[int(np.argmax(vp))] if out_moves else moves[0]
             else:
                 move = _minimax_best_move(pos, mm_depth) or moves[0]
@@ -271,7 +272,7 @@ def eval_net_vs_random(net: AZNetwork, n_games: int) -> float:
             if result is not None: break
             is_net = (pos.side == 1) == net_is_p1
             if is_net:
-                out_moves, vp = mcts(pos, net, N_SIMS // 2, add_noise=False)
+                out_moves, vp = mcts(pos, net, N_EVAL_SIMS, add_noise=False)
                 move = out_moves[int(np.argmax(vp))] if out_moves else moves[0]
             else:
                 move = random.choice(moves)
@@ -284,8 +285,18 @@ def eval_net_vs_random(net: AZNetwork, n_games: int) -> float:
             wins += 1.0
     return wins / n_games
 
-import smtplib
+import smtplib, subprocess
 from email.mime.text import MIMEText
+
+def get_gpu_info() -> str:
+    try:
+        return subprocess.check_output(
+            ['nvidia-smi', '--query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu',
+             '--format=csv,noheader,nounits'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return 'N/A'
 
 def send_iter_email(it, p_loss, v_loss, elapsed, extra=''):
     subject = f'Makhos AZ — iter {it}/200'
@@ -310,7 +321,8 @@ print('Helper functions OK')
 # CELL 5 — Main training loop  (this is the cell you keep running)
 # ─────────────────────────────────────────────────────────────────────────────
 
-BEST_NET_PATH  = f'{MODELS_DIR}/best.pt'
+BEST_NET_PATH    = f'{MODELS_DIR}/best.pt'    # best promoted model only
+LATEST_NET_PATH  = f'{MODELS_DIR}/latest.pt'  # curr_net saved every iter (for resume)
 TRAIN_STATE_PATH = f'{MODELS_DIR}/train_state.pt'   # optimizer + scheduler state
 
 # ── Init or resume ────────────────────────────────────────────────────────────
@@ -323,9 +335,9 @@ replay_buffer = []
 start_iter    = 0
 BUFFER_PATH   = f'{DRIVE_DIR}/replay_buffer.npy'
 
-if os.path.exists(BEST_NET_PATH):
-    best_net.load(BEST_NET_PATH)
-    curr_net.load(BEST_NET_PATH)
+if os.path.exists(LATEST_NET_PATH):
+    curr_net.load(LATEST_NET_PATH)
+    best_net.load(BEST_NET_PATH if os.path.exists(BEST_NET_PATH) else LATEST_NET_PATH)
 
     # Restore optimizer + scheduler state
     if os.path.exists(TRAIN_STATE_PATH):
@@ -389,6 +401,7 @@ for it in range(start_iter, N_ITER):
     p_loss  = np.mean(p_losses)
     v_loss  = np.mean(v_losses)
 
+    gpu_info = get_gpu_info()
     log = {
         'iter':       it,
         'new_samples': new_samples,
@@ -396,6 +409,7 @@ for it in range(start_iter, N_ITER):
         'p_loss':     round(p_loss, 4),
         'v_loss':     round(v_loss, 4),
         'elapsed_s':  round(elapsed, 1),
+        'gpu':        gpu_info,
     }
 
     # ── Evaluate every EVAL_INTERVAL iterations ───────────────────────────────
@@ -436,24 +450,26 @@ for it in range(start_iter, N_ITER):
         curr_net.save(iter_path)
 
         # 5) Send checkpoint email
+        print(f'  GPU: {gpu_info}')
         extra = (f'vs best net  : {wr_net:.1%}\n'
                  f'vs random    : {wr_rand:.1%}\n'
                  f'vs minimax-3 : {wr_mm3:.1%}\n'
-                 f'vs minimax-5 : {wr_mm5:.1%}')
+                 f'vs minimax-5 : {wr_mm5:.1%}\n'
+                 f'\nGPU: {gpu_info}')
         send_iter_email(it, p_loss, v_loss, elapsed, extra)
 
     else:
         # Quick progress print every iteration
         print(f'iter {it:3d}  samples={new_samples:4d}  buf={len(replay_buffer):6d}'
-              f'  p_loss={p_loss:.4f}  v_loss={v_loss:.4f}  {elapsed:.0f}s')
-        send_iter_email(it, p_loss, v_loss, elapsed)
+              f'  p_loss={p_loss:.4f}  v_loss={v_loss:.4f}  {elapsed:.0f}s  GPU: {gpu_info}')
+        send_iter_email(it, p_loss, v_loss, elapsed, f'GPU: {gpu_info}')
 
     # Append to log
     with open(LOG_FILE, 'a') as f:
         f.write(json.dumps(log) + '\n')
 
     # Save curr_net + optimizer + scheduler + buffer every iteration (for resume)
-    curr_net.save(BEST_NET_PATH)
+    curr_net.save(LATEST_NET_PATH)
     torch.save({
         'optimizer': optimizer.state_dict(),
         'scheduler': scheduler.state_dict(),

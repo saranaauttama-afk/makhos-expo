@@ -16,10 +16,10 @@ import { generateMoves, applyMove, Move }                from '../src/coreClaude
 import { handEvaluate }                                  from '../src/coreClaude/eval';
 import { getFeatures }                                   from '../src/coreClaude/azFeatures';
 
-const MODEL_PATH = path.join(__dirname, '../../data/iter_0049.onnx');
+const MODEL_PATH = path.join(__dirname, '../../data/iter_0099.onnx');
 const N_GAMES    = 20;   // games per match
-const AZ_SIMS    = 200;  // MCTS simulations per move
-const MM_DEPTH   = 3;    // minimax depth
+const AZ_SIMS    = 1600;  // MCTS simulations per move
+const MM_DEPTH   = 7;     // minimax depth
 
 // ── ONNX inference ─────────────────────────────────────────────────────────────
 let session: ort.InferenceSession | null = null;
@@ -39,7 +39,7 @@ async function azInfer(features: Float32Array): Promise<{ policyLogits: Float32A
 }
 
 // ── MCTS ───────────────────────────────────────────────────────────────────────
-const C_PUCT = 1.0;
+const C_PUCT = 1.5;
 
 interface Node {
   pos: Position; move: Move | null; parent: Node | null;

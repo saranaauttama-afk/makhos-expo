@@ -9,7 +9,7 @@ import { isDrawByInactivity, Position } from './position';
 import { getFeatures } from './azFeatures';
 import { azInfer } from './azNet';
 
-const C_PUCT = 1.0;
+const C_PUCT = 1.5;
 
 interface Node {
   pos:      Position;

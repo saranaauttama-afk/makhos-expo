@@ -1,7 +1,7 @@
 // azNet.ts — ONNX model loading and inference for AlphaZero
 //
 // Network: 128 → FC+BN+ReLU → 4×ResBlock(256) → policy(1024) + value(1)
-// Model file: data/iter_0049.onnx (single-file ONNX)
+// Model file: data/iter_0009.onnx (single-file ONNX)
 
 import * as ort from 'onnxruntime-react-native';
 import { Asset } from 'expo-asset';
@@ -14,7 +14,7 @@ async function getSession(): Promise<ort.InferenceSession> {
   if (!sessionPromise) {
     sessionPromise = (async () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const [asset] = await Asset.loadAsync(require('../../data/iter_0049.onnx'));
+      const [asset] = await Asset.loadAsync(require('../../data/iter_0009.onnx'));
       const uri = asset.localUri ?? asset.uri;
       const s = await ort.InferenceSession.create(uri);
       session = s;
