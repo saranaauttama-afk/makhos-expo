@@ -10,7 +10,7 @@ import { useCodexEngine } from './useCodexEngine';
 import { Difficulty, GameConfig } from './types';
 
 const THINK_MS: Record<Difficulty, number> = { easy: 300, medium: 1000, hard: 2000 };
-const ALGORITHM_NAME = 'Codex v2';
+const ALGORITHM_NAME = 'Codex Hybrid';
 
 function posKey(p: Position) {
   return [p.side, p.p1Men, p.p1Kings, p.p2Men, p.p2Kings, p.halfmoveClock].join(':');
@@ -31,7 +31,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const [hashHistory, setHashHistory] = useState<number[]>(() => [hashPosition(initialPosition())]);
   const [sel, setSel]                 = useState<number | null>(null);
 
-  const { think, thinking, lastInfo, cancel } = useCodexEngine();
+  const { think, thinking, lastInfo, lastPlan, cancel } = useCodexEngine();
   const pendingRef = useRef<string | null>(null);
   const endgameRef = useRef<string | null>(null);
 
@@ -154,6 +154,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
       {!isHvH && lastInfo && (
         <Text style={{ fontSize: 12, opacity: 0.6 }}>
           depth {lastInfo.depth} | score {lastInfo.score} | nodes {lastInfo.nodes}
+          {lastPlan ? `\nmode: ${lastPlan.mode} · ${lastPlan.reason}` : ''}
           {pvText ? `\npv: ${pvText}` : ''}
         </Text>
       )}

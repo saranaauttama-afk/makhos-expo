@@ -1,29 +1,32 @@
-// useCodexEngine.ts — async wrapper around the search engine
+// useCodexEngine.ts — async wrapper around the hybrid engine
 //
-// Runs iterativeDeepening on the main thread, yielding between depth iterations
-// via await setTimeout(0) to keep the UI responsive.
-// (Web Worker support was removed: Metro bundles CommonJS, which rejects
-//  import.meta syntax at parse time — a Worker-safe solution requires a
-//  separate ESM entry point, which is out of scope for now.)
+// Hybrid flow:
+//   opening -> book
+//   tactical / endgame -> alpha-beta
+//   midgame -> AlphaZero MCTS
 
 import { useCallback, useRef, useState } from 'react';
 import { TT } from '../coreClaude/search/tt';
-import { CancelToken, iterativeDeepening, SearchInfo } from '../coreClaude/search/alphabeta';
+import { CancelToken, SearchInfo } from '../coreClaude/search/alphabeta';
 import { Position } from '../coreClaude/position';
 import { Move } from '../coreClaude/movegen';
-import { lookupOpeningBook } from '../coreClaude/search/openingBook';
+import { preloadAZModel } from '../coreClaude/azNet';
+import { HybridPlan, hybridBestMove } from '../coreClaude/search/hybrid';
 import { Difficulty } from './types';
-
-// Probability of skipping the book to add opening variety.
-// Easy: high skip → more random; Hard: low skip → mostly follows book.
-const BOOK_SKIP_RATE: Record<Difficulty, number> = { easy: 0.7, medium: 0.35, hard: 0.15 };
 
 export function useCodexEngine() {
   const [thinking, setThinking]   = useState(false);
   const [lastInfo, setLastInfo]   = useState<SearchInfo | null>(null);
+  const [lastPlan, setLastPlan]   = useState<HybridPlan | null>(null);
 
   const ttRef     = useRef(new TT());
   const cancelRef = useRef<CancelToken | null>(null);
+  const preloaded = useRef(false);
+
+  if (!preloaded.current) {
+    preloaded.current = true;
+    preloadAZModel();
+  }
 
   const cancel = useCallback(() => {
     if (cancelRef.current) cancelRef.current.cancelled = true;
@@ -42,36 +45,25 @@ export function useCodexEngine() {
     cancelRef.current = token;
     setThinking(true);
 
-    // Opening book — instant reply for known opening positions.
-    // Randomly skip to create variety (higher skip rate for easier levels).
-    const bookHit = lookupOpeningBook(pos);
-    const skipBook = Math.random() < BOOK_SKIP_RATE[difficulty];
-    if (bookHit && !skipBook) {
-      return new Promise<Move | undefined>(resolve => {
-        setTimeout(() => {
-          setThinking(false);
-          resolve(token.cancelled ? undefined : bookHit.move);
-        }, 120);
-      });
-    }
-
-    return iterativeDeepening(
-      pos, ms, ttRef.current,
-      (info) => {
-        if (token.cancelled) return;
-        setLastInfo(info);
-        onInfo?.(info);
-      },
+    return hybridBestMove(
+      pos,
+      ms,
+      ttRef.current,
       historyHashes,
       token,
+      difficulty,
     ).then(res => {
       setThinking(false);
-      return token.cancelled ? undefined : res.best;
+      if (token.cancelled) return undefined;
+      setLastPlan(res.plan);
+      setLastInfo(res.info);
+      if (res.info) onInfo?.(res.info);
+      return res.move;
     }).catch(() => {
       setThinking(false);
       return undefined;
     });
   }, [cancel]);
 
-  return { think, thinking, lastInfo, cancel };
+  return { think, thinking, lastInfo, lastPlan, cancel };
 }
