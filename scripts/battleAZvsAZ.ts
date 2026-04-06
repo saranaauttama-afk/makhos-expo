@@ -100,8 +100,8 @@ async function makeAZPlayer(modelPath: string, useFlip: boolean) {
 }
 
 async function main() {
-  console.log(`\n=== iter_0079 vs iter_0059  [${N_GAMES} games] ===\n`);
-  const newAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0079.onnx'), true);
+  console.log(`\n=== v4 iter_0049 vs v3 iter_0059  [${N_GAMES} games] ===\n`);
+  const newAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0049.onnx'), true);
   const oldAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0059.onnx'), true);
   console.log('Models loaded\n');
 
@@ -129,8 +129,8 @@ async function main() {
     process.stdout.write(' ');
   }
 
-  console.log(`\n\nNEW (iter_0079) wins : ${newW}/${N_GAMES}`);
-  console.log(`OLD (iter_0059) wins : ${oldW}/${N_GAMES}`);
+  console.log(`\n\nNEW (v4 iter_0049) wins : ${newW}/${N_GAMES}`);
+  console.log(`OLD (v3 iter_0059) wins : ${oldW}/${N_GAMES}`);
   console.log(`Draws               : ${draws}/${N_GAMES}`);
 }
 main().catch(e => { console.error(e); process.exit(1); });

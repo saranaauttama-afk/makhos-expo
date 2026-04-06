@@ -2,7 +2,7 @@
 train_az.py — AlphaZero Training Loop for Thai Checkers (Makhos)
 =================================================================
 
-Upload to Drive/makhos_az_v5/:
+Upload to Drive/makhos_az_v3/:
   makhos_engine.py  network_az.py  mcts_az.py  train_az.py
 
 Run cells 1 → 2 → 3 → 4 (main loop).
@@ -23,7 +23,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-DRIVE_DIR  = '/content/drive/MyDrive/makhos_az_v5'
+DRIVE_DIR  = '/content/drive/MyDrive/makhos_az_v4'
 MODELS_DIR = f'{DRIVE_DIR}/models'
 LOG_FILE   = f'{DRIVE_DIR}/training_log.jsonl'
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -58,7 +58,7 @@ HIDDEN    = 256
 N_RES     = 6          # v4: deeper network (was 4)
 
 # Self-play
-N_SELFPLAY   = 50     # v5: budget-aware (was 100)
+N_SELFPLAY   = 100    # games per iteration
 N_SIMS       = 400    # v4: 2x sims → higher quality games (was 200)
 TEMP_CUTOFF  = 16     # plies before switching to argmax selection
 MAX_GAME_LEN = 250    # hard cap per game (safety)
