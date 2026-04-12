@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { bitCount } from '../coreClaude/bitboards';
 import { applyMove, generateMoves, Move } from '../coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position } from '../coreClaude/position';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../coreClaude/search/repetition';
@@ -11,7 +12,8 @@ import { Difficulty, GameConfig } from './types';
 import { usePixelGameFx } from './usePixelGameFx';
 
 const THINK_MS: Record<Difficulty, number> = { easy: 300, medium: 1000, hard: 2000 };
-const ALGORITHM_NAME = 'Codex Hybrid';
+const MOVE_ANIM_GUARD_MS = 460;
+const INITIAL_PIECES_PER_SIDE = 8;
 
 const BG = '#120c1c';
 const PANEL = '#211638';
@@ -29,24 +31,248 @@ function posKey(p: Position) {
   return [p.side, p.p1Men, p.p1Kings, p.p2Men, p.p2Kings, p.halfmoveClock].join(':');
 }
 
+function formatLastMoveCompact(move: { from: number; to: number; captured: number; promote: boolean } | null) {
+  if (!move) return '-';
+  const cap = move.captured > 0 ? ` x${move.captured}` : '';
+  const promo = move.promote ? ' K' : '';
+  return `${move.from}->${move.to}${cap}${promo}`;
+}
+
+function formatTurnSeconds(ms: number) {
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 interface Props {
   config: GameConfig;
   onBack: () => void;
 }
 
-function PixelInfoCard({
-  label,
-  value,
+type MoveHint = { from: number; to: number; captured: number; promote: boolean };
+type AvatarKind = 'human' | 'human-sad' | 'bot-easy' | 'bot-medium' | 'bot-hard';
+
+const AVATAR_PATTERNS_16: Record<AvatarKind, string[]> = {
+  human: [
+    '..hhhhhhhhhhhh..',
+    '.hhhhhhhhhhhhhh.',
+    '.hhsssssssssshh.',
+    'hhsssssssssssshh',
+    'hhsssse..esssshh',
+    'hhssss....sssshh',
+    'hhsssse..esssshh',
+    'hhsssssssssssshh',
+    'hhssssmmmmsssshh',
+    'hhssssmmmmsssshh',
+    'hhsssssssssssshh',
+    '.hhsssssssssshh.',
+    '.hhssmmmmmmsshh.',
+    '..hhsssssssshh..',
+    '...hhhhhhhhhh...',
+    '................',
+  ],
+  'human-sad': [
+    '..hhhhhhhhhhhh..',
+    '.hhhhhhhhhhhhhh.',
+    '.hhsssssssssshh.',
+    'hhsssssssssssshh',
+    'hhsssse..esssshh',
+    'hhssss....sssshh',
+    'hhsssse..esssshh',
+    'hhsssssssssssshh',
+    'hhssssmmmmsssshh',
+    'hhssssmmmmsssshh',
+    'hhsssssssssssshh',
+    '.hhsssssssssshh.',
+    '.hhssm....msshh.',
+    '..hhssmmmmsshh..',
+    '...hhhhhhhhhh...',
+    '................',
+  ],
+  'bot-easy': [
+    '.......bb.......',
+    '.......bb.......',
+    '..bbbbbbbbbbbb..',
+    '.bbccccccccccbb.',
+    'bbccgg....ggccbb',
+    'bbccg......gccbb',
+    'bbcc........ccbb',
+    'bbcc..bbbb..ccbb',
+    'bbcc........ccbb',
+    'bbccgg....ggccbb',
+    'bbcc........ccbb',
+    '.bbccccccccccbb.',
+    '..bbbbbbbbbbbb..',
+    '......bbbb......',
+    '......b..b......',
+    '................',
+  ],
+  'bot-medium': [
+    '.......bb.......',
+    '.......bb.......',
+    '..bbbbbbbbbbbb..',
+    '.bbccccccccccbb.',
+    'bbccyy....yyccbb',
+    'bbccy......yccbb',
+    'bbcc........ccbb',
+    'bbcc..byyb..ccbb',
+    'bbcc........ccbb',
+    'bbcc..yyyy..ccbb',
+    'bbcc........ccbb',
+    '.bbccccccccccbb.',
+    '..bbbbbbbbbbbb..',
+    '.....bbbbbb.....',
+    '......b..b......',
+    '................',
+  ],
+  'bot-hard': [
+    '......rr..rr....',
+    '.......rrrr.....',
+    '..rrrrrrrrrrrr..',
+    '.rrccccccccccrr.',
+    'rrccxx....xxccrr',
+    'rrccx......xccrr',
+    'rrcc........ccrr',
+    'rrcc..rrrr..ccrr',
+    'rrcc........ccrr',
+    'rrcc..xxxx..ccrr',
+    'rrcc........ccrr',
+    '.rrccccccccccrr.',
+    '..rrrrrrrrrrrr..',
+    '.....rrrrrr.....',
+    '......r..r......',
+    '................',
+  ],
+};
+
+const AVATAR_COLORS: Record<string, string> = {
+  h: '#5f3d1a',
+  s: '#ffd7a1',
+  e: '#2b1b12',
+  m: '#d88d6a',
+  b: '#9ec7ff',
+  c: '#2e3f64',
+  g: '#77f7cf',
+  y: '#ffe17d',
+  x: '#ff7dc4',
+  r: '#ff5f85',
+};
+
+function avatarKindByDifficulty(difficulty: Difficulty): AvatarKind {
+  if (difficulty === 'hard') return 'bot-hard';
+  if (difficulty === 'medium') return 'bot-medium';
+  return 'bot-easy';
+}
+
+function PixelAvatar({
+  kind,
   tint,
+  active,
 }: {
-  label: string;
-  value: string;
+  kind: AvatarKind;
   tint: string;
+  active: boolean;
+}) {
+  const pattern = AVATAR_PATTERNS_16[kind];
+  return (
+    <View style={[styles.avatarShell, { borderColor: active ? tint : LINE }]}>
+      <View style={[styles.avatarGrid, { opacity: active ? 1 : 0.78 }]}>
+        {pattern.flatMap((row, r) =>
+          row.split('').map((cell, c) => (
+            <View
+              key={`${kind}-${r}-${c}`}
+              style={[
+                styles.avatarPixel,
+                { backgroundColor: cell === '.' ? 'transparent' : (AVATAR_COLORS[cell] ?? 'transparent') },
+              ]}
+            />
+          )),
+        )}
+      </View>
+    </View>
+  );
+}
+
+function aiLevelTag(difficulty: Difficulty) {
+  if (difficulty === 'hard') return 'AI-H';
+  if (difficulty === 'medium') return 'AI-M';
+  return 'AI-E';
+}
+
+function TurnSeatChip({
+  lane,
+  avatarKind,
+  role,
+  captured,
+  turnTimer,
+  lastMoveText,
+  active,
+  tint,
+  showTelemetryToggle = false,
+  telemetryEnabled = false,
+  onToggleTelemetry,
+}: {
+  lane: string;
+  avatarKind: AvatarKind;
+  role: string;
+  captured: number;
+  turnTimer: string;
+  lastMoveText?: string | null;
+  active: boolean;
+  tint: string;
+  showTelemetryToggle?: boolean;
+  telemetryEnabled?: boolean;
+  onToggleTelemetry?: () => void;
 }) {
   return (
-    <View style={[styles.infoCard, { borderColor: tint }]}>
-      <Text style={[styles.infoValue, { color: tint }]}>{value}</Text>
-      <Text style={styles.infoLabel}>{label}</Text>
+    <View
+      style={[
+        styles.turnSeatChip,
+        {
+          borderColor: active ? tint : LINE,
+          backgroundColor: active ? PANEL_ALT : PANEL_DARK,
+          opacity: active ? 1 : 0.68,
+          transform: [{ scale: active ? 1 : 0.98 }],
+        },
+      ]}
+    >
+      <View style={styles.turnSeatInner}>
+        <PixelAvatar kind={avatarKind} tint={tint} active={active} />
+        <View style={styles.turnSeatCopy}>
+          <Text style={[styles.turnSeatText, { color: active ? WHITE : SOFT }]}>
+            {lane}
+          </Text>
+          <View style={styles.seatBoxRow}>
+            <View style={[styles.seatInfoBox, { borderColor: active ? tint : LINE }]}>
+              <Text style={[styles.turnSeatRole, { color: active ? tint : SOFT }]}>
+                {role}
+              </Text>
+            </View>
+            <View style={[styles.seatInfoBox, { borderColor: active ? tint : LINE }]}>
+              <Text style={styles.seatInfoText}>CAP x{captured}</Text>
+            </View>
+            <View style={[styles.seatInfoBox, { borderColor: active ? tint : LINE }]}>
+              <Text style={styles.seatInfoText}>T {turnTimer}</Text>
+            </View>
+            <View style={[styles.seatInfoBox, styles.seatInfoBoxWide, { borderColor: active ? GOLD : LINE }]}>
+              <Text style={styles.seatInfoText}>
+                {lastMoveText ? `LAST ${lastMoveText}` : 'LAST -'}
+              </Text>
+            </View>
+          </View>
+        </View>
+        {showTelemetryToggle && onToggleTelemetry ? (
+          <Pressable
+            onPress={onToggleTelemetry}
+            style={[
+              styles.telemetryToggleBtn,
+              telemetryEnabled ? styles.telemetryToggleBtnOn : styles.telemetryToggleBtnOff,
+            ]}
+          >
+            <Text style={styles.telemetryToggleText}>
+              {telemetryEnabled ? 'TEL ON' : 'TEL OFF'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -58,17 +284,26 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const thinkMs = THINK_MS[difficulty];
 
   const [pos, setPos] = useState<Position>(() => initialPosition());
+  const [posHistory, setPosHistory] = useState<Position[]>(() => [initialPosition()]);
   const [hashHistory, setHashHistory] = useState<number[]>(() => [hashPosition(initialPosition())]);
   const [sel, setSel] = useState<number | null>(null);
-  const [lastMove, setLastMove] = useState<{ from: number; to: number; captured: number; promote: boolean } | null>(null);
+  const [moveHistory, setMoveHistory] = useState<MoveHint[]>([]);
+  const [lastMove, setLastMove] = useState<MoveHint | null>(null);
   const [shakeFrame, setShakeFrame] = useState(0);
   const [comboFrame, setComboFrame] = useState(0);
   const [comboText, setComboText] = useState('');
+  const [showTelemetry, setShowTelemetry] = useState(false);
+  const [premiumUndo, setPremiumUndo] = useState(false);
+  const [turnElapsedMs, setTurnElapsedMs] = useState(0);
+  const [isAnimLocked, setIsAnimLocked] = useState(false);
+  const turnStartRef = useRef<number>(Date.now());
 
   const { think, thinking, lastInfo, lastPlan, cancel } = useCodexEngine();
   const { triggerFx } = usePixelGameFx();
   const pendingRef = useRef<string | null>(null);
-  const endgameRef = useRef<string | null>(null);
+  const aiCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animLockUntilRef = useRef<number>(0);
 
   const myMoves = useMemo(() => generateMoves(pos), [pos]);
   const isDraw = useMemo(() => isDrawByInactivity(pos), [pos]);
@@ -77,48 +312,80 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     () => isThreefoldRepetition(buildRepetitionCounts(hashHistory), curHash),
     [curHash, hashHistory],
   );
+  const gameResult = useMemo(() => {
+    if (isDraw || isThreefold) return { label: 'DRAW', tone: 'draw' as const };
+    if (myMoves.length > 0) return null;
+
+    const winnerSide = (pos.side === 1 ? -1 : 1) as 1 | -1;
+    if (isHvH) return { label: winnerSide === 1 ? 'P1 WIN' : 'P2 WIN', tone: 'win' as const };
+    return winnerSide === humanSide
+      ? { label: 'YOU WIN', tone: 'win' as const, avatarKind: 'human' as AvatarKind }
+      : { label: 'YOU LOSE', tone: 'loss' as const, avatarKind: 'human-sad' as AvatarKind };
+  }, [humanSide, isDraw, isHvH, isThreefold, myMoves.length, pos.side]);
 
   const canHumanMove =
     (isHvH || pos.side === humanSide) &&
-    !thinking && !isDraw && !isThreefold && myMoves.length > 0;
+    !thinking && !isAnimLocked && !isDraw && !isThreefold && myMoves.length > 0;
   const shakeX = [0, -6, 5, -4, 3, -2, 0][Math.min(shakeFrame, 6)];
   const comboOpacity = [0, 0.75, 1, 1, 0.9, 0.7, 0.45, 0.2, 0][Math.min(comboFrame, 8)];
   const comboLift = [24, 18, 14, 10, 6, 2, -2, -6, -10][Math.min(comboFrame, 8)];
 
-  function commitMove(move: Move) {
-    const next = applyMove(pos, move);
+  function commitMove(basePos: Position, move: Move) {
+    const next = applyMove(basePos, move);
+    const hint: MoveHint = { from: move.from, to: move.to, captured: move.captured.length, promote: move.promote };
+    lockMoveAnimationWindow();
     setPos(next);
+    setPosHistory(prev => [...prev, next]);
     setHashHistory(prev => [...prev, hashPosition(next)]);
-    setLastMove({ from: move.from, to: move.to, captured: move.captured.length, promote: move.promote });
+    setMoveHistory(prev => [...prev, hint]);
+    setLastMove(hint);
   }
 
-  useEffect(() => {
-    if (isDraw || isThreefold) {
-      const key = posKey(pos) + (isThreefold ? ':rep' : ':draw');
-      if (endgameRef.current !== key) {
-        endgameRef.current = key;
-        Alert.alert('Game Over', isThreefold ? 'Draw by repetition.' : 'Draw by inactivity.');
-      }
+  function clearPendingAICommit() {
+    if (aiCommitTimerRef.current) {
+      clearTimeout(aiCommitTimerRef.current);
+      aiCommitTimerRef.current = null;
+    }
+  }
+
+  function clearAnimUnlockTimer() {
+    if (animUnlockTimerRef.current) {
+      clearTimeout(animUnlockTimerRef.current);
+      animUnlockTimerRef.current = null;
+    }
+  }
+
+  function lockMoveAnimationWindow() {
+    animLockUntilRef.current = Date.now() + MOVE_ANIM_GUARD_MS;
+    setIsAnimLocked(true);
+    clearAnimUnlockTimer();
+    animUnlockTimerRef.current = setTimeout(() => {
+      animUnlockTimerRef.current = null;
+      if (Date.now() >= animLockUntilRef.current) setIsAnimLocked(false);
+    }, MOVE_ANIM_GUARD_MS);
+  }
+
+  function scheduleAICommit(basePos: Position, move: Move, turnKey: string) {
+    clearPendingAICommit();
+    setSel(null);
+
+    const delayMs = Math.max(0, animLockUntilRef.current - Date.now());
+    if (delayMs <= 0) {
+      if (pendingRef.current === turnKey) commitMove(basePos, move);
       return;
     }
-    if (!myMoves.length) {
-      const key = posKey(pos) + ':nomoves';
-      if (endgameRef.current !== key) {
-        endgameRef.current = key;
-        const winner = isHvH
-          ? (pos.side === 1 ? 'Player 2 wins.' : 'Player 1 wins.')
-          : (pos.side === humanSide ? `${ALGORITHM_NAME} wins.` : 'You win.');
-        Alert.alert('Game Over', winner);
-      }
-      return;
-    }
-    endgameRef.current = null;
-  }, [humanSide, isDraw, isHvH, isThreefold, myMoves.length, pos]);
+
+    aiCommitTimerRef.current = setTimeout(() => {
+      aiCommitTimerRef.current = null;
+      if (pendingRef.current === turnKey) commitMove(basePos, move);
+    }, delayMs);
+  }
 
   useEffect(() => {
     if (isHvH) return;
     if (pos.side !== aiSide || isDraw || isThreefold || !myMoves.length) {
       pendingRef.current = null;
+      clearPendingAICommit();
       return;
     }
     const key = posKey(pos);
@@ -126,8 +393,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     pendingRef.current = key;
 
     if (myMoves.length === 1) {
-      commitMove(myMoves[0]);
-      setSel(null);
+      scheduleAICommit(pos, myMoves[0], key);
       return;
     }
 
@@ -138,15 +404,16 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
       if (pendingRef.current !== key) return;
       const move = best ?? generateMoves(posSnapshot)[0];
       if (move) {
-        const next = applyMove(posSnapshot, move);
-        setPos(next);
-        setHashHistory(prev => [...prev, hashPosition(next)]);
-        setLastMove({ from: move.from, to: move.to, captured: move.captured.length, promote: move.promote });
+        scheduleAICommit(posSnapshot, move, key);
       }
-      setSel(null);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos.side, isDraw, isThreefold, myMoves.length]);
+
+  useEffect(() => () => {
+    clearPendingAICommit();
+    clearAnimUnlockTimer();
+  }, []);
 
   useEffect(() => {
     if (!lastMove) {
@@ -209,6 +476,19 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     if (!myMoves.length || isDraw || isThreefold) triggerFx('victory');
   }, [isDraw, isThreefold, myMoves.length, triggerFx]);
 
+  useEffect(() => {
+    turnStartRef.current = Date.now();
+    setTurnElapsedMs(0);
+  }, [pos.side]);
+
+  useEffect(() => {
+    if (!myMoves.length || isDraw || isThreefold) return;
+    const id = setInterval(() => {
+      setTurnElapsedMs(Date.now() - turnStartRef.current);
+    }, 100);
+    return () => clearInterval(id);
+  }, [isDraw, isThreefold, myMoves.length, pos.side]);
+
   function onTapSquare(i: number) {
     if (!canHumanMove) return;
     if (sel === null) {
@@ -217,67 +497,143 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     }
     const move = myMoves.find(m => m.from === sel && m.to === i);
     if (move) {
-      commitMove(move);
+      commitMove(pos, move);
       setSel(null);
       return;
     }
     setSel(myMoves.some(m => m.from === i) ? i : null);
   }
 
+  function runUndo() {
+    const rewindPlies = isHvH ? 1 : 2;
+    const maxUndo = posHistory.length - 1;
+    const actual = Math.min(rewindPlies, maxUndo);
+    if (actual <= 0) return;
+
+    cancel();
+    pendingRef.current = null;
+    clearPendingAICommit();
+    clearAnimUnlockTimer();
+    animLockUntilRef.current = 0;
+    setIsAnimLocked(false);
+
+    const nextPosHistory = posHistory.slice(0, posHistory.length - actual);
+    const restored = nextPosHistory[nextPosHistory.length - 1];
+    const nextHashHistory = hashHistory.slice(0, Math.max(1, hashHistory.length - actual));
+    const nextMoveHistory = moveHistory.slice(0, Math.max(0, moveHistory.length - actual));
+
+    setPos(restored);
+    setPosHistory(nextPosHistory);
+    setHashHistory(nextHashHistory);
+    setMoveHistory(nextMoveHistory);
+    setLastMove(nextMoveHistory.length ? nextMoveHistory[nextMoveHistory.length - 1] : null);
+    setSel(null);
+  }
+
+  function onPressUndo() {
+    if (thinking) return;
+    if (posHistory.length <= 1) return;
+
+    const undoLockedByMode = !isHvH && difficulty === 'hard';
+    if (undoLockedByMode) {
+      Alert.alert('Undo Locked', 'Hard mode locks undo to keep the challenge fair.');
+      return;
+    }
+
+    if (premiumUndo) {
+      runUndo();
+      return;
+    }
+
+    Alert.alert(
+      'Unlock Undo',
+      'Watch an ad to get 1 undo or unlock premium for unlimited undo.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Go Premium',
+          onPress: () => {
+            setPremiumUndo(true);
+            runUndo();
+          },
+        },
+        {
+          text: 'Watch Ad',
+          onPress: () => {
+            runUndo();
+          },
+        },
+      ],
+    );
+  }
+
   function onNewGame() {
     cancel();
     pendingRef.current = null;
-    endgameRef.current = null;
+    clearPendingAICommit();
+    clearAnimUnlockTimer();
+    animLockUntilRef.current = 0;
+    setIsAnimLocked(false);
     setSel(null);
     const next = initialPosition();
     setPos(next);
+    setPosHistory([next]);
     setHashHistory([hashPosition(next)]);
+    setMoveHistory([]);
     setLastMove(null);
   }
 
   const pvText = lastInfo?.pv.map((m: Move) => `${m.from}->${m.to}`).join(' ');
 
-  let statusText = 'Waiting';
-  if (isDraw || isThreefold) statusText = 'DRAW';
-  else if (!myMoves.length) statusText = 'GAME OVER';
-  else if (isHvH) statusText = pos.side === 1 ? 'PLAYER 1 TURN' : 'PLAYER 2 TURN';
-  else statusText = pos.side === humanSide ? 'YOUR TURN' : (thinking ? 'AI THINKING' : 'AI READY');
-
-  const opponentLabel = isHvH ? 'Player 2 (P2)' : `${ALGORITHM_NAME} (P2)`;
-  const planMode = lastPlan?.mode?.toUpperCase() ?? 'IDLE';
-  const moveCount = String(myMoves.length).padStart(2, '0');
-  const selectCount = sel === null ? '00' : '01';
+  const p1IsHuman = isHvH || humanSide === 1;
+  const p2IsHuman = isHvH || humanSide === -1;
+  const p1Role = p1IsHuman ? 'HUMAN' : aiLevelTag(difficulty);
+  const p2Role = p2IsHuman ? 'HUMAN' : aiLevelTag(difficulty);
+  const p1AvatarKind: AvatarKind = p1IsHuman ? 'human' : avatarKindByDifficulty(difficulty);
+  const p2AvatarKind: AvatarKind = p2IsHuman ? 'human' : avatarKindByDifficulty(difficulty);
+  const p1IsBot = !p1IsHuman;
+  const p2IsBot = !p2IsHuman;
+  const p1PieceCount = bitCount((pos.p1Men | pos.p1Kings) >>> 0);
+  const p2PieceCount = bitCount((pos.p2Men | pos.p2Kings) >>> 0);
+  const p1Captured = Math.max(0, INITIAL_PIECES_PER_SIDE - p2PieceCount);
+  const p2Captured = Math.max(0, INITIAL_PIECES_PER_SIDE - p1PieceCount);
+  const lastMovedSide: 1 | -1 = pos.side === 1 ? -1 : 1;
+  const lastMoveText = formatLastMoveCompact(lastMove);
+  const p1Last = lastMovedSide === 1 && lastMove ? lastMoveText : null;
+  const p2Last = lastMovedSide === -1 && lastMove ? lastMoveText : null;
+  const liveTurn = formatTurnSeconds(turnElapsedMs);
+  const p1Turn = pos.side === 1 ? liveTurn : '--';
+  const p2Turn = pos.side === -1 ? liveTurn : '--';
+  const undoLockedByMode = !isHvH && difficulty === 'hard';
+  const canUndoNow = !thinking && posHistory.length > 1;
+  const undoBtnText = undoLockedByMode ? '🔒 UNDO' : 'UNDO';
+  const forcedFrom = useMemo(() => {
+    if (!canHumanMove || sel !== null) return null;
+    const fromSet = new Set(myMoves.map(m => m.from));
+    if (fromSet.size !== 1) return null;
+    const [onlyFrom] = Array.from(fromSet);
+    return onlyFrom ?? null;
+  }, [canHumanMove, myMoves, sel]);
+  const suggestedFrom = sel === null ? forcedFrom : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerPanel}>
-          <View style={styles.headerTopRow}>
-            <Pressable style={styles.backButton} onPress={() => { cancel(); onBack(); }}>
-              <Text style={styles.backButtonText}>MENU</Text>
-            </Pressable>
-            <View style={styles.headerTag}>
-              <Text style={styles.headerTagText}>{isHvH ? 'LOCAL' : 'HYBRID AI'}</Text>
-            </View>
-          </View>
+        <View style={styles.edgeSpacer} />
 
-          <Text style={styles.kicker}>PIXEL MATCH HUD</Text>
-          <Text style={styles.title}>MAKHOS BOARD</Text>
-          <Text style={styles.subtitle}>Player 1 (P1) vs {opponentLabel}</Text>
-          <Text style={styles.statusText}>{statusText}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <PixelInfoCard label="TURN" value={pos.side === 1 ? 'P1' : 'P2'} tint={GOLD} />
-          <PixelInfoCard label="STATE" value={thinking ? 'THINK' : 'READY'} tint={thinking ? PINK : MINT} />
-          <PixelInfoCard label="MODE" value={planMode} tint={CYAN} />
-        </View>
-
-        <View style={styles.infoRow}>
-          <PixelInfoCard label="MOVES" value={moveCount} tint={MINT} />
-          <PixelInfoCard label="PICK" value={selectCount} tint={PINK} />
-          <PixelInfoCard label="CLOCK" value={String(pos.halfmoveClock).padStart(2, '0')} tint={GOLD} />
-        </View>
+        <TurnSeatChip
+          lane="P2"
+          avatarKind={p2AvatarKind}
+          role={p2Role}
+          captured={p2Captured}
+          turnTimer={p2Turn}
+          lastMoveText={p2Last}
+          active={pos.side === -1}
+          tint={PINK}
+          showTelemetryToggle={p2IsBot}
+          telemetryEnabled={showTelemetry}
+          onToggleTelemetry={() => setShowTelemetry(v => !v)}
+        />
 
         <View style={styles.boardPanel}>
           {!!comboText && comboFrame < 8 && (
@@ -298,35 +654,105 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
             <Board
               pos={pos}
               onTapSquare={onTapSquare}
-              fromSquares={sel !== null ? [sel] : []}
+              fromSquares={suggestedFrom !== null ? [suggestedFrom] : []}
               selectedFrom={sel}
               destSquares={sel !== null ? myMoves.filter(m => m.from === sel).map(m => ({ to: m.to, caps: m.captured.length })) : []}
               lastMove={lastMove}
             />
+            {gameResult ? (
+              <View style={styles.resultOverlay}>
+                <View
+                  style={[
+                    styles.resultOverlayBox,
+                    gameResult.tone === 'win'
+                      ? styles.resultOverlayWin
+                      : gameResult.tone === 'loss'
+                        ? styles.resultOverlayLoss
+                        : styles.resultOverlayDraw,
+                  ]}
+                >
+                  <Text style={styles.resultOverlayTitle}>{gameResult.label}</Text>
+                  {'avatarKind' in gameResult && gameResult.avatarKind ? (
+                    <View style={styles.resultOverlayAvatarRow}>
+                      <View style={styles.resultOverlayAvatarWrap}>
+                        <PixelAvatar
+                          kind={gameResult.avatarKind}
+                          tint={gameResult.tone === 'win' ? MINT : PINK}
+                          active
+                        />
+                        {gameResult.tone === 'loss' ? (
+                          <View pointerEvents="none" style={styles.lossCrossOverlay}>
+                            <View style={[styles.lossCrossLine, styles.lossCrossLineA]} />
+                            <View style={[styles.lossCrossLine, styles.lossCrossLineB]} />
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
           </View>
+
         </View>
 
-        <View style={styles.telemetryPanel}>
-          <Text style={styles.telemetryTitle}>ENGINE TELEMETRY</Text>
-          {!isHvH && lastInfo ? (
-            <>
-              <Text style={styles.telemetryLine}>depth {lastInfo.depth} | score {lastInfo.score} | nodes {lastInfo.nodes}</Text>
-              {lastPlan ? <Text style={styles.telemetryLine}>mode {lastPlan.mode} | {lastPlan.reason}</Text> : null}
-              {pvText ? <Text style={styles.telemetryLine}>pv {pvText}</Text> : null}
-            </>
-          ) : (
-            <Text style={styles.telemetryLine}>Telemetry appears after the first AI search completes.</Text>
-          )}
-        </View>
+        <TurnSeatChip
+          lane="P1"
+          avatarKind={p1AvatarKind}
+          role={p1Role}
+          captured={p1Captured}
+          turnTimer={p1Turn}
+          lastMoveText={p1Last}
+          active={pos.side === 1}
+          tint={CYAN}
+          showTelemetryToggle={p1IsBot}
+          telemetryEnabled={showTelemetry}
+          onToggleTelemetry={() => setShowTelemetry(v => !v)}
+        />
+
+        {showTelemetry ? (
+          <View style={styles.telemetryPanel}>
+            <Text style={styles.telemetryTitle}>ENGINE TELEMETRY</Text>
+            {!isHvH && lastInfo ? (
+              <>
+                <Text style={styles.telemetryLine}>depth {lastInfo.depth} | score {lastInfo.score} | nodes {lastInfo.nodes}</Text>
+                {lastPlan ? <Text style={styles.telemetryLine}>mode {lastPlan.mode} | {lastPlan.reason}</Text> : null}
+                {pvText ? <Text style={styles.telemetryLine}>pv {pvText}</Text> : null}
+              </>
+            ) : (
+              <Text style={styles.telemetryLine}>Telemetry appears after the first AI search completes.</Text>
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.actionRow}>
+          <Pressable
+            style={[
+              styles.secondaryButton,
+              undoLockedByMode && styles.undoBtnLockedLook,
+              !canUndoNow && styles.btnDisabled,
+            ]}
+            onPress={onPressUndo}
+            disabled={!canUndoNow}
+          >
+            <Text style={styles.secondaryButtonText}>{undoBtnText}</Text>
+          </Pressable>
           <Pressable style={styles.primaryButton} onPress={onNewGame}>
             <Text style={styles.primaryButtonText}>NEW GAME</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => { cancel(); onBack(); }}>
+          <Pressable style={styles.secondaryButton} onPress={() => {
+            cancel();
+            clearPendingAICommit();
+            clearAnimUnlockTimer();
+            animLockUntilRef.current = 0;
+            setIsAnimLocked(false);
+            onBack();
+          }}>
             <Text style={styles.secondaryButtonText}>EXIT BOARD</Text>
           </Pressable>
         </View>
+
+        <View style={styles.edgeSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -338,19 +764,24 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24,
-    gap: 14,
+    flexGrow: 1,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 16,
+    gap: 10,
     alignItems: 'center',
+  },
+  edgeSpacer: {
+    flexGrow: 1,
+    minHeight: 0,
   },
   headerPanel: {
     width: '100%',
     backgroundColor: PANEL,
     borderWidth: 3,
     borderColor: LINE,
-    padding: 14,
-    gap: 8,
+    padding: 12,
+    gap: 6,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -358,9 +789,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButton: {
-    minWidth: 88,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    minWidth: 78,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderWidth: 2,
     borderColor: LINE,
     backgroundColor: PANEL_DARK,
@@ -368,77 +799,146 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: WHITE,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1,
   },
   headerTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderWidth: 2,
     borderColor: CYAN,
     backgroundColor: PANEL_DARK,
   },
   headerTagText: {
     color: CYAN,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.9,
   },
   kicker: {
     color: GOLD,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.3,
   },
   title: {
     color: WHITE,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     letterSpacing: 1.1,
   },
   subtitle: {
     color: SOFT,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
   },
   statusText: {
     color: MINT,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.7,
   },
-  infoRow: {
+  turnSeatChip: {
     width: '100%',
-    flexDirection: 'row',
-    gap: 10,
+    minHeight: 44,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'stretch',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  infoCard: {
+  turnSeatInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  turnSeatCopy: {
     flex: 1,
-    minHeight: 82,
-    backgroundColor: PANEL_ALT,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  seatBoxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  seatInfoBox: {
+    minHeight: 16,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    backgroundColor: PANEL_DARK,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seatInfoBoxWide: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  seatInfoText: {
+    color: WHITE,
+    fontSize: 7,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  telemetryToggleBtn: {
+    minWidth: 62,
+    minHeight: 26,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    paddingHorizontal: 6,
   },
-  infoValue: {
-    fontSize: 20,
+  telemetryToggleBtnOn: {
+    borderColor: MINT,
+    backgroundColor: '#19392e',
+  },
+  telemetryToggleBtnOff: {
+    borderColor: LINE,
+    backgroundColor: '#1b1330',
+  },
+  telemetryToggleText: {
+    color: WHITE,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  turnSeatText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 13,
+  },
+  turnSeatRole: {
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1,
   },
-  infoLabel: {
-    color: SOFT,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+  avatarShell: {
+    width: 40,
+    height: 40,
+    borderWidth: 2,
+    backgroundColor: PANEL_DARK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarGrid: {
+    width: 32,
+    height: 32,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: PANEL_DARK,
+  },
+  avatarPixel: {
+    width: 2,
+    height: 2,
   },
   boardPanel: {
     width: '100%',
     backgroundColor: PANEL,
     borderWidth: 3,
     borderColor: LINE,
-    padding: 14,
+    padding: 10,
     alignItems: 'center',
     overflow: 'hidden',
   },
@@ -447,20 +947,89 @@ const styles = StyleSheet.create({
     backgroundColor: PANEL_DARK,
     borderWidth: 3,
     borderColor: GOLD,
+    position: 'relative',
+  },
+  resultOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultOverlayBox: {
+    minWidth: 140,
+    minHeight: 72,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#130d1e',
+  },
+  resultOverlayWin: {
+    borderColor: MINT,
+  },
+  resultOverlayLoss: {
+    borderColor: PINK,
+  },
+  resultOverlayDraw: {
+    borderColor: GOLD,
+  },
+  resultOverlayTitle: {
+    color: WHITE,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  resultOverlayAvatarRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resultOverlayAvatarWrap: {
+    width: 40,
+    height: 40,
+    position: 'relative',
+  },
+  lossCrossOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lossCrossLine: {
+    position: 'absolute',
+    width: 58,
+    height: 4,
+    backgroundColor: '#000000',
+    opacity: 0.95,
+  },
+  lossCrossLineA: {
+    transform: [{ rotate: '45deg' }],
+  },
+  lossCrossLineB: {
+    transform: [{ rotate: '-45deg' }],
   },
   comboBadge: {
     position: 'absolute',
     top: 8,
     zIndex: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderWidth: 2,
     borderColor: GOLD,
     backgroundColor: '#ff4fa3',
   },
   comboBadgeText: {
     color: WHITE,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.1,
   },
@@ -469,28 +1038,28 @@ const styles = StyleSheet.create({
     backgroundColor: PANEL,
     borderWidth: 3,
     borderColor: LINE,
-    padding: 14,
-    gap: 6,
+    padding: 12,
+    gap: 4,
   },
   telemetryTitle: {
     color: PINK,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
   },
   telemetryLine: {
     color: WHITE,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
   },
   actionRow: {
     width: '100%',
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   primaryButton: {
     flex: 1,
-    minHeight: 54,
+    minHeight: 46,
     backgroundColor: PANEL_ALT,
     borderWidth: 3,
     borderColor: GOLD,
@@ -499,13 +1068,13 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: WHITE,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
   },
   secondaryButton: {
     flex: 1,
-    minHeight: 54,
+    minHeight: 46,
     backgroundColor: PANEL,
     borderWidth: 2,
     borderColor: LINE,
@@ -514,8 +1083,14 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: SOFT,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
+  },
+  undoBtnLockedLook: {
+    opacity: 0.7,
+  },
+  btnDisabled: {
+    opacity: 0.45,
   },
 });

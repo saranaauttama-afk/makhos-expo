@@ -302,3 +302,7 @@ If the immediate goal is to build the new interface first, the best order is:
 4. Result screen skeleton
 5. Shop / No Ads screen skeleton
 6. Settings screen skeleton
+
+cd "d:\My App\makhos-v2"
+$env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.10"
+npx expo start --lan -c
