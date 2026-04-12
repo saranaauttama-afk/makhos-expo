@@ -43,3 +43,10 @@ yarn-error.*
 /ios
 /android
 makhos/
+
+# local temp / generated files
+.tmp/
+tmp_battle/
+tmp_review/
+__pycache__/
+*.pyc

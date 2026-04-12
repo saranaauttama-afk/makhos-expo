@@ -188,3 +188,115 @@ npx tsc --module commonjs --moduleResolution node --target es2017 \
 - P2 always wins vs minimax at any depth tested — this is a **real game-theory property**, not a bug (confirmed by reading Java original source and Thai Checkers references)
 - Max-capture is enforced from **v3 onwards** — earlier models were trained without it
 - C_PUCT = 1.5 in both training (Python) and inference (TypeScript) from v3 onwards
+
+---
+
+## Product UI Plan
+
+This section is a practical product/UI checklist for turning Makhos into a shippable mobile game with ads plus a paid "remove ads" option.
+
+### Core Difficulty Structure
+
+Recommended difficulty ladder for the new UI:
+
+| Level | Goal |
+|---|---|
+| Beginner | Very forgiving, fast turns |
+| Easy | Casual players |
+| Medium | Default mode |
+| Hard | Strong AI with more thinking time |
+| Master | Strongest practical mobile setting |
+
+### Minimum Screen Set
+
+These are the screens worth planning before final art production:
+
+| Screen | Why it exists |
+|---|---|
+| Splash / Boot | Load assets, model, and saved settings |
+| Home | Main entry point: Play, Settings, Shop, Profile/Future events |
+| Mode Select | Human vs AI, Human vs Human, Arena / analysis later |
+| Difficulty Select | Choose one of the 5 AI levels |
+| Side Select | Let player choose first/second side when playing AI |
+| Match Screen | Main board UI, timers, hints, pause, undo rules |
+| Pause Sheet | Resume, restart, sound, quit |
+| Result Screen | Win/loss/draw, rematch, next action, ad offer if appropriate |
+| Shop / No Ads | Buy ad removal, restore purchase, explain benefits clearly |
+| Settings | Sound, vibration, language, animation speed, privacy links |
+| Privacy / Terms | Needed for store submission and ad SDK compliance |
+
+### Monetization Screens
+
+If the game uses ads but allows players to pay to remove them, these screens are the practical minimum:
+
+| Screen | Purpose |
+|---|---|
+| No Ads Offer | Explain one-time purchase or subscription to remove forced ads |
+| Restore Purchase | Required for iOS if purchases are supported |
+| Ad-Free Confirmation | Simple success state after purchase |
+| Rewarded Ad Prompt | Optional: watch ad for retry, hint, theme, coins, etc. |
+| Ad Error / Unavailable | Fallback when ad inventory is not available |
+
+### Recommended Player Flow
+
+For an ad-supported strategy game, a clean first version can be:
+
+1. Splash
+2. Home
+3. Mode Select
+4. Difficulty Select
+5. Side Select
+6. Match Screen
+7. Result Screen
+
+From Home, Settings and Shop should always be reachable in one tap.
+
+### Ad Strategy
+
+For better retention, prefer this order:
+
+| Ad Type | Recommendation |
+|---|---|
+| Banner | Avoid on gameplay board if it makes the board feel cheap or cramped |
+| Interstitial | Show sparingly after match results, not during active play |
+| Rewarded | Best option for voluntary monetization |
+| Remove Ads Purchase | Offer permanently from Settings, Result screen, and Shop |
+
+Suggested rule:
+
+- Free players may see interstitial ads after some completed matches
+- Players who buy "No Ads" stop seeing forced ads
+- Rewarded ads can still remain optional even for paying users if tied to bonuses
+
+### UI Skeleton Guidance
+
+Before final art, it helps to design these reusable blocks:
+
+| Block | Notes |
+|---|---|
+| Hero header | Logo, subtitle, seasonal/event art zone |
+| Large mode cards | Big tap targets for AI / local play / future online mode |
+| Difficulty cards | 5 stacked cards with fixed image placeholders |
+| Bottom CTA | Consistent primary action button height across screens |
+| Modal sheet | Reusable for pause, confirm quit, ad prompts, purchase prompts |
+| Result card | Shared win/loss/draw presentation pattern |
+
+### Store / Compliance Notes
+
+If ads or in-app purchases are added, plan for these non-game pages too:
+
+- Privacy Policy
+- Terms of Service
+- Restore Purchases
+- Data / tracking consent if required by the ad SDK or platform rules
+
+### Suggested Next UI Work
+
+If the immediate goal is to build the new interface first, the best order is:
+
+1. Home screen skeleton
+2. Difficulty select skeleton with 5 levels
+3. Match screen skeleton
+4. Result screen skeleton
+5. Shop / No Ads screen skeleton
+6. Settings screen skeleton

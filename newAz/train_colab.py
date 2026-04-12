@@ -26,7 +26,13 @@ import torch.nn.functional as F
 DRIVE_DIR  = '/content/drive/MyDrive/makhos_az_v5'
 MODELS_DIR = f'{DRIVE_DIR}/models'
 LOG_FILE   = f'{DRIVE_DIR}/training_log.jsonl'
-os.makedirs(MODELS_DIR, exist_ok=True)
+EXTERNAL_EVAL_DIR = f'{DRIVE_DIR}/external_eval'
+EXTERNAL_REQUESTS_DIR = f'{EXTERNAL_EVAL_DIR}/requests'
+EXTERNAL_RESULTS_DIR = f'{EXTERNAL_EVAL_DIR}/results'
+EXTERNAL_DECISIONS_DIR = f'{EXTERNAL_EVAL_DIR}/decisions'
+TARGET_STATUS_PATH = f'{EXTERNAL_EVAL_DIR}/target_status.json'
+for path in [MODELS_DIR, EXTERNAL_EVAL_DIR, EXTERNAL_REQUESTS_DIR, EXTERNAL_RESULTS_DIR, EXTERNAL_DECISIONS_DIR]:
+    os.makedirs(path, exist_ok=True)
 
 # Copy engine + network modules to /content so we can import them
 for fname in ['makhos_engine.py', 'network_az.py', 'mcts_az.py']:
@@ -67,7 +73,7 @@ MAX_GAME_LEN = 250    # hard cap per game (safety)
 REPLAY_SIZE  = 200_000  # v4: start moderate, will grow (was 350k)
 BATCH_SIZE   = 256
 TRAIN_STEPS  = 500      # optimizer steps per iteration
-LR           = 2e-4     # lower LR reduces late-iteration drift
+LR           = 1e-4     # round-2 resume: slower updates to break the mm7 plateau
 WD           = 1e-4
 MIN_BUFFER_TO_TRAIN = 8_192
 SELFPLAY_ANCHOR_FRACTION = 0.25
@@ -83,23 +89,14 @@ LOSS_MINING_MAX_SAMPLES = 48
 OVERRIDE_LR_ON_RESUME = True
 
 # Evaluation
-EVAL_INTERVAL   = 10    # eval every N iterations
-N_EVAL_GAMES    = 30    # new-net vs best-net (was 60)
-WIN_THRESHOLD   = 0.55  # win-rate needed to replace best net
-N_MINIMAX_GAMES = 20    # games vs minimax at each checkpoint (was 40)
+EVAL_INTERVAL   = 10    # save checkpoint / quick-eval every N iterations
+WIN_THRESHOLD   = 0.55  # quick win-rate needed to replace best net
 N_EVAL_SIMS     = 400   # MCTS sims during eval (stronger play than self-play)
 MINIMAX_DEPTH   = 3
 MINIMAX_DEPTH_5 = 5
 MINIMAX_DEPTH_7 = 7
 MINIMAX_DEPTH_9 = 9
 MINIMAX_DEPTH_11 = 11
-MINIMAX_EVAL_PLAN = [
-    (MINIMAX_DEPTH,   12),
-    (MINIMAX_DEPTH_5, 10),
-    (MINIMAX_DEPTH_7,  8),
-    (MINIMAX_DEPTH_9,  6),
-    (MINIMAX_DEPTH_11, 6),
-]
 TARGET_MINIMAX_DEPTH = MINIMAX_DEPTH_11
 TARGET_BEST_MARGIN   = 0.02
 OPENING_SUITE_SIZE = 8
@@ -107,12 +104,36 @@ OPENING_SUITE_MAX_PLY = 8
 OPENING_SUITE_SEED = 20260406
 OPENING_SUITE_MM_DEPTH = TARGET_MINIMAX_DEPTH
 
-# Learning-rate + rollback control
+# Quick in-loop eval for Colab only.
+QUICK_EVAL_ENABLED = True
+QUICK_EVAL_NET_GAMES = 12
+QUICK_EVAL_RANDOM_GAMES = 6
+QUICK_EVAL_MINIMAX_PLAN = [
+    (MINIMAX_DEPTH, 6),
+    (MINIMAX_DEPTH_5, 4),
+]
+QUICK_EVAL_USE_OPENING_SUITE = False
+ENABLE_LOSS_MINING = False
+AUTO_LOSS_MINING_FROM_DECISIONS = True
+DEFAULT_LOSS_MINING_DEPTH = 5
+DEFAULT_LOSS_MINING_GAMES = 0
+DEFAULT_LOSS_MINING_POSITIONS_PER_GAME = 0
+DEFAULT_LOSS_MINING_MAX_SAMPLES = 0
+
+# External eval handshake (local machine reads requests and writes results/decisions).
+REQUEST_EXTERNAL_EVAL = True
+APPLY_EXTERNAL_DECISIONS = True
+EXTERNAL_DECISION_POLL_EVERY = 1
+ALLOW_QUICK_PROMOTE_BEST = False
+
+# Run-policy
+RUN_BLOCK_ITERS = 20     # stop after each 20-iter block so we can review and adjust
+MAX_TOTAL_ITERS = 200
+
+# Learning-rate control
 LR_PLATEAU_PATIENCE = 2
 LR_DECAY_FACTOR     = 0.5
 MIN_LR              = 5e-5
-ROLLBACK_PATIENCE   = 2
-ROLLBACK_DELTA      = 0.08
 
 # Email notification
 EMAIL_FROM     = 'saranaauttama@gmail.com'
@@ -122,8 +143,11 @@ EMAIL_PASSWORD = 'vktn yrqy apkd gkza'  # Gmail App Password 16 ตัว
 print('Config OK')
 print(f'  self-play: {N_SELFPLAY} games × {N_SIMS} sims/move')
 print(f'  training : {TRAIN_STEPS} steps × batch {BATCH_SIZE}')
-print(f'  eval     : every {EVAL_INTERVAL} iterations, {N_EVAL_GAMES} games')
-print(f'  target   : beat minimax-{TARGET_MINIMAX_DEPTH}')
+print(f'  eval     : every {EVAL_INTERVAL} iterations, quick eval on Colab')
+print(f'  external : requests -> {EXTERNAL_REQUESTS_DIR}')
+print(f'  target   : full decisions come from local eval vs minimax-{TARGET_MINIMAX_DEPTH}')
+print(f'  mining   : {"auto-from-decisions" if AUTO_LOSS_MINING_FROM_DECISIONS else ("enabled" if ENABLE_LOSS_MINING else "disabled")}')
+print(f'  run      : blocks of {RUN_BLOCK_ITERS} iterations (cap {MAX_TOTAL_ITERS})')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CELL 4 — Helper functions
@@ -342,8 +366,16 @@ def eval_net_on_opening_suite(net: AZNetwork, mm_depth: int, suite: list) -> dic
     }
 
 
-def mine_losses_vs_minimax(net: AZNetwork, mm_depth: int, n_games: int) -> list:
+def mine_losses_vs_minimax(
+    net: AZNetwork,
+    mm_depth: int,
+    n_games: int,
+    positions_per_game: int,
+    max_samples: int,
+) -> list:
     samples = []
+    if n_games <= 0 or positions_per_game <= 0 or max_samples <= 0:
+        return samples
     for g in range(n_games):
         start_pos = OPENING_SUITE[g % len(OPENING_SUITE)] if OPENING_SUITE else initial_position()
         net_side = 1 if (g % 2 == 0) else -1
@@ -356,13 +388,13 @@ def mine_losses_vs_minimax(net: AZNetwork, mm_depth: int, n_games: int) -> list:
         )
         if score != 0.0:
             continue
-        tail_positions = net_positions[-LOSS_MINING_POSITIONS_PER_GAME:]
+        tail_positions = net_positions[-positions_per_game:]
         for pos in tail_positions:
             move = _minimax_best_move(pos, LOSS_MINING_DEPTH)
             if move is None:
                 continue
             samples.append((get_features(pos).copy(), one_hot_policy(pos, move), np.float32(-1.0)))
-            if len(samples) >= LOSS_MINING_MAX_SAMPLES:
+            if len(samples) >= max_samples:
                 return samples
     return samples
 
@@ -569,6 +601,165 @@ def send_iter_email(it, p_loss, v_loss, elapsed, extra=''):
     except Exception as e:
         print(f'  Email failed: {e}')
 
+
+def checkpoint_path_for_iter(iteration: int) -> str:
+    return f'{MODELS_DIR}/iter_{iteration:04d}.pt'
+
+
+def write_external_eval_request(iteration: int, checkpoint_path: str):
+    if not REQUEST_EXTERNAL_EVAL:
+        return
+    payload = {
+        'iter': iteration,
+        'checkpoint': checkpoint_path,
+        'created_at': int(time.time()),
+        'status': 'pending',
+        'full_eval_plan': {
+            'vs_best_games': 60,
+            'vs_random_games': 20,
+            'minimax_plan': [[3, 24], [5, 20], [7, 12], [9, 8], [11, 8]],
+            'opening_suite_size': OPENING_SUITE_SIZE,
+            'opening_suite_max_ply': OPENING_SUITE_MAX_PLY,
+            'target_depth': TARGET_MINIMAX_DEPTH,
+        },
+    }
+    request_path = f'{EXTERNAL_REQUESTS_DIR}/iter_{iteration:04d}.request.json'
+    with open(request_path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, indent=2)
+    print(f'  queued external eval -> {request_path}')
+
+
+def load_target_status():
+    if not os.path.exists(TARGET_STATUS_PATH):
+        return None
+    try:
+        with open(TARGET_STATUS_PATH, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as exc:
+        print(f'  target status read failed: {exc}')
+        return None
+
+
+def resolve_decision_checkpoint_path(checkpoint: str | None, decision_iter: int) -> str:
+    candidates = []
+    if checkpoint:
+        candidates.append(checkpoint)
+        candidates.append(os.path.join(MODELS_DIR, os.path.basename(checkpoint)))
+    candidates.append(checkpoint_path_for_iter(decision_iter))
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return checkpoint or checkpoint_path_for_iter(decision_iter)
+
+
+def apply_external_decisions(
+    best_net: AZNetwork,
+    target_net: AZNetwork,
+    target_best_wr: float,
+    target_best_suite: float,
+    target_best_side_floor: float,
+    last_external_decision_iter: int,
+    current_loss_mining_enabled: bool,
+    current_loss_mining_depth: int,
+    current_loss_mining_games: int,
+    current_loss_mining_positions_per_game: int,
+    current_loss_mining_max_samples: int,
+):
+    if not APPLY_EXTERNAL_DECISIONS:
+        return (
+            best_net,
+            target_net,
+            target_best_wr,
+            target_best_suite,
+            target_best_side_floor,
+            last_external_decision_iter,
+            current_loss_mining_enabled,
+            current_loss_mining_depth,
+            current_loss_mining_games,
+            current_loss_mining_positions_per_game,
+            current_loss_mining_max_samples,
+            [],
+        )
+
+    decision_paths = sorted(glob.glob(f'{EXTERNAL_DECISIONS_DIR}/iter_*.decision.json'))
+    applied = []
+    for path in decision_paths:
+        try:
+            with open(path, encoding='utf-8') as f:
+                decision = json.load(f)
+        except Exception as exc:
+            print(f'  decision read failed for {path}: {exc}')
+            continue
+
+        decision_iter = int(decision.get('iter', -1))
+        if decision_iter <= last_external_decision_iter:
+            continue
+
+        checkpoint = resolve_decision_checkpoint_path(decision.get('checkpoint'), decision_iter)
+        if not os.path.exists(checkpoint):
+            print(f'  decision skipped: missing checkpoint {checkpoint}')
+            continue
+
+        if decision.get('promote_best'):
+            best_net.load(checkpoint)
+            best_net.save(BEST_NET_PATH)
+
+        if decision.get('promote_target'):
+            target_net.load(checkpoint)
+            target_net.save(TARGET_NET_PATH)
+            target_best_wr = float(decision.get('wr_vs_minimax11', target_best_wr))
+            target_best_suite = float(decision.get('wr_opening_suite', target_best_suite))
+            target_best_side_floor = float(decision.get('wr_opening_floor', target_best_side_floor))
+            target_status = {
+                'iter': decision_iter,
+                'checkpoint': checkpoint,
+                'wr_vs_minimax11': target_best_wr,
+                'wr_opening_suite': target_best_suite,
+                'wr_opening_floor': target_best_side_floor,
+                'updated_at': int(time.time()),
+                'source': 'external_decision',
+            }
+            with open(TARGET_STATUS_PATH, 'w', encoding='utf-8') as f:
+                json.dump(target_status, f, indent=2)
+
+        if AUTO_LOSS_MINING_FROM_DECISIONS:
+            current_loss_mining_enabled = bool(decision.get('enable_loss_mining', current_loss_mining_enabled))
+            current_loss_mining_depth = int(decision.get('loss_mining_depth', current_loss_mining_depth))
+            current_loss_mining_games = int(decision.get('loss_mining_games', current_loss_mining_games))
+            current_loss_mining_positions_per_game = int(
+                decision.get('loss_mining_positions_per_game', current_loss_mining_positions_per_game)
+            )
+            current_loss_mining_max_samples = int(
+                decision.get('loss_mining_max_samples', current_loss_mining_max_samples)
+            )
+
+        last_external_decision_iter = decision_iter
+        applied.append({
+            'iter': decision_iter,
+            'promote_best': bool(decision.get('promote_best')),
+            'promote_target': bool(decision.get('promote_target')),
+            'summary': decision.get('summary', ''),
+            'loss_mining_reason': decision.get('loss_mining_reason', ''),
+            'loss_mining_enabled': current_loss_mining_enabled,
+            'loss_mining_depth': current_loss_mining_depth,
+        })
+
+    return (
+        best_net,
+        target_net,
+        target_best_wr,
+        target_best_suite,
+        target_best_side_floor,
+        last_external_decision_iter,
+        current_loss_mining_enabled,
+        current_loss_mining_depth,
+        current_loss_mining_games,
+        current_loss_mining_positions_per_game,
+        current_loss_mining_max_samples,
+        applied,
+    )
+
 print('Helper functions OK')
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -592,7 +783,12 @@ BUFFER_PATH   = f'{DRIVE_DIR}/replay_buffer.npy'
 target_best_wr = -1.0
 target_best_suite = -1.0
 target_best_side_floor = -1.0
-rollback_streak = 0
+last_external_decision_iter = -1
+current_loss_mining_enabled = ENABLE_LOSS_MINING
+current_loss_mining_depth = DEFAULT_LOSS_MINING_DEPTH
+current_loss_mining_games = DEFAULT_LOSS_MINING_GAMES
+current_loss_mining_positions_per_game = DEFAULT_LOSS_MINING_POSITIONS_PER_GAME
+current_loss_mining_max_samples = DEFAULT_LOSS_MINING_MAX_SAMPLES
 opponent_pool = load_recent_pool_snapshots()
 
 if os.path.exists(LATEST_NET_PATH):
@@ -616,7 +812,35 @@ if os.path.exists(LATEST_NET_PATH):
         target_best_wr = state.get('target_best_wr', -1.0)
         target_best_suite = state.get('target_best_suite', -1.0)
         target_best_side_floor = state.get('target_best_side_floor', -1.0)
-        rollback_streak = state.get('rollback_streak', 0)
+        last_external_decision_iter = state.get('last_external_decision_iter', -1)
+        current_loss_mining_enabled = state.get('current_loss_mining_enabled', current_loss_mining_enabled)
+        current_loss_mining_depth = state.get('current_loss_mining_depth', current_loss_mining_depth)
+        current_loss_mining_games = state.get('current_loss_mining_games', current_loss_mining_games)
+        current_loss_mining_positions_per_game = state.get(
+            'current_loss_mining_positions_per_game',
+            current_loss_mining_positions_per_game,
+        )
+        current_loss_mining_max_samples = state.get(
+            'current_loss_mining_max_samples',
+            current_loss_mining_max_samples,
+        )
+
+    target_status = load_target_status()
+    if target_status:
+        target_best_wr = float(target_status.get('wr_vs_minimax11', target_best_wr))
+        target_best_suite = float(target_status.get('wr_opening_suite', target_best_suite))
+        target_best_side_floor = float(target_status.get('wr_opening_floor', target_best_side_floor))
+        mining_policy = target_status.get('loss_mining_policy') or {}
+        current_loss_mining_enabled = bool(mining_policy.get('enable_loss_mining', current_loss_mining_enabled))
+        current_loss_mining_depth = int(mining_policy.get('loss_mining_depth', current_loss_mining_depth))
+        current_loss_mining_games = int(mining_policy.get('loss_mining_games', current_loss_mining_games))
+        current_loss_mining_positions_per_game = int(
+            mining_policy.get('loss_mining_positions_per_game', current_loss_mining_positions_per_game)
+        )
+        current_loss_mining_max_samples = int(
+            mining_policy.get('loss_mining_max_samples', current_loss_mining_max_samples)
+        )
+
     maybe_override_lr(optimizer, scheduler)
 
     # Restore replay buffer
@@ -638,7 +862,7 @@ else:
 
 opponent_pool = refresh_opponent_pool(opponent_pool, best_net, target_net, curr_net, 0)
 
-N_ITER = 200   # total iterations to run — increase if you want more training
+N_ITER = min(MAX_TOTAL_ITERS, start_iter + RUN_BLOCK_ITERS)
 
 print(f'\nTraining {start_iter} → {N_ITER}  on {DEVICE}')
 print('=' * 60)
@@ -646,6 +870,43 @@ print('=' * 60)
 for it in range(start_iter, N_ITER):
     t0 = time.time()
     print(f'\n{"="*40}\niter {it}/{N_ITER}  buf={len(replay_buffer)}', flush=True)
+
+    if it % EXTERNAL_DECISION_POLL_EVERY == 0:
+        (
+            best_net,
+            target_net,
+            target_best_wr,
+            target_best_suite,
+            target_best_side_floor,
+            last_external_decision_iter,
+            current_loss_mining_enabled,
+            current_loss_mining_depth,
+            current_loss_mining_games,
+            current_loss_mining_positions_per_game,
+            current_loss_mining_max_samples,
+            applied_decisions,
+        ) = apply_external_decisions(
+            best_net,
+            target_net,
+            target_best_wr,
+            target_best_suite,
+            target_best_side_floor,
+            last_external_decision_iter,
+            current_loss_mining_enabled,
+            current_loss_mining_depth,
+            current_loss_mining_games,
+            current_loss_mining_positions_per_game,
+            current_loss_mining_max_samples,
+        )
+        for decision in applied_decisions:
+            print(
+                f'  applied external decision iter {decision["iter"]}'
+                f'  best={decision["promote_best"]} target={decision["promote_target"]}'
+                f'  mining={decision["loss_mining_enabled"]}@d{decision["loss_mining_depth"]}'
+                f'  {decision["loss_mining_reason"]}'
+                f'  {decision["summary"]}',
+                flush=True,
+            )
 
     # ── Self-play ─────────────────────────────────────────────────────────────
     print('  [self-play]', flush=True)
@@ -700,139 +961,105 @@ for it in range(start_iter, N_ITER):
         'elapsed_s':  round(elapsed, 1),
         'gpu':        gpu_info,
         'lr':         round(get_current_lr(optimizer), 7),
+        'loss_mining_enabled': bool(current_loss_mining_enabled),
+        'loss_mining_depth_current': int(current_loss_mining_depth),
+        'loss_mining_games_current': int(current_loss_mining_games),
+        'loss_mining_max_samples_current': int(current_loss_mining_max_samples),
     }
 
-    # ── Evaluate every EVAL_INTERVAL iterations ───────────────────────────────
+    # ── Checkpoint every EVAL_INTERVAL iterations ─────────────────────────────
     if (it + 1) % EVAL_INTERVAL == 0:
         print(f'\n── Checkpoint iter {it} ──')
 
-        # 1) New net vs best net
-        wr_net = eval_net_vs_net(curr_net, best_net, N_EVAL_GAMES)
-        print(f'  curr vs best : {wr_net:.1%}  ({N_EVAL_GAMES} games)')
+        iter_path = checkpoint_path_for_iter(it)
+        curr_net.save(iter_path)
+        write_external_eval_request(it, iter_path)
 
-        # 2) Net vs random
-        wr_rand = eval_net_vs_random(curr_net, N_MINIMAX_GAMES)
-        print(f'  curr vs random   : {wr_rand:.1%}  ({N_MINIMAX_GAMES} games)')
-
-        log['wr_vs_best']     = round(wr_net, 3)
-        log['wr_vs_random']   = round(wr_rand, 3)
-
+        wr_net = 0.0
+        wr_rand = 0.0
         mm_results = {}
-        for depth, n_games in MINIMAX_EVAL_PLAN:
-            wr = eval_net_vs_minimax(curr_net, n_games, depth)
-            mm_results[depth] = wr
-            log[f'wr_vs_minimax{depth}'] = round(wr, 3)
-            print(f'  curr vs minimax-{depth:<2}: {wr:.1%}  ({n_games} games)')
-            if wr < 0.25:
-                print(f'  ⏭  Skipping deeper depths (win rate {wr:.1%} < 25%)')
-                break
+        suite_metrics = {'overall': 0.0, 'p1': 0.0, 'p2': 0.0, 'games': 0}
 
-        wr_mm3  = mm_results.get(MINIMAX_DEPTH, 0.0)
-        wr_mm5  = mm_results.get(MINIMAX_DEPTH_5, 0.0)
-        wr_mm11 = mm_results.get(TARGET_MINIMAX_DEPTH, 0.0)
-        reached_mm7 = MINIMAX_DEPTH_7 in mm_results and mm_results[MINIMAX_DEPTH_7] >= 0.25
-        suite_metrics = eval_net_on_opening_suite(curr_net, OPENING_SUITE_MM_DEPTH, OPENING_SUITE) if reached_mm7 else {'overall': 0.0, 'p1': 0.0, 'p2': 0.0, 'games': 0}
-        suite_side_floor = min(suite_metrics['p1'], suite_metrics['p2'])
-        log['wr_opening_suite'] = round(suite_metrics['overall'], 3)
-        log['wr_opening_p1']    = round(suite_metrics['p1'], 3)
-        log['wr_opening_p2']    = round(suite_metrics['p2'], 3)
-        log['wr_opening_floor'] = round(suite_side_floor, 3)
-        print(
-            f'  opening suite   : {suite_metrics["overall"]:.1%}'
-            f'  (P1 {suite_metrics["p1"]:.1%} / P2 {suite_metrics["p2"]:.1%}, {suite_metrics["games"]} games)'
-        )
+        if QUICK_EVAL_ENABLED:
+            wr_net = eval_net_vs_net(curr_net, best_net, QUICK_EVAL_NET_GAMES)
+            wr_rand = eval_net_vs_random(curr_net, QUICK_EVAL_RANDOM_GAMES)
+            print(f'  quick curr vs best   : {wr_net:.1%}  ({QUICK_EVAL_NET_GAMES} games)')
+            print(f'  quick curr vs random : {wr_rand:.1%}  ({QUICK_EVAL_RANDOM_GAMES} games)')
+            log['quick_wr_vs_best'] = round(wr_net, 3)
+            log['quick_wr_vs_random'] = round(wr_rand, 3)
 
-        # 3) Update best if curr is better
-        if wr_net >= WIN_THRESHOLD:
-            best_net = curr_net.copy()
-            best_net.save(BEST_NET_PATH)
-            print(f'  ✅ Updated best net  (win rate {wr_net:.1%})')
-        else:
-            print(f'  ➡  Keep old best net (win rate {wr_net:.1%} < {WIN_THRESHOLD:.0%})')
+            for depth, n_games in QUICK_EVAL_MINIMAX_PLAN:
+                wr = eval_net_vs_minimax(curr_net, n_games, depth)
+                mm_results[depth] = wr
+                log[f'quick_wr_vs_minimax{depth}'] = round(wr, 3)
+                print(f'  quick vs minimax-{depth:<2}: {wr:.1%}  ({n_games} games)')
 
-        target_improved = (
-            (
-                wr_mm11 >= target_best_wr + TARGET_BEST_MARGIN and
-                suite_side_floor >= target_best_side_floor - 0.05
-            ) or
-            (
-                abs(wr_mm11 - target_best_wr) <= TARGET_BEST_MARGIN and
-                (
-                    suite_side_floor > target_best_side_floor + 0.02 or
-                    suite_metrics['overall'] > target_best_suite + 0.01
+            if QUICK_EVAL_USE_OPENING_SUITE:
+                suite_metrics = eval_net_on_opening_suite(curr_net, MINIMAX_DEPTH_5, OPENING_SUITE)
+                log['quick_wr_opening_suite'] = round(suite_metrics['overall'], 3)
+                print(
+                    f'  quick opening suite : {suite_metrics["overall"]:.1%}'
+                    f'  (P1 {suite_metrics["p1"]:.1%} / P2 {suite_metrics["p2"]:.1%}, {suite_metrics["games"]} games)'
                 )
+
+            if ALLOW_QUICK_PROMOTE_BEST and wr_net >= WIN_THRESHOLD:
+                best_net = curr_net.copy()
+                best_net.save(BEST_NET_PATH)
+                print(f'  ✅ Updated best net from quick eval  ({wr_net:.1%})')
+            elif not ALLOW_QUICK_PROMOTE_BEST:
+                print('  ➡  Quick eval will not promote best.pt; waiting for external decision')
+            else:
+                print(f'  ➡  Keep old best net from quick eval ({wr_net:.1%} < {WIN_THRESHOLD:.0%})')
+
+            quick_frontier = mm_results.get(MINIMAX_DEPTH_5, mm_results.get(MINIMAX_DEPTH, wr_net))
+            scheduler.step(quick_frontier)
+        else:
+            scheduler.step(wr_net)
+
+        if current_loss_mining_enabled:
+            mined_samples = mine_losses_vs_minimax(
+                curr_net,
+                current_loss_mining_depth,
+                current_loss_mining_games,
+                current_loss_mining_positions_per_game,
+                current_loss_mining_max_samples,
             )
-        )
-        if target_improved:
-            target_best_wr = wr_mm11
-            target_best_suite = suite_metrics['overall']
-            target_best_side_floor = suite_side_floor
-            target_net = curr_net.copy()
-            target_net.save(TARGET_NET_PATH)
-            rollback_streak = 0
+            log['loss_mining_depth'] = current_loss_mining_depth
+            if mined_samples:
+                replay_buffer.extend(mined_samples)
+                if len(replay_buffer) > REPLAY_SIZE:
+                    replay_buffer = replay_buffer[-REPLAY_SIZE:]
+            log['loss_mined'] = len(mined_samples)
             print(
-                f'  🎯 Updated target best  (vs minimax-{TARGET_MINIMAX_DEPTH}: {wr_mm11:.1%},'
-                f' opening {suite_metrics["overall"]:.1%}, floor {suite_side_floor:.1%})'
+                f'  loss mining        : +{len(mined_samples)} samples'
+                f'  (depth={current_loss_mining_depth}, games={current_loss_mining_games},'
+                f' tail={current_loss_mining_positions_per_game}, max={current_loss_mining_max_samples})'
             )
         else:
-            shown_best = max(target_best_wr, 0.0)
-            print(
-                f'  ➡  Keep target best (vs minimax-{TARGET_MINIMAX_DEPTH}:'
-                f' {wr_mm11:.1%} < {shown_best:.1%} + {TARGET_BEST_MARGIN:.0%})'
-            )
-
-        scheduler.step(wr_mm11)
-        new_lr = get_current_lr(optimizer)
-        print(f'  LR now          : {new_lr:.2e}')
-
-        # Adaptive frontier: mine from the depth we're currently struggling with
-        frontier_depth = TARGET_MINIMAX_DEPTH
-        for depth, _ in MINIMAX_EVAL_PLAN:
-            if mm_results.get(depth, 0.0) < 0.25:
-                frontier_depth = depth
-                break
-        mined_samples = mine_losses_vs_minimax(curr_net, frontier_depth, LOSS_MINING_GAMES)
-        log['loss_mining_depth'] = frontier_depth
-        if mined_samples:
-            replay_buffer.extend(mined_samples)
-            if len(replay_buffer) > REPLAY_SIZE:
-                replay_buffer = replay_buffer[-REPLAY_SIZE:]
-        log['loss_mined'] = len(mined_samples)
-        print(f'  loss mining     : +{len(mined_samples)} samples')
-
-        if (wr_mm11 <= max(0.0, target_best_wr - ROLLBACK_DELTA)
-                and suite_metrics['overall'] <= max(0.0, target_best_suite - 0.05)
-                and suite_side_floor <= max(0.0, target_best_side_floor - 0.07)):
-            rollback_streak += 1
-        else:
-            rollback_streak = 0
-
-        if rollback_streak >= ROLLBACK_PATIENCE:
-            rollback_lr = max(MIN_LR, get_current_lr(optimizer) * LR_DECAY_FACTOR)
-            curr_net = target_net.copy()
-            optimizer, scheduler = build_optimizer_and_scheduler(curr_net, rollback_lr)
-            rollback_streak = 0
-            print(f'  ↩  Rollback to target best  (reset optimizer, LR={rollback_lr:.2e})')
+            mined_samples = []
+            log['loss_mined'] = 0
+            print('  loss mining        : skipped by current policy')
 
         opponent_pool = refresh_opponent_pool(opponent_pool, best_net, target_net, curr_net, it)
 
-        # 4) Save iteration checkpoint
-        iter_path = f'{MODELS_DIR}/iter_{it:04d}.pt'
-        curr_net.save(iter_path)
-
-        # 5) Send checkpoint email
-        print(f'  GPU: {gpu_info}')
-        extra = (f'vs best net  : {wr_net:.1%}\n'
-                 f'vs random    : {wr_rand:.1%}\n'
-                 f'vs minimax-3 : {wr_mm3:.1%}\n'
-                 f'vs minimax-5 : {wr_mm5:.1%}\n'
-                 f'vs minimax-11: {wr_mm11:.1%}\n'
-                 f'opening suite: {suite_metrics["overall"]:.1%}'
-                 f' (P1 {suite_metrics["p1"]:.1%} / P2 {suite_metrics["p2"]:.1%},'
-                 f' floor {suite_side_floor:.1%})\n'
-                 f'loss mined   : {len(mined_samples)}\n'
-                 f'LR           : {get_current_lr(optimizer):.2e}\n'
-                 f'\nGPU: {gpu_info}')
+        print(f'  LR now             : {get_current_lr(optimizer):.2e}')
+        print(f'  external eval      : waiting for local machine to process iter {it:04d}')
+        print(f'  GPU                : {gpu_info}')
+        extra = (
+            f'quick vs best   : {wr_net:.1%}\n'
+            f'quick vs random : {wr_rand:.1%}\n'
+            f'quick vs mm3    : {mm_results.get(MINIMAX_DEPTH, 0.0):.1%}\n'
+            f'quick vs mm5    : {mm_results.get(MINIMAX_DEPTH_5, 0.0):.1%}\n'
+            f'loss mined      : {len(mined_samples)}\n'
+            f'loss mining     : {"on" if current_loss_mining_enabled else "off"}'
+            f' @d{current_loss_mining_depth}'
+            f' g{current_loss_mining_games}'
+            f' t{current_loss_mining_positions_per_game}'
+            f' m{current_loss_mining_max_samples}\n'
+            f'LR              : {get_current_lr(optimizer):.2e}\n'
+            f'external eval   : queued for iter {it:04d}\n'
+            f'\nGPU: {gpu_info}'
+        )
         send_iter_email(it, p_loss, v_loss, elapsed, extra)
 
     else:
@@ -854,7 +1081,12 @@ for it in range(start_iter, N_ITER):
         'target_best_wr': target_best_wr,
         'target_best_suite': target_best_suite,
         'target_best_side_floor': target_best_side_floor,
-        'rollback_streak': rollback_streak,
+        'last_external_decision_iter': last_external_decision_iter,
+        'current_loss_mining_enabled': current_loss_mining_enabled,
+        'current_loss_mining_depth': current_loss_mining_depth,
+        'current_loss_mining_games': current_loss_mining_games,
+        'current_loss_mining_positions_per_game': current_loss_mining_positions_per_game,
+        'current_loss_mining_max_samples': current_loss_mining_max_samples,
     }, TRAIN_STATE_PATH)
     np.save(BUFFER_PATH, np.array(replay_buffer, dtype=object))
 
@@ -870,16 +1102,16 @@ with open(LOG_FILE) as f:
     for line in f:
         rows.append(json.loads(line))
 
-print(f'{"iter":>4}  {"p_loss":>7}  {"v_loss":>7}  {"vs_mm11":>8}  {"open":>8}  {"floor":>8}  {"lr":>9}  {"mined":>5}  {"buf":>6}')
+print(f'{"iter":>4}  {"p_loss":>7}  {"v_loss":>7}  {"q_best":>8}  {"q_mm3":>8}  {"q_mm5":>8}  {"lr":>9}  {"mined":>5}  {"buf":>6}')
 print('-' * 86)
 for r in rows:
-    vs_mm11 = f'{r["wr_vs_minimax11"]:.1%}'  if 'wr_vs_minimax11'  in r else '      —'
-    open_wr = f'{r["wr_opening_suite"]:.1%}' if 'wr_opening_suite' in r else '      —'
-    open_fl = f'{r["wr_opening_floor"]:.1%}' if 'wr_opening_floor' in r else '      —'
+    quick_best = f'{r["quick_wr_vs_best"]:.1%}' if 'quick_wr_vs_best' in r else '      —'
+    quick_mm3  = f'{r["quick_wr_vs_minimax3"]:.1%}' if 'quick_wr_vs_minimax3' in r else '      —'
+    quick_mm5  = f'{r["quick_wr_vs_minimax5"]:.1%}' if 'quick_wr_vs_minimax5' in r else '      —'
     lr      = f'{r["lr"]:.1e}' if 'lr' in r else '        —'
     mined   = f'{r["loss_mined"]:>5}' if 'loss_mined' in r else '    —'
     print(f'{r["iter"]:>4}  {r["p_loss"]:>7.4f}  {r["v_loss"]:>7.4f}  '
-          f'{vs_mm11:>8}  {open_wr:>8}  {open_fl:>8}  {lr:>9}  {mined:>5}  {r["buffer_size"]:>6}')
+          f'{quick_best:>8}  {quick_mm3:>8}  {quick_mm5:>8}  {lr:>9}  {mined:>5}  {r["buffer_size"]:>6}')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CELL 7 — Export model to ONNX  (run anytime, does not affect training)
