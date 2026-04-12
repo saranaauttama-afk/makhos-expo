@@ -1,10 +1,10 @@
 // src/ui/theme.ts
 export const COLORS = {
-  light: '#EEE',
-  dark: '#5A3',
-  pieceP1: '#222',
-  pieceP2: '#d33',
-  kingRing: '#ffd700',
+  light: '#f6d6a8',
+  dark: '#7b4f2c',
+  pieceP1: '#2f2447',
+  pieceP2: '#d95763',
+  kingRing: '#ffe17d',
 };
 export const SIZE = {
   board: 320,

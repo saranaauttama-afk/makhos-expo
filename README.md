@@ -137,7 +137,9 @@ Move encoding: `from_sq * 32 + to_sq` (1024 slots). Flipped for P2: `(31-from)*3
 ```python
 EXPORT_ITER = 'iter_0099'   # change to desired checkpoint
 ```
-Run Cell 7 → downloads `iter_XXXX.onnx` → place in `data/` → update `azNet.ts`.
+Run Cell 7 -> export the chosen checkpoint as ONNX -> copy it to `assets/models/makhos_az.onnx`.
+The app runtime only loads `assets/models/makhos_az.onnx`.
+Archived experiment exports stay in `data_old/` and should not be referenced by the mobile app.
 
 ---
 

@@ -101,8 +101,8 @@ async function makeAZPlayer(modelPath: string, useFlip: boolean) {
 
 async function main() {
   console.log(`\n=== v4 iter_0049 vs v3 iter_0059  [${N_GAMES} games] ===\n`);
-  const newAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0049.onnx'), true);
-  const oldAZ = await makeAZPlayer(path.join(__dirname, '../../data/iter_0059.onnx'), true);
+  const newAZ = await makeAZPlayer(path.join(__dirname, '../../data_old/iter_0049.onnx'), true);
+  const oldAZ = await makeAZPlayer(path.join(__dirname, '../../data_old/iter_0059.onnx'), true);
   console.log('Models loaded\n');
 
   let newW=0, oldW=0, draws=0;

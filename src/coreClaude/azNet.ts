@@ -1,41 +1,73 @@
-// azNet.ts — ONNX model loading and inference for AlphaZero
+// azNet.ts - lazy ONNX runtime loading for mobile builds.
 //
-// Network: 128 → FC+BN+ReLU → 4×ResBlock(256) → policy(1024) + value(1)
-// Model file: data/iter_0009.onnx (single-file ONNX)
+// Expo Go does not provide the native onnxruntime-react-native module.
+// We therefore load it only at runtime and let callers fall back gracefully.
 
-import * as ort from 'onnxruntime-react-native';
 import { Asset } from 'expo-asset';
+import { NativeModules } from 'react-native';
 
-let session: ort.InferenceSession | null = null;
-let sessionPromise: Promise<ort.InferenceSession> | null = null;
+type OrtModule = typeof import('onnxruntime-react-native');
+type InferenceSession = import('onnxruntime-react-native').InferenceSession;
+type OrtTensor = import('onnxruntime-react-native').Tensor;
 
-async function getSession(): Promise<ort.InferenceSession> {
+let session: InferenceSession | null = null;
+let sessionPromise: Promise<InferenceSession> | null = null;
+let ortModulePromise: Promise<OrtModule> | null = null;
+let azRuntimeAvailable = true;
+
+async function getOrtModule(): Promise<OrtModule> {
+  if (!azRuntimeAvailable) {
+    throw new Error('AZ runtime unavailable');
+  }
+  if (!NativeModules.Onnxruntime) {
+    azRuntimeAvailable = false;
+    throw new Error('ONNX native module is not available in this runtime');
+  }
+  if (!ortModulePromise) {
+    ortModulePromise = import('onnxruntime-react-native').catch(err => {
+      azRuntimeAvailable = false;
+      throw err;
+    });
+  }
+  return ortModulePromise;
+}
+
+async function getSession(): Promise<InferenceSession> {
   if (session) return session;
   if (!sessionPromise) {
     sessionPromise = (async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const [asset] = await Asset.loadAsync(require('../../data/iter_0009.onnx'));
-      const uri = asset.localUri ?? asset.uri;
-      const s = await ort.InferenceSession.create(uri);
-      session = s;
-      return s;
+      try {
+        const ort = await getOrtModule();
+        const [asset] = await Asset.loadAsync(require('../../assets/models/makhos_az.onnx'));
+        const uri = asset.localUri ?? asset.uri;
+        const created = await ort.InferenceSession.create(uri);
+        session = created;
+        return created;
+      } catch (error) {
+        azRuntimeAvailable = false;
+        sessionPromise = null;
+        throw error;
+      }
     })();
   }
   return sessionPromise;
 }
 
-/** Preload model in background — call on screen mount to avoid first-move latency. */
-export function preloadAZModel(): void {
-  getSession().catch(() => {}); // fire-and-forget
+export function isAZRuntimeAvailable() {
+  return azRuntimeAvailable;
 }
 
-/** Run one forward pass. Returns raw policy logits (1024) and value ∈ [-1,1]. */
+export function preloadAZModel(): void {
+  getSession().catch(() => {});
+}
+
 export async function azInfer(
   features: Float32Array,
 ): Promise<{ policyLogits: Float32Array; value: number }> {
-  const s = await getSession();
-  const tensor = new ort.Tensor('float32', features, [1, 128]);
-  const results = await s.run({ features: tensor });
+  const loadedSession = await getSession();
+  const ort = await getOrtModule();
+  const tensor = new ort.Tensor('float32', features, [1, 128]) as OrtTensor;
+  const results = await loadedSession.run({ features: tensor });
   return {
     policyLogits: results['policy_logits'].data as Float32Array,
     value: (results['value'].data as Float32Array)[0],

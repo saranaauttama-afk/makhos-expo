@@ -22,7 +22,12 @@ export function useAZEngine() {
     cancelledRef.current = false;
     setThinking(true);
     try {
-      const move = await azBestMove(pos, N_SIMS);
+      let move: Move | undefined;
+      try {
+        move = await azBestMove(pos, N_SIMS);
+      } catch {
+        move = undefined;
+      }
       if (cancelledRef.current) return null;
       return move ?? null;
     } finally {

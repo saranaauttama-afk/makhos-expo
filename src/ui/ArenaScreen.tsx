@@ -9,6 +9,7 @@ import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
 import { azBestMove } from '../coreClaude/azMcts';
 import { preloadAZModel } from '../coreClaude/azNet';
+import { usePixelGameFx } from './usePixelGameFx';
 
 type AgentType = 'human' | 'hand' | 'az';
 
@@ -57,8 +58,13 @@ export default function ArenaScreen({ onBack }: Props) {
   const [autoPlay, setAutoPlay]       = useState(false);
   const [elapsed, setElapsed]         = useState(0);   // ms since think started
   const [gameResult, setGameResult]   = useState<string | null>(null);
+  const [lastMove, setLastMove]       = useState<{ from: number; to: number; captured: number; promote: boolean } | null>(null);
+  const [shakeFrame, setShakeFrame]   = useState(0);
+  const [comboFrame, setComboFrame]   = useState(0);
+  const [comboText, setComboText]     = useState('');
 
   const { think, thinking } = useCodexEngine();
+  const { triggerFx } = usePixelGameFx();
 
   // Preload AZ model when arena opens
   useEffect(() => { preloadAZModel(); }, []);
@@ -78,6 +84,9 @@ export default function ArenaScreen({ onBack }: Props) {
   );
   const gameOver     = isDraw || isThreefold || moves.length === 0;
   const currentAgent = pos.side === 1 ? p1Agent : p2Agent;
+  const shakeX       = [0, -6, 5, -4, 3, -2, 0][Math.min(shakeFrame, 6)];
+  const comboOpacity = [0, 0.75, 1, 1, 0.9, 0.7, 0.45, 0.2, 0][Math.min(comboFrame, 8)];
+  const comboLift    = [24, 18, 14, 10, 6, 2, -2, -6, -10][Math.min(comboFrame, 8)];
 
   // ── Timer ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -109,7 +118,11 @@ export default function ArenaScreen({ onBack }: Props) {
 
     let move: Move | undefined;
     if (agent === 'az') {
-      move = await azBestMove(curPos);
+      try {
+        move = await azBestMove(curPos);
+      } catch {
+        move = await think(curPos, THINK_MS.hand, curHistory);
+      }
     } else {
       move = await think(curPos, THINK_MS[agent], curHistory);
     }
@@ -128,6 +141,7 @@ export default function ArenaScreen({ onBack }: Props) {
       agent,
       move,
     }]);
+    setLastMove({ from: move.from, to: move.to, captured: move.captured.length, promote: move.promote });
 
     const nextMoves = generateMoves(next);
     const draw = isDrawByInactivity(next);
@@ -156,6 +170,65 @@ export default function ArenaScreen({ onBack }: Props) {
     return () => clearTimeout(delay);
   }, [autoPlay, pos, thinking, gameOver, step]);
 
+  useEffect(() => {
+    if (!lastMove) {
+      setShakeFrame(0);
+      return;
+    }
+
+    if (lastMove.captured > 1) {
+      triggerFx('combo');
+      let frame = 0;
+      setShakeFrame(0);
+      const shakeId = setInterval(() => {
+        frame += 1;
+        setShakeFrame(frame);
+        if (frame >= 6) clearInterval(shakeId);
+      }, 42);
+      return () => clearInterval(shakeId);
+    }
+
+    if (lastMove.promote) triggerFx('promote');
+    else if (lastMove.captured > 0) triggerFx('capture');
+    else triggerFx('move');
+
+    setShakeFrame(0);
+    return undefined;
+  }, [lastMove, triggerFx]);
+
+  useEffect(() => {
+    if (!lastMove) {
+      setComboFrame(0);
+      setComboText('');
+      return;
+    }
+
+    let nextText = '';
+    if (lastMove.promote && lastMove.captured > 1) nextText = `ROYAL ${lastMove.captured}X!`;
+    else if (lastMove.promote) nextText = 'KING UP!';
+    else if (lastMove.captured > 1) nextText = `${lastMove.captured}X COMBO!`;
+
+    if (!nextText) {
+      setComboFrame(0);
+      setComboText('');
+      return;
+    }
+
+    setComboText(nextText);
+    setComboFrame(0);
+    let frame = 0;
+    const comboId = setInterval(() => {
+      frame += 1;
+      setComboFrame(frame);
+      if (frame >= 8) clearInterval(comboId);
+    }, 90);
+    return () => clearInterval(comboId);
+  }, [lastMove]);
+
+  useEffect(() => {
+    if (gameResult) triggerFx('victory');
+  }, [gameResult, triggerFx]);
+
   // ── Actions ──────────────────────────────────────────────────────────────────
   function reset() {
     setAutoPlay(false);
@@ -165,6 +238,7 @@ export default function ArenaScreen({ onBack }: Props) {
     setHashHistory([hashPosition(start)]);
     setLog([]);
     setGameResult(null);
+    setLastMove(null);
   }
 
   function toggleAutoPlay() {
@@ -209,13 +283,32 @@ export default function ArenaScreen({ onBack }: Props) {
       {/* Main area: board + log */}
       <View style={styles.mainRow}>
         {/* Board */}
-        <Board
-          pos={pos}
-          onTapSquare={() => {}}
-          fromSquares={[]}
-          selectedFrom={null}
-          destSquares={[]}
-        />
+        <View style={styles.boardStage}>
+          {!!comboText && comboFrame < 8 && (
+            <View
+              style={[
+                styles.comboBadge,
+                {
+                  opacity: comboOpacity,
+                  transform: [{ translateY: comboLift }],
+                },
+              ]}
+            >
+              <Text style={styles.comboBadgeText}>{comboText}</Text>
+            </View>
+          )}
+
+          <View style={{ transform: [{ translateX: shakeX }] }}>
+            <Board
+              pos={pos}
+              onTapSquare={() => {}}
+              fromSquares={[]}
+              selectedFrom={null}
+              destSquares={[]}
+              lastMove={lastMove}
+            />
+          </View>
+        </View>
 
         {/* Move log */}
         <View style={styles.logPanel}>
@@ -295,6 +388,9 @@ const styles = StyleSheet.create({
   agentTextActive: { color: ACCENT },
 
   mainRow:     { flexDirection: 'row', gap: 8, width: '100%', flex: 1 },
+  boardStage:  { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  comboBadge:  { position: 'absolute', top: 8, zIndex: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#ff4fa3', borderWidth: 2, borderColor: '#ffe17d' },
+  comboBadgeText: { fontSize: 12, fontWeight: '900', color: '#fff', letterSpacing: 1 },
 
   logPanel:    { flex: 1, borderRadius: 10, backgroundColor: '#f4f4f4', padding: 8 },
   logTitle:    { fontSize: 11, fontWeight: '700', opacity: 0.4, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },

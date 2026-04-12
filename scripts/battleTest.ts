@@ -16,7 +16,7 @@ import { generateMoves, applyMove, Move }                from '../src/coreClaude
 import { handEvaluate }                                  from '../src/coreClaude/eval';
 import { getFeatures }                                   from '../src/coreClaude/azFeatures';
 
-const MODEL_PATH = path.join(__dirname, '../../data/iter_0059_az4.onnx');
+const MODEL_PATH = path.join(__dirname, '../../assets/models/makhos_az.onnx');
 const N_GAMES    = 20;   // games per match
 const AZ_SIMS    = 3200;  // MCTS simulations per move
 const MM_DEPTH   = 9;     // minimax depth

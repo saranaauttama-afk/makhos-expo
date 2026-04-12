@@ -8,7 +8,7 @@ import { generateMoves, applyMove, Move }                from '../src/coreClaude
 import { handEvaluate }                                  from '../src/coreClaude/eval';
 import { bits }                                          from '../src/coreClaude/bitboards';
 
-const MODEL_PATH = path.join(__dirname, '../../data/iter_0059.onnx');
+const MODEL_PATH = path.join(__dirname, '../../data_old/iter_0059.onnx');
 const N_GAMES    = 20;
 const AZ_SIMS    = 200;
 const MM_DEPTH   = 5;

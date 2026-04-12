@@ -5,6 +5,7 @@ import { Position } from '../position';
 import { CancelToken, iterativeDeepening, SearchInfo } from './alphabeta';
 import { lookupOpeningBook } from './openingBook';
 import { TT } from './tt';
+import { isAZRuntimeAvailable } from '../azNet';
 
 export type HybridDifficulty = 'easy' | 'medium' | 'hard';
 export type HybridMode = 'book' | 'az' | 'alphabeta' | 'forced';
@@ -126,7 +127,23 @@ export async function hybridBestMove(
     };
   }
 
-  const move = await azBestMove(pos, AZ_SIMS[difficulty]);
+  let move: Move | undefined;
+  try {
+    move = await azBestMove(pos, AZ_SIMS[difficulty]);
+  } catch {
+    move = undefined;
+  }
+  if (!isAZRuntimeAvailable() || !move) {
+    const fallback = await iterativeDeepening(pos, Math.max(ms, AB_BUDGET_MS[difficulty].tactical), tt, undefined, historyHashes, cancel);
+    return {
+      move: fallback.best,
+      info: fallback.depth > 0 ? { depth: fallback.depth, score: fallback.score, nodes: fallback.nodes, pv: fallback.best ? [fallback.best] : [] } : null,
+      plan: {
+        mode: 'alphabeta',
+        reason: !isAZRuntimeAvailable() ? 'AZ runtime unavailable, fallback search' : 'AZ returned no move, fallback search',
+      },
+    };
+  }
   return {
     move,
     info: makeSyntheticInfo(move, 'az', plan.reason, AZ_SIMS[difficulty]),
