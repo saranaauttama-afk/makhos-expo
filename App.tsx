@@ -13,6 +13,7 @@ import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTable
 import { GameConfig } from './src/ui/types';
 
 type ErrorBoundaryState = { error: Error | null };
+export type AppLanguage = 'th' | 'en';
 
 class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
@@ -43,6 +44,7 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBounda
 export default function App() {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [draftConfig, setDraftConfig] = useState<GameConfig | null>(null);
+  const [language, setLanguage] = useState<AppLanguage>('th');
   const [screen, setScreen] = useState<'home' | 'arena' | 'concept' | 'setup' | 'shop' | 'settings' | 'result'>('home');
 
   useEffect(() => { precomputeEndgameTablebase(); }, []);
@@ -68,7 +70,11 @@ export default function App() {
         ) : screen === 'shop' ? (
           <ShopScreen onBack={() => setScreen('home')} />
         ) : screen === 'settings' ? (
-          <SettingsScreen onBack={() => setScreen('home')} />
+          <SettingsScreen
+            language={language}
+            onLanguageChange={setLanguage}
+            onBack={() => setScreen('home')}
+          />
         ) : screen === 'result' ? (
           <ResultScreen
             onBack={() => setScreen('home')}
@@ -85,6 +91,7 @@ export default function App() {
           />
         ) : (
           <HomeScreen
+            language={language}
             onStart={config => {
               setDraftConfig(config);
               setScreen('setup');
