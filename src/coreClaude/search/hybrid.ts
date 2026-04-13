@@ -119,7 +119,9 @@ export async function hybridBestMove(
     const budget = plan.reason.includes('endgame')
       ? AB_BUDGET_MS[difficulty].endgame
       : AB_BUDGET_MS[difficulty].tactical;
-    const result = await iterativeDeepening(pos, Math.max(ms, budget), tt, undefined, historyHashes, cancel);
+    // Keep search responsive to UI budget on mobile screens.
+    const searchMs = Math.max(250, Math.min(ms, budget));
+    const result = await iterativeDeepening(pos, searchMs, tt, undefined, historyHashes, cancel);
     return {
       move: result.best,
       info: result.depth > 0 ? { depth: result.depth, score: result.score, nodes: result.nodes, pv: result.best ? [result.best] : [] } : null,
@@ -134,7 +136,8 @@ export async function hybridBestMove(
     move = undefined;
   }
   if (!isAZRuntimeAvailable() || !move) {
-    const fallback = await iterativeDeepening(pos, Math.max(ms, AB_BUDGET_MS[difficulty].tactical), tt, undefined, historyHashes, cancel);
+    const fallbackMs = Math.max(250, Math.min(ms, AB_BUDGET_MS[difficulty].tactical));
+    const fallback = await iterativeDeepening(pos, fallbackMs, tt, undefined, historyHashes, cancel);
     return {
       move: fallback.best,
       info: fallback.depth > 0 ? { depth: fallback.depth, score: fallback.score, nodes: fallback.nodes, pv: fallback.best ? [fallback.best] : [] } : null,

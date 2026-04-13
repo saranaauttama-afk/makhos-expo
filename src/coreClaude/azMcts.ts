@@ -99,6 +99,9 @@ export async function azBestMove(pos: Position, nSims = 200): Promise<Move | und
   if (root.children.length === 0) return undefined;
 
   for (let sim = 0; sim < nSims; sim++) {
+    if ((sim & 7) === 7) {
+      await new Promise<void>(r => setTimeout(r, 0));
+    }
     // ── Selection ──────────────────────────────────────────────────────────
     let node = root;
     while (node.expanded && node.children.length > 0) {

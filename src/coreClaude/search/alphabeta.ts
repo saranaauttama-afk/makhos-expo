@@ -350,6 +350,8 @@ export async function iterativeDeepening(
     let result: { move?: Move; score: number } = { score: 0 };
 
     while (true) {
+      // Cooperative yield between aspiration retries.
+      await new Promise<void>(r => setTimeout(r, 0));
       // Run root search (first move full window, rest PVS)
       const moves = generateMoves(root);
       if (!moves.length) break;
@@ -359,6 +361,9 @@ export async function iterativeDeepening(
       acc.n = 0;
 
       for (let i = 0; i < ordered.length; i++) {
+        if ((i & 1) === 1) {
+          await new Promise<void>(r => setTimeout(r, 0));
+        }
         if (cancel?.cancelled) break;
         if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) break;
         const m      = ordered[i];

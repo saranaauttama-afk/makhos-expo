@@ -47,7 +47,7 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
     progress: number;
   } | null>(null);
   const lastMoveKeyRef = useRef<string | null>(null);
-  const moveRafRef = useRef<number | null>(null);
+  const moveStepRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const moveClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fromSet = new Set(fromSquares);
@@ -57,9 +57,9 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
   const moveKey = lastMove ? `${lastMove.from}-${lastMove.to}-${pos.side}` : null;
 
   const stopMoveAnimation = () => {
-    if (moveRafRef.current !== null) {
-      cancelAnimationFrame(moveRafRef.current);
-      moveRafRef.current = null;
+    if (moveStepRef.current !== null) {
+      clearInterval(moveStepRef.current);
+      moveStepRef.current = null;
     }
     if (moveClearRef.current !== null) {
       clearTimeout(moveClearRef.current);
@@ -99,8 +99,8 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
     }, 85);
 
     stopMoveAnimation();
-    const durationMs = 240;
-    const startedAt = Date.now();
+    const stepMs = 48;
+    const totalSteps = 5;
     const toMask = (1 << lm.to) >>> 0;
     const p1HasTo = ((pos.p1Men | pos.p1Kings) & toMask) !== 0;
     const side: 1 | -1 = p1HasTo ? 1 : -1;
@@ -115,21 +115,21 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
       progress: 0,
     });
 
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - startedAt) / durationMs);
-      const eased = 1 - (1 - t) * (1 - t) * (1 - t);
+    let step = 0;
+    moveStepRef.current = setInterval(() => {
+      step += 1;
+      const raw = Math.min(1, step / totalSteps);
+      const eased = 1 - (1 - raw) * (1 - raw) * (1 - raw);
       setMoveAnim(prev => (prev && prev.key === moveKey ? { ...prev, progress: eased } : prev));
-      if (t < 1) {
-        moveRafRef.current = requestAnimationFrame(tick);
-      } else {
-        moveRafRef.current = null;
+      if (step >= totalSteps && moveStepRef.current) {
+        clearInterval(moveStepRef.current);
+        moveStepRef.current = null;
       }
-    };
-    moveRafRef.current = requestAnimationFrame(tick);
+    }, stepMs);
     moveClearRef.current = setTimeout(() => {
       setMoveAnim(prev => (prev && prev.key === moveKey ? null : prev));
       stopMoveAnimation();
-    }, durationMs + 90);
+    }, stepMs * totalSteps + 90);
 
     return () => clearInterval(id);
   }, [moveKey, lastMove, pos.p1Men, pos.p1Kings, pos.p2Men, pos.p2Kings]);

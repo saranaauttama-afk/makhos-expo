@@ -12,7 +12,7 @@ import { Difficulty, GameConfig } from './types';
 import { usePixelGameFx } from './usePixelGameFx';
 
 const THINK_MS: Record<Difficulty, number> = { easy: 300, medium: 1000, hard: 2000 };
-const MOVE_ANIM_GUARD_MS = 460;
+const MOVE_ANIM_GUARD_MS = 560;
 const INITIAL_PIECES_PER_SIDE = 8;
 
 const BG = '#120c1c';
@@ -197,10 +197,39 @@ function aiLevelTag(difficulty: Difficulty) {
   return 'AI-E';
 }
 
+function PieceMeter({
+  pieceCount,
+  active,
+  tint,
+}: {
+  pieceCount: number;
+  active: boolean;
+  tint: string;
+}) {
+  const ratio = Math.max(0, Math.min(1, pieceCount / INITIAL_PIECES_PER_SIDE));
+  const fillFlex = ratio <= 0 ? 0 : ratio;
+  const restFlex = 1 - ratio;
+  return (
+    <View style={styles.pieceMeterTrack}>
+      <View
+        style={[
+          styles.pieceMeterFill,
+          {
+            flex: fillFlex,
+            backgroundColor: active ? tint : '#8478a8',
+          },
+        ]}
+      />
+      <View style={[styles.pieceMeterRest, { flex: restFlex }]} />
+    </View>
+  );
+}
+
 function TurnSeatChip({
   lane,
   avatarKind,
   role,
+  pieceCount,
   captured,
   turnTimer,
   lastMoveText,
@@ -213,6 +242,7 @@ function TurnSeatChip({
   lane: string;
   avatarKind: AvatarKind;
   role: string;
+  pieceCount: number;
   captured: number;
   turnTimer: string;
   lastMoveText?: string | null;
@@ -257,6 +287,10 @@ function TurnSeatChip({
                 {lastMoveText ? `LAST ${lastMoveText}` : 'LAST -'}
               </Text>
             </View>
+          </View>
+          <View style={styles.pieceMeterRow}>
+            <Text style={styles.pieceMeterLabel}>UNITS {pieceCount}/{INITIAL_PIECES_PER_SIDE}</Text>
+            <PieceMeter pieceCount={pieceCount} active={active} tint={tint} />
           </View>
         </View>
         {showTelemetryToggle && onToggleTelemetry ? (
@@ -303,6 +337,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const pendingRef = useRef<string | null>(null);
   const aiCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thinkStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animLockUntilRef = useRef<number>(0);
 
   const myMoves = useMemo(() => generateMoves(pos), [pos]);
@@ -355,6 +390,13 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     }
   }
 
+  function clearThinkStartTimer() {
+    if (thinkStartTimerRef.current) {
+      clearTimeout(thinkStartTimerRef.current);
+      thinkStartTimerRef.current = null;
+    }
+  }
+
   function lockMoveAnimationWindow() {
     animLockUntilRef.current = Date.now() + MOVE_ANIM_GUARD_MS;
     setIsAnimLocked(true);
@@ -382,10 +424,14 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   }
 
   useEffect(() => {
-    if (isHvH) return;
+    if (isHvH) {
+      clearThinkStartTimer();
+      return;
+    }
     if (pos.side !== aiSide || isDraw || isThreefold || !myMoves.length) {
       pendingRef.current = null;
       clearPendingAICommit();
+      clearThinkStartTimer();
       return;
     }
     const key = posKey(pos);
@@ -399,20 +445,32 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
 
     const posSnapshot = pos;
     const histSnapshot = hashHistory;
-
-    think(posSnapshot, thinkMs, histSnapshot, undefined, difficulty).then(best => {
+    const runThink = () => {
+      thinkStartTimerRef.current = null;
       if (pendingRef.current !== key) return;
-      const move = best ?? generateMoves(posSnapshot)[0];
-      if (move) {
-        scheduleAICommit(posSnapshot, move, key);
-      }
-    });
+      think(posSnapshot, thinkMs, histSnapshot, undefined, difficulty).then(best => {
+        if (pendingRef.current !== key) return;
+        const move = best ?? generateMoves(posSnapshot)[0];
+        if (move) {
+          scheduleAICommit(posSnapshot, move, key);
+        }
+      });
+    };
+
+    clearThinkStartTimer();
+    const startDelayMs = Math.max(0, animLockUntilRef.current - Date.now());
+    if (startDelayMs > 0) {
+      thinkStartTimerRef.current = setTimeout(runThink, startDelayMs);
+    } else {
+      runThink();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos.side, isDraw, isThreefold, myMoves.length]);
 
   useEffect(() => () => {
     clearPendingAICommit();
     clearAnimUnlockTimer();
+    clearThinkStartTimer();
   }, []);
 
   useEffect(() => {
@@ -484,10 +542,10 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   useEffect(() => {
     if (!myMoves.length || isDraw || isThreefold) return;
     const id = setInterval(() => {
-      setTurnElapsedMs(Date.now() - turnStartRef.current);
-    }, 100);
+      if (!isAnimLocked) setTurnElapsedMs(Date.now() - turnStartRef.current);
+    }, 220);
     return () => clearInterval(id);
-  }, [isDraw, isThreefold, myMoves.length, pos.side]);
+  }, [isAnimLocked, isDraw, isThreefold, myMoves.length, pos.side]);
 
   function onTapSquare(i: number) {
     if (!canHumanMove) return;
@@ -513,6 +571,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     cancel();
     pendingRef.current = null;
     clearPendingAICommit();
+    clearThinkStartTimer();
     clearAnimUnlockTimer();
     animLockUntilRef.current = 0;
     setIsAnimLocked(false);
@@ -571,6 +630,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     cancel();
     pendingRef.current = null;
     clearPendingAICommit();
+    clearThinkStartTimer();
     clearAnimUnlockTimer();
     animLockUntilRef.current = 0;
     setIsAnimLocked(false);
@@ -607,6 +667,11 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const undoLockedByMode = !isHvH && difficulty === 'hard';
   const canUndoNow = !thinking && posHistory.length > 1;
   const undoBtnText = undoLockedByMode ? '🔒 UNDO' : 'UNDO';
+  const modeLabel = isHvH ? 'LOCAL DUEL' : `YOU VS ${aiLevelTag(difficulty)}`;
+  const stateLabel = gameResult ? gameResult.label : pos.side === 1 ? 'P1 TURN' : 'P2 TURN';
+  const recentMovesText = moveHistory.length
+    ? moveHistory.slice(-4).map(m => formatLastMoveCompact(m)).join(' | ')
+    : '-';
   const forcedFrom = useMemo(() => {
     if (!canHumanMove || sel !== null) return null;
     const fromSet = new Set(myMoves.map(m => m.from));
@@ -616,15 +681,36 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   }, [canHumanMove, myMoves, sel]);
   const suggestedFrom = sel === null ? forcedFrom : null;
 
+  function onExitBoard() {
+    cancel();
+    clearPendingAICommit();
+    clearThinkStartTimer();
+    clearAnimUnlockTimer();
+    animLockUntilRef.current = 0;
+    setIsAnimLocked(false);
+    onBack();
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.edgeSpacer} />
 
+        <View style={styles.matchHeaderPanel}>
+          <View style={styles.matchHeaderCopy}>
+            <Text style={styles.matchHeaderMode}>{modeLabel}</Text>
+            <Text style={styles.matchHeaderState}>{stateLabel}</Text>
+          </View>
+          <Pressable style={styles.matchHeaderExitBtn} onPress={onExitBoard}>
+            <Text style={styles.matchHeaderExitText}>EXIT</Text>
+          </Pressable>
+        </View>
+
         <TurnSeatChip
           lane="P2"
           avatarKind={p2AvatarKind}
           role={p2Role}
+          pieceCount={p2PieceCount}
           captured={p2Captured}
           turnTimer={p2Turn}
           lastMoveText={p2Last}
@@ -696,10 +782,16 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
 
         </View>
 
+        <View style={styles.recentMovesPanel}>
+          <Text style={styles.recentMovesTitle}>RECENT MOVES</Text>
+          <Text style={styles.recentMovesText}>{recentMovesText}</Text>
+        </View>
+
         <TurnSeatChip
           lane="P1"
           avatarKind={p1AvatarKind}
           role={p1Role}
+          pieceCount={p1PieceCount}
           captured={p1Captured}
           turnTimer={p1Turn}
           lastMoveText={p1Last}
@@ -740,14 +832,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
           <Pressable style={styles.primaryButton} onPress={onNewGame}>
             <Text style={styles.primaryButtonText}>NEW GAME</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => {
-            cancel();
-            clearPendingAICommit();
-            clearAnimUnlockTimer();
-            animLockUntilRef.current = 0;
-            setIsAnimLocked(false);
-            onBack();
-          }}>
+          <Pressable style={styles.secondaryButton} onPress={onExitBoard}>
             <Text style={styles.secondaryButtonText}>EXIT BOARD</Text>
           </Pressable>
         </View>
@@ -775,73 +860,53 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     minHeight: 0,
   },
-  headerPanel: {
+  matchHeaderPanel: {
     width: '100%',
     backgroundColor: PANEL,
     borderWidth: 3,
     borderColor: LINE,
-    padding: 12,
-    gap: 6,
-  },
-  headerTopRow: {
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  backButton: {
-    minWidth: 78,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 2,
-    borderColor: LINE,
-    backgroundColor: PANEL_DARK,
-    alignItems: 'center',
+  matchHeaderCopy: {
+    flex: 1,
+    gap: 2,
   },
-  backButtonText: {
-    color: WHITE,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  headerTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderWidth: 2,
-    borderColor: CYAN,
-    backgroundColor: PANEL_DARK,
-  },
-  headerTagText: {
-    color: CYAN,
+  matchHeaderMode: {
+    color: GOLD,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.9,
   },
-  kicker: {
-    color: GOLD,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.3,
-  },
-  title: {
+  matchHeaderState: {
     color: WHITE,
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 1.1,
+    letterSpacing: 0.8,
   },
-  subtitle: {
-    color: SOFT,
-    fontSize: 11,
-    lineHeight: 16,
+  matchHeaderExitBtn: {
+    minWidth: 58,
+    minHeight: 30,
+    borderWidth: 2,
+    borderColor: LINE,
+    backgroundColor: PANEL_DARK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
-  statusText: {
-    color: MINT,
-    fontSize: 12,
-    fontWeight: '800',
+  matchHeaderExitText: {
+    color: WHITE,
+    fontSize: 10,
+    fontWeight: '900',
     letterSpacing: 0.7,
   },
   turnSeatChip: {
     width: '100%',
-    minHeight: 44,
+    minHeight: 58,
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'stretch',
@@ -880,6 +945,33 @@ const styles = StyleSheet.create({
     fontSize: 7,
     fontWeight: '900',
     letterSpacing: 0.3,
+  },
+  pieceMeterRow: {
+    marginTop: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pieceMeterLabel: {
+    width: 50,
+    color: SOFT,
+    fontSize: 7,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  pieceMeterTrack: {
+    flex: 1,
+    height: 8,
+    borderWidth: 1,
+    borderColor: LINE,
+    backgroundColor: '#161022',
+    flexDirection: 'row',
+  },
+  pieceMeterFill: {
+    height: '100%',
+  },
+  pieceMeterRest: {
+    height: '100%',
   },
   telemetryToggleBtn: {
     minWidth: 62,
@@ -1032,6 +1124,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.1,
+  },
+  recentMovesPanel: {
+    width: '100%',
+    backgroundColor: PANEL,
+    borderWidth: 2,
+    borderColor: LINE,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 3,
+  },
+  recentMovesTitle: {
+    color: GOLD,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  recentMovesText: {
+    color: SOFT,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
   },
   telemetryPanel: {
     width: '100%',
