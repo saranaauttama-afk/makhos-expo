@@ -305,6 +305,7 @@ function negamax(
 export async function iterativeDeepening(
   root: Position, timeMs: number, tt = new TT(), onInfo?: OnInfo,
   historyHashes: number[] = [], cancel?: CancelToken,
+  maxDepth = 24,
 ): Promise<SearchResult> {
   const deadline  = Date.now() + timeMs;
   const rootHash  = hashPosition(root);
@@ -338,7 +339,7 @@ export async function iterativeDeepening(
   const startTime = Date.now();
   let stableDepths = 0, lastBestKey = -1;
 
-  for (let depth = 1; depth <= 24; depth++) {
+  for (let depth = 1; depth <= maxDepth; depth++) {
     // Yield to the JS event loop between depth iterations so React Native can
     // process layout/input events and the UI doesn't freeze.
     await new Promise<void>(r => setTimeout(r, 0));

@@ -137,8 +137,14 @@ Move encoding: `from_sq * 32 + to_sq` (1024 slots). Flipped for P2: `(31-from)*3
 ```python
 EXPORT_ITER = 'iter_0099'   # change to desired checkpoint
 ```
-Run Cell 7 -> export the chosen checkpoint as ONNX -> copy it to `assets/models/makhos_az.onnx`.
-The app runtime only loads `assets/models/makhos_az.onnx`.
+Run Cell 7 -> export the chosen checkpoint as ONNX.
+
+Model plug-in point for gameplay:
+1. Put ONNX file in `assets/models/` (for example `iter_0099.onnx`)
+2. Register it in `src/coreClaude/azModelCatalog.ts`
+3. Open `Settings` -> `AI Model` and select that model
+
+The active model is reloaded automatically at runtime after selection.
 Archived experiment exports stay in `data_old/` and should not be referenced by the mobile app.
 
 ---
@@ -304,5 +310,8 @@ If the immediate goal is to build the new interface first, the best order is:
 6. Settings screen skeleton
 
 cd "d:\My App\makhos-v2"
-$env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.10"
+$env:REACT_NATIVE_PACKAGER_HOSTNAME="10.28.15.44"
 npx expo start --lan -c
+
+cd /d "d:\My App\makhos-v2"
+python newAz\eval_local.py --drive-dir "G:\My Drive\makhos_az_v5" --checkpoint iter_0099 

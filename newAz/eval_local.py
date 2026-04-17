@@ -15,6 +15,7 @@ import json
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -72,6 +73,13 @@ PRACTICAL_VERIFY_TRIGGER_MM7 = 0.25
 VERBOSE_MINIMAX_DEPTHS = {9, 11}
 
 _INF = 10_000
+
+# Mining policy presets (written into decision.json for Colab to apply).
+MINING_POLICY_WEAK = dict(depth=5, games=0, tail=0, max_samples=0, reason='mm5 below 20%; keep training on self-play only')
+MINING_POLICY_MID5 = dict(depth=5, games=3, tail=8, max_samples=32, reason='aggressive light mining at mm5 frontier')
+MINING_POLICY_MID7 = dict(depth=7, games=3, tail=6, max_samples=36, reason='aggressive mining at mm7 frontier')
+MINING_POLICY_MID9 = dict(depth=9, games=3, tail=8, max_samples=48, reason='deeper aggressive mining near mm11 frontier')
+MINING_POLICY_MAINT = dict(depth=9, games=1, tail=4, max_samples=8, reason='maintenance mining only; avoid overfitting late-stage checkpoints')
 
 
 def parse_args():
@@ -308,50 +316,50 @@ def recommend_loss_mining(result: dict) -> dict:
     if wr5 is None or float(wr5) < 0.20:
         return {
             'enable_loss_mining': False,
-            'loss_mining_depth': 5,
-            'loss_mining_games': 0,
-            'loss_mining_positions_per_game': 0,
-            'loss_mining_max_samples': 0,
-            'loss_mining_reason': 'mm5 below 20%; keep training on self-play only',
+            'loss_mining_depth': MINING_POLICY_WEAK['depth'],
+            'loss_mining_games': MINING_POLICY_WEAK['games'],
+            'loss_mining_positions_per_game': MINING_POLICY_WEAK['tail'],
+            'loss_mining_max_samples': MINING_POLICY_WEAK['max_samples'],
+            'loss_mining_reason': MINING_POLICY_WEAK['reason'],
         }
 
     if wr7 is None or float(wr7) < 0.35:
         return {
             'enable_loss_mining': True,
-            'loss_mining_depth': 5,
-            'loss_mining_games': 2,
-            'loss_mining_positions_per_game': 6,
-            'loss_mining_max_samples': 16,
-            'loss_mining_reason': 'stronger light mining at mm5 frontier',
+            'loss_mining_depth': MINING_POLICY_MID5['depth'],
+            'loss_mining_games': MINING_POLICY_MID5['games'],
+            'loss_mining_positions_per_game': MINING_POLICY_MID5['tail'],
+            'loss_mining_max_samples': MINING_POLICY_MID5['max_samples'],
+            'loss_mining_reason': MINING_POLICY_MID5['reason'],
         }
 
     if wr9 is None or float(wr9) < 0.45:
         return {
             'enable_loss_mining': True,
-            'loss_mining_depth': 7,
-            'loss_mining_games': 2,
-            'loss_mining_positions_per_game': 4,
-            'loss_mining_max_samples': 16,
-            'loss_mining_reason': 'medium mining at mm7 frontier',
+            'loss_mining_depth': MINING_POLICY_MID7['depth'],
+            'loss_mining_games': MINING_POLICY_MID7['games'],
+            'loss_mining_positions_per_game': MINING_POLICY_MID7['tail'],
+            'loss_mining_max_samples': MINING_POLICY_MID7['max_samples'],
+            'loss_mining_reason': MINING_POLICY_MID7['reason'],
         }
 
     if wr11 is None or float(wr11) < 0.50:
         return {
             'enable_loss_mining': True,
-            'loss_mining_depth': 9,
-            'loss_mining_games': 2,
-            'loss_mining_positions_per_game': 6,
-            'loss_mining_max_samples': 24,
-            'loss_mining_reason': 'deeper mining near mm11 frontier',
+            'loss_mining_depth': MINING_POLICY_MID9['depth'],
+            'loss_mining_games': MINING_POLICY_MID9['games'],
+            'loss_mining_positions_per_game': MINING_POLICY_MID9['tail'],
+            'loss_mining_max_samples': MINING_POLICY_MID9['max_samples'],
+            'loss_mining_reason': MINING_POLICY_MID9['reason'],
         }
 
     return {
         'enable_loss_mining': True,
-        'loss_mining_depth': 9,
-        'loss_mining_games': 1,
-        'loss_mining_positions_per_game': 4,
-        'loss_mining_max_samples': 8,
-        'loss_mining_reason': 'maintenance mining only; avoid overfitting late-stage checkpoints',
+        'loss_mining_depth': MINING_POLICY_MAINT['depth'],
+        'loss_mining_games': MINING_POLICY_MAINT['games'],
+        'loss_mining_positions_per_game': MINING_POLICY_MAINT['tail'],
+        'loss_mining_max_samples': MINING_POLICY_MAINT['max_samples'],
+        'loss_mining_reason': MINING_POLICY_MAINT['reason'],
     }
 
 
@@ -375,14 +383,29 @@ def should_run_practical_verify(result: dict) -> bool:
     return False
 
 
+def _resolve_exec(*names: str) -> Optional[str]:
+    for name in names:
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+
 def run_ts_verify(checkpoint_path: str, *, mm_depth: int, n_games: int, az_sims: int) -> dict:
     runner_ts = os.path.join(ROOT_DIR, 'battle_verify.ts')
     out_dir = os.path.join(ROOT_DIR, '..', 'tmp_battle_newaz')
     os.makedirs(out_dir, exist_ok=True)
     compiled_js = os.path.join(out_dir, 'newAz', 'battle_verify.js')
+    npx_exec = _resolve_exec('npx', 'npx.cmd')
+    node_exec = _resolve_exec('node', 'node.exe')
+    if not npx_exec or not node_exec:
+        raise FileNotFoundError(
+            'Node.js toolchain not found in PATH (need node + npx). '
+            'Install Node.js LTS and reopen terminal before running eval.'
+        )
 
     compile_cmd = [
-        'npx', 'tsc',
+        npx_exec, 'tsc',
         '--module', 'commonjs',
         '--moduleResolution', 'node',
         '--target', 'es2019',
@@ -399,7 +422,7 @@ def run_ts_verify(checkpoint_path: str, *, mm_depth: int, n_games: int, az_sims:
     subprocess.run(compile_cmd, cwd=os.path.join(ROOT_DIR, '..'), check=True, capture_output=True, text=True)
 
     run_cmd = [
-        'node',
+        node_exec,
         compiled_js,
         '--model', checkpoint_path,
         '--games', str(n_games),
@@ -469,7 +492,15 @@ def evaluate_checkpoint(drive_dir: str, checkpoint_path: str) -> dict:
     result['evaluated_minimax_depths'] = sorted(mm_results.keys())
     result['skipped_minimax_depths'] = [depth for depth, _ in FULL_MINIMAX_PLAN if depth not in mm_results]
 
-    if run_mm11 and 7 in mm_results and mm_results[7] >= FULL_EVAL_GATES[7]:
+    should_run_opening_suite = (
+        run_mm11
+        and gated_at_depth is None
+        and 11 in mm_results
+        and 7 in mm_results
+        and mm_results[7] >= FULL_EVAL_GATES[7]
+    )
+
+    if should_run_opening_suite:
         print(f'  opening suite...', flush=True)
         suite_metrics = eval_net_on_opening_suite(candidate, TARGET_MINIMAX_DEPTH, suite)
         result['wr_opening_suite'] = round(suite_metrics['overall'], 3)
@@ -483,6 +514,10 @@ def evaluate_checkpoint(drive_dir: str, checkpoint_path: str) -> dict:
         result['wr_opening_floor'] = None
         if not run_mm11:
             print(f'  opening suite skipped for iter {result["iter"]:04d} (paired with mm11-only heavy eval)', flush=True)
+        elif gated_at_depth is not None:
+            print(f'  opening suite skipped (gated earlier at mm{gated_at_depth})', flush=True)
+        elif 11 not in mm_results:
+            print('  opening suite skipped (mm11 not evaluated)', flush=True)
 
     target_baseline = {
         'wr_vs_minimax11': -1.0,

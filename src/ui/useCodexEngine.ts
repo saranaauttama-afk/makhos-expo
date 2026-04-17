@@ -1,4 +1,4 @@
-// useCodexEngine.ts — async wrapper around the hybrid engine
+// useCodexEngine.ts - async wrapper around the hybrid engine
 //
 // Hybrid flow:
 //   opening -> book
@@ -11,15 +11,23 @@ import { CancelToken, SearchInfo } from '../coreClaude/search/alphabeta';
 import { Position } from '../coreClaude/position';
 import { Move } from '../coreClaude/movegen';
 import { preloadAZModel } from '../coreClaude/azNet';
-import { HybridPlan, hybridBestMove } from '../coreClaude/search/hybrid';
+import { HybridDifficulty, HybridPlan, hybridBestMove } from '../coreClaude/search/hybrid';
 import { Difficulty } from './types';
 
-export function useCodexEngine() {
-  const [thinking, setThinking]   = useState(false);
-  const [lastInfo, setLastInfo]   = useState<SearchInfo | null>(null);
-  const [lastPlan, setLastPlan]   = useState<HybridPlan | null>(null);
+const HYBRID_PROFILE: Record<Difficulty, { hybridDifficulty: HybridDifficulty; budgetMs: number }> = {
+  easy: { hybridDifficulty: 'medium', budgetMs: 900 },
+  normal: { hybridDifficulty: 'medium', budgetMs: 1400 },
+  hard: { hybridDifficulty: 'hard', budgetMs: 2200 },
+  expert: { hybridDifficulty: 'hard', budgetMs: 3200 },
+  master: { hybridDifficulty: 'hard', budgetMs: 4500 },
+};
 
-  const ttRef     = useRef(new TT());
+export function useCodexEngine() {
+  const [thinking, setThinking] = useState(false);
+  const [lastInfo, setLastInfo] = useState<SearchInfo | null>(null);
+  const [lastPlan, setLastPlan] = useState<HybridPlan | null>(null);
+
+  const ttRef = useRef(new TT());
   const cancelRef = useRef<CancelToken | null>(null);
   const preloaded = useRef(false);
 
@@ -37,7 +45,7 @@ export function useCodexEngine() {
     ms = 1800,
     historyHashes: number[] = [],
     onInfo?: (info: SearchInfo) => void,
-    difficulty: Difficulty = 'medium',
+    difficulty: Difficulty = 'easy',
   ): Promise<Move | undefined> => {
     cancel();
 
@@ -45,13 +53,16 @@ export function useCodexEngine() {
     cancelRef.current = token;
     setThinking(true);
 
+    const profile = HYBRID_PROFILE[difficulty];
+    const budgetMs = Math.max(350, Math.min(ms, profile.budgetMs));
+
     return hybridBestMove(
       pos,
-      ms,
+      budgetMs,
       ttRef.current,
       historyHashes,
       token,
-      difficulty,
+      profile.hybridDifficulty,
     ).then(res => {
       setThinking(false);
       if (token.cancelled) return undefined;

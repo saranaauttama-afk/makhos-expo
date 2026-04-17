@@ -4,7 +4,7 @@
 // native Pressable grid remains the source of truth for input.
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Svg, { G, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Rect, Text as SvgText } from 'react-native-svg';
 import { bits, toIndex, toRC } from '../coreClaude/bitboards';
 import { Position } from '../coreClaude/position';
 import { COLORS, SIZE } from './theme';
@@ -25,13 +25,15 @@ interface Props {
   lastMove?: LastMoveHint | null;
 }
 
-const HILITE_FROM = '#5ec5ff';
-const HILITE_SELECTED = '#f3c969';
-const HILITE_DEST = '#77f7cf';
-const HILITE_DEST_DARK = '#1a7f62';
-const PIECE_P1_SHADOW = '#171126';
-const PIECE_P2_SHADOW = '#7a2430';
-const KING_FILL = '#fff3ba';
+const HILITE_FROM = '#8ecbc2';
+const HILITE_SELECTED = '#d8f2eb';
+const HILITE_DEST = '#b8a777';
+const HILITE_LAST = '#84c8bd';
+const PIECE_P1_SHADOW = 'rgba(24,28,38,0.45)';
+const PIECE_P2_SHADOW = 'rgba(78,83,90,0.35)';
+const PIECE_P1_BASE = '#4c515e';
+const PIECE_P2_BASE = '#d9dde4';
+const KING_FILL = '#f6e5b8';
 
 export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selectedFrom, destSquares, lastMove = null }) => {
   const N = 8;
@@ -137,7 +139,6 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
   useEffect(() => () => stopMoveAnimation(), []);
 
   const fromAlpha = [0.5, 0.65, 0.82, 1, 0.82, 0.65][animFrame];
-  const selectedInset = [8, 7, 6, 7, 8, 9][animFrame];
   const selectedThickness = [3, 3, 4, 4, 3, 3][animFrame];
   const destSize = [0.28, 0.31, 0.34, 0.36, 0.34, 0.31][animFrame];
   const destAlpha = [0.55, 0.68, 0.82, 1, 0.82, 0.68][animFrame];
@@ -156,22 +157,27 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
     king: boolean,
     key: string
   ) => {
-    const pad = S * 0.16;
-    const body = S - pad * 2;
-    const inset = S * 0.08;
+    const cx = x + S * 0.5;
+    const cy = y + S * 0.52;
+    const outerR = S * 0.31;
+    const innerR = S * 0.24;
+    const shineR = S * 0.12;
     const shadowFill = side === 1 ? PIECE_P1_SHADOW : PIECE_P2_SHADOW;
-    const baseFill = side === 1 ? COLORS.pieceP1 : COLORS.pieceP2;
+    const baseFill = side === 1 ? PIECE_P1_BASE : PIECE_P2_BASE;
+    const innerFill = side === 1 ? '#646a78' : '#eceff5';
+    const kingStroke = side === 1 ? '#2b2f38' : '#8d939d';
     return (
       <G key={key}>
-        <Rect x={x + pad + 2} y={y + pad + 4} width={body} height={body} fill={shadowFill} />
-        <Rect x={x + pad} y={y + pad} width={body} height={body} fill={baseFill} />
-        <Rect x={x + pad + 4} y={y + pad + 4} width={body - 8} height={body - 8} fill="rgba(255,255,255,0.12)" />
+        <Circle cx={cx + 1.6} cy={cy + 3.8} r={outerR} fill={shadowFill} />
+        <Circle cx={cx} cy={cy} r={outerR} fill={baseFill} />
+        <Circle cx={cx} cy={cy - S * 0.02} r={innerR} fill={innerFill} />
+        <Circle cx={cx - S * 0.11} cy={cy - S * 0.13} r={shineR} fill="rgba(255,255,255,0.22)" />
 
         {king && (
           <>
-            <Rect x={x + pad + inset + 2} y={y + pad + inset + 2} width={body - inset * 2} height={body - inset * 2} fill="#7f5f1a" />
-            <Rect x={x + pad + inset} y={y + pad + inset} width={body - inset * 2} height={body - inset * 2} fill={KING_FILL} />
-            <Rect x={x + pad + inset + 6} y={y + pad + inset + 6} width={body - inset * 2 - 12} height={body - inset * 2 - 12} fill="rgba(0,0,0,0.10)" />
+            <Circle cx={cx} cy={cy} r={S * 0.11} fill={KING_FILL} />
+            <Rect x={cx - S * 0.02} y={cy - S * 0.14} width={S * 0.04} height={S * 0.2} fill={kingStroke} />
+            <Rect x={cx - S * 0.1} y={cy - S * 0.04} width={S * 0.2} height={S * 0.04} fill={kingStroke} />
           </>
         )}
       </G>
@@ -190,156 +196,112 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
           const isSelected = idx >= 0 && selectedFrom === idx;
           const isDest = idx >= 0 && destSet.has(idx);
           const isLastFrom = idx >= 0 && lastMove?.from === idx;
-          const isLastTo = idx >= 0 && lastMove?.to === idx;
-          const x = c * S;
-          const y = r * S;
+              const isLastTo = idx >= 0 && lastMove?.to === idx;
+              const x = c * S;
+              const y = r * S;
+              const capCount = idx >= 0 ? (capsMap.get(idx) ?? 0) : 0;
 
-          return (
-            <G key={k}>
-              <Rect x={x} y={y} width={S} height={S} fill={dark ? COLORS.dark : COLORS.light} />
-              <Rect x={x} y={y} width={S} height={2} fill="rgba(255,255,255,0.12)" />
-              <Rect x={x} y={y + S - 2} width={S} height={2} fill="rgba(0,0,0,0.18)" />
+              return (
+                <G key={k}>
+                  <Rect x={x} y={y} width={S} height={S} fill={dark ? COLORS.dark : COLORS.light} />
 
-              {isLastFrom && (
-                <Rect
-                  x={x + 5}
-                  y={y + 5}
-                  width={S - 10}
-                  height={S - 10}
-                  fill="#23143d"
-                  opacity={moveFlashAlpha}
-                />
-              )}
+                  {isLastFrom && (
+                    <Circle
+                      cx={x + S * 0.5}
+                      cy={y + S * 0.5}
+                      r={S * 0.33}
+                      fill={HILITE_LAST}
+                      opacity={moveFlashAlpha * 0.38}
+                    />
+                  )}
 
-              {isLastTo && (
-                <>
-                  <Rect
-                    x={x + 3}
-                    y={y + 3}
-                    width={S - 6}
-                    height={S - 6}
-                    fill={HILITE_SELECTED}
-                    opacity={moveFlashAlpha}
-                  />
-                  <Rect
-                    x={x + 8}
-                    y={y + 8}
-                    width={S - 16}
-                    height={S - 16}
-                    fill="#fff2b1"
-                    opacity={moveFlashAlpha * 0.8}
-                  />
-                </>
-              )}
+                  {isLastTo && (
+                    <Circle
+                      cx={x + S * 0.5}
+                      cy={y + S * 0.5}
+                      r={S * 0.4}
+                      fill={HILITE_SELECTED}
+                      opacity={moveFlashAlpha * 0.45}
+                    />
+                  )}
 
-              {isLastTo && isCaptureMove && moveAnimFrame < 5 && (
-                <>
-                  <Rect
-                    x={x + (S - S * burstOuter) / 2}
-                    y={y + (S - S * burstOuter) / 2}
-                    width={S * burstOuter}
-                    height={S * burstOuter}
-                    fill="#ff7dc4"
-                    opacity={moveFlashAlpha * 0.7}
-                  />
-                  <Rect
-                    x={x + (S - S * burstInner) / 2}
-                    y={y + (S - S * burstInner) / 2}
-                    width={S * burstInner}
-                    height={S * burstInner}
-                    fill="#ffe17d"
-                    opacity={moveFlashAlpha}
-                  />
-                  <Rect x={x + S * 0.08} y={y + S * 0.46} width={S * 0.18} height={4} fill="#ffe17d" opacity={moveFlashAlpha} />
-                  <Rect x={x + S * 0.74} y={y + S * 0.46} width={S * 0.18} height={4} fill="#ffe17d" opacity={moveFlashAlpha} />
-                  <Rect x={x + S * 0.46} y={y + S * 0.08} width={4} height={S * 0.18} fill="#ffe17d" opacity={moveFlashAlpha} />
-                  <Rect x={x + S * 0.46} y={y + S * 0.74} width={4} height={S * 0.18} fill="#ffe17d" opacity={moveFlashAlpha} />
-                </>
-              )}
+                  {isLastTo && isCaptureMove && moveAnimFrame < 5 && (
+                    <>
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.5}
+                        r={S * burstOuter * 0.5}
+                        fill="#f3d995"
+                        opacity={moveFlashAlpha * 0.7}
+                      />
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.5}
+                        r={S * burstInner * 0.5}
+                        fill="#fff2ca"
+                        opacity={moveFlashAlpha}
+                      />
+                    </>
+                  )}
 
-              {isFrom && (
-                <>
-                  <Rect x={x + 2} y={y + 2} width={S - 4} height={4} fill={HILITE_FROM} opacity={fromAlpha} />
-                  <Rect x={x + 2} y={y + S - 6} width={S - 4} height={4} fill={HILITE_FROM} opacity={fromAlpha} />
-                  <Rect x={x + 2} y={y + 2} width={4} height={S - 4} fill={HILITE_FROM} opacity={fromAlpha} />
-                  <Rect x={x + S - 6} y={y + 2} width={4} height={S - 4} fill={HILITE_FROM} opacity={fromAlpha} />
-                </>
-              )}
+                  {isFrom && (
+                    <Circle
+                      cx={x + S * 0.5}
+                      cy={y + S * 0.5}
+                      r={S * 0.31}
+                      fill="none"
+                      stroke={HILITE_FROM}
+                      strokeWidth={3}
+                      opacity={fromAlpha}
+                    />
+                  )}
 
-              {isSelected && (
-                <>
-                  <Rect
-                    x={x + selectedInset}
-                    y={y + selectedInset}
-                    width={S - selectedInset * 2}
-                    height={selectedThickness}
-                    fill={HILITE_SELECTED}
-                  />
-                  <Rect
-                    x={x + selectedInset}
-                    y={y + S - selectedInset - selectedThickness}
-                    width={S - selectedInset * 2}
-                    height={selectedThickness}
-                    fill={HILITE_SELECTED}
-                  />
-                  <Rect
-                    x={x + selectedInset}
-                    y={y + selectedInset}
-                    width={selectedThickness}
-                    height={S - selectedInset * 2}
-                    fill={HILITE_SELECTED}
-                  />
-                  <Rect
-                    x={x + S - selectedInset - selectedThickness}
-                    y={y + selectedInset}
-                    width={selectedThickness}
-                    height={S - selectedInset * 2}
-                    fill={HILITE_SELECTED}
-                  />
-                  <Rect
-                    x={x + selectedInset + 5}
-                    y={y + selectedInset + 5}
-                    width={S - (selectedInset + 5) * 2}
-                    height={2}
-                    fill="#fff2b1"
-                    opacity={destAlpha}
-                  />
-                </>
-              )}
+                  {isSelected && (
+                    <Circle
+                      cx={x + S * 0.5}
+                      cy={y + S * 0.5}
+                      r={S * 0.34}
+                      fill="none"
+                      stroke={HILITE_SELECTED}
+                      strokeWidth={selectedThickness + 1}
+                      opacity={destAlpha}
+                    />
+                  )}
 
-              {isDest && (
-                <>
-                  <Rect
-                    x={x + (S - S * destSize) / 2}
-                    y={y + (S - S * destSize) / 2}
-                    width={S * destSize}
-                    height={S * destSize}
-                    fill={HILITE_DEST}
-                    opacity={destAlpha}
-                  />
-                  <Rect
-                    x={x + (S - S * (destSize - 0.05)) / 2}
-                    y={y + (S - S * (destSize - 0.05)) / 2}
-                    width={S * (destSize - 0.05)}
-                    height={S * (destSize - 0.05)}
-                    fill={HILITE_DEST_DARK}
-                    opacity={0.35}
-                  />
-                  <Rect x={x + S * 0.70} y={y + S * 0.10} width={S * 0.20} height={S * 0.20} fill={HILITE_DEST} />
-                  <SvgText
-                    x={x + S * 0.80}
-                    y={y + S * 0.27}
-                    fontSize={S * 0.20}
-                    fill="#0f0918"
-                    fontWeight="bold"
-                    textAnchor="middle"
-                  >
-                    {capsMap.get(idx) ?? 0}
-                  </SvgText>
-                </>
-              )}
-            </G>
-          );
+                  {isDest && (
+                    <>
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.5}
+                        r={S * destSize * 0.46}
+                        fill={HILITE_DEST}
+                        opacity={destAlpha}
+                      />
+                      {capCount > 1 && (
+                        <>
+                          <Circle
+                            cx={x + S * 0.78}
+                            cy={y + S * 0.22}
+                            r={S * 0.12}
+                            fill="#f4ead1"
+                            opacity={0.95}
+                          />
+                          <SvgText
+                            x={x + S * 0.78}
+                            y={y + S * 0.26}
+                            fontSize={S * 0.18}
+                            fill="#5a4a29"
+                            fontWeight="bold"
+                            textAnchor="middle"
+                          >
+                            {capCount}
+                          </SvgText>
+                        </>
+                      )}
+                    </>
+                  )}
+                </G>
+              );
         })}
 
         {pieces.map((p, i) => {

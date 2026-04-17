@@ -6,17 +6,17 @@ interface Props {
   onBack: () => void;
 }
 
-const BG = '#120c1c';
-const PANEL = '#211638';
-const PANEL_ALT = '#2c1f49';
-const PANEL_DARK = '#0f0918';
-const LINE = '#5d4d8a';
-const GOLD = '#f3c969';
-const MINT = '#77f7cf';
-const CYAN = '#5ec5ff';
-const PINK = '#ff7dc4';
-const WHITE = '#f7f2ff';
-const SOFT = '#b9abd8';
+const BG = '#3f837b';
+const PANEL = 'rgba(27, 69, 64, 0.74)';
+const PANEL_ALT = '#2b5f59';
+const PANEL_DARK = '#214b46';
+const LINE = 'rgba(223, 247, 240, 0.34)';
+const GOLD = '#f6e2aa';
+const MINT = '#b8f3df';
+const CYAN = '#9be7da';
+const PINK = '#f2c5c5';
+const WHITE = '#f5f2e8';
+const SOFT = '#d7efe8';
 
 function StatCard({ title, value, tint }: { title: string; value: string; tint: string }) {
   return (
@@ -54,6 +54,8 @@ function ConceptBlock({
 export default function ConceptScreen({ onBack }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View pointerEvents="none" style={styles.bgAuraLarge} />
+      <View pointerEvents="none" style={styles.bgAuraSmall} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.headerPanel}>
           <Pressable style={styles.backButton} onPress={onBack}>
@@ -129,15 +131,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
+  bgAuraLarge: {
+    position: 'absolute',
+    width: 540,
+    height: 540,
+    borderRadius: 270,
+    backgroundColor: 'rgba(174, 235, 223, 0.17)',
+    top: -260,
+    left: -90,
+  },
+  bgAuraSmall: {
+    position: 'absolute',
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: 'rgba(98, 174, 163, 0.26)',
+    bottom: -140,
+    right: -100,
+  },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 18,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 22,
     gap: 12,
   },
   headerPanel: {
     backgroundColor: PANEL,
-    borderWidth: 3,
+    borderWidth: 1,
+    borderRadius: 14,
     borderColor: LINE,
     padding: 12,
     gap: 10,
@@ -146,7 +167,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderWidth: 2,
+    borderWidth: 1,
+    borderRadius: 999,
     borderColor: LINE,
     backgroundColor: PANEL_DARK,
   },
@@ -184,7 +206,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 76,
     backgroundColor: PANEL_ALT,
-    borderWidth: 2,
+    borderWidth: 1,
+    borderRadius: 12,
     padding: 10,
     justifyContent: 'space-between',
   },
@@ -201,7 +224,8 @@ const styles = StyleSheet.create({
   },
   block: {
     backgroundColor: PANEL,
-    borderWidth: 3,
+    borderWidth: 1,
+    borderRadius: 14,
     borderColor: LINE,
     padding: 12,
     gap: 8,
@@ -227,7 +251,8 @@ const styles = StyleSheet.create({
   },
   roadmapPanel: {
     backgroundColor: PANEL_DARK,
-    borderWidth: 3,
+    borderWidth: 1,
+    borderRadius: 14,
     borderColor: CYAN,
     padding: 12,
     gap: 8,

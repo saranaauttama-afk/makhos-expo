@@ -5,6 +5,7 @@
 
 import { Asset } from 'expo-asset';
 import { NativeModules } from 'react-native';
+import { getBundledAZModels } from './azModelCatalog';
 
 type OrtModule = typeof import('onnxruntime-react-native');
 type InferenceSession = import('onnxruntime-react-native').InferenceSession;
@@ -14,6 +15,19 @@ let session: InferenceSession | null = null;
 let sessionPromise: Promise<InferenceSession> | null = null;
 let ortModulePromise: Promise<OrtModule> | null = null;
 let azRuntimeAvailable = true;
+let loadedModelId: string | null = null;
+
+let activeModelId = getBundledAZModels()[0]?.id ?? 'makhos_az';
+
+function resetSession() {
+  session = null;
+  sessionPromise = null;
+  loadedModelId = null;
+}
+
+function findModelById(modelId: string) {
+  return getBundledAZModels().find(m => m.id === modelId);
+}
 
 async function getOrtModule(): Promise<OrtModule> {
   if (!azRuntimeAvailable) {
@@ -33,15 +47,20 @@ async function getOrtModule(): Promise<OrtModule> {
 }
 
 async function getSession(): Promise<InferenceSession> {
-  if (session) return session;
+  if (session && loadedModelId === activeModelId) return session;
   if (!sessionPromise) {
     sessionPromise = (async () => {
       try {
+        const model = findModelById(activeModelId);
+        if (!model) {
+          throw new Error(`Unknown AZ model id: ${activeModelId}`);
+        }
         const ort = await getOrtModule();
-        const [asset] = await Asset.loadAsync(require('../../assets/models/makhos_az.onnx'));
+        const [asset] = await Asset.loadAsync(model.asset);
         const uri = asset.localUri ?? asset.uri;
         const created = await ort.InferenceSession.create(uri);
         session = created;
+        loadedModelId = activeModelId;
         return created;
       } catch (error) {
         azRuntimeAvailable = false;
@@ -57,7 +76,26 @@ export function isAZRuntimeAvailable() {
   return azRuntimeAvailable;
 }
 
-export function preloadAZModel(): void {
+export function getActiveAZModelId() {
+  return activeModelId;
+}
+
+export function getAvailableAZModels() {
+  return getBundledAZModels().map(m => ({ id: m.id, label: m.label }));
+}
+
+export function setActiveAZModel(modelId: string): boolean {
+  const model = findModelById(modelId);
+  if (!model) return false;
+  if (activeModelId === modelId) return true;
+  activeModelId = modelId;
+  azRuntimeAvailable = true;
+  resetSession();
+  return true;
+}
+
+export function preloadAZModel(modelId?: string): void {
+  if (modelId) setActiveAZModel(modelId);
   getSession().catch(() => {});
 }
 

@@ -11,21 +11,27 @@ import { useCodexEngine } from './useCodexEngine';
 import { Difficulty, GameConfig } from './types';
 import { usePixelGameFx } from './usePixelGameFx';
 
-const THINK_MS: Record<Difficulty, number> = { easy: 300, medium: 1000, hard: 2000 };
+const THINK_MS: Record<Difficulty, number> = {
+  easy: 900,
+  normal: 1400,
+  hard: 2200,
+  expert: 3200,
+  master: 4500,
+};
 const MOVE_ANIM_GUARD_MS = 560;
 const INITIAL_PIECES_PER_SIDE = 8;
 
-const BG = '#120c1c';
-const PANEL = '#211638';
-const PANEL_ALT = '#2c1f49';
-const PANEL_DARK = '#0f0918';
-const LINE = '#5d4d8a';
-const GOLD = '#f3c969';
-const CYAN = '#5ec5ff';
-const MINT = '#77f7cf';
-const PINK = '#ff7dc4';
-const WHITE = '#f7f2ff';
-const SOFT = '#b9abd8';
+const BG = '#3f837b';
+const PANEL = 'rgba(27, 69, 64, 0.74)';
+const PANEL_ALT = '#2b5f59';
+const PANEL_DARK = '#214b46';
+const LINE = 'rgba(223, 247, 240, 0.34)';
+const GOLD = '#f6e2aa';
+const CYAN = '#9be7da';
+const MINT = '#b8f3df';
+const PINK = '#f2c5c5';
+const WHITE = '#f5f2e8';
+const SOFT = '#d7efe8';
 
 function posKey(p: Position) {
   return [p.side, p.p1Men, p.p1Kings, p.p2Men, p.p2Kings, p.halfmoveClock].join(':');
@@ -157,8 +163,8 @@ const AVATAR_COLORS: Record<string, string> = {
 };
 
 function avatarKindByDifficulty(difficulty: Difficulty): AvatarKind {
-  if (difficulty === 'hard') return 'bot-hard';
-  if (difficulty === 'medium') return 'bot-medium';
+  if (difficulty === 'expert' || difficulty === 'master') return 'bot-hard';
+  if (difficulty === 'normal' || difficulty === 'hard') return 'bot-medium';
   return 'bot-easy';
 }
 
@@ -192,44 +198,13 @@ function PixelAvatar({
 }
 
 function aiLevelTag(difficulty: Difficulty) {
-  if (difficulty === 'hard') return 'AI-H';
-  if (difficulty === 'medium') return 'AI-M';
-  return 'AI-E';
-}
-
-function PieceMeter({
-  pieceCount,
-  active,
-  tint,
-}: {
-  pieceCount: number;
-  active: boolean;
-  tint: string;
-}) {
-  const ratio = Math.max(0, Math.min(1, pieceCount / INITIAL_PIECES_PER_SIDE));
-  const fillFlex = ratio <= 0 ? 0 : ratio;
-  const restFlex = 1 - ratio;
-  return (
-    <View style={styles.pieceMeterTrack}>
-      <View
-        style={[
-          styles.pieceMeterFill,
-          {
-            flex: fillFlex,
-            backgroundColor: active ? tint : '#8478a8',
-          },
-        ]}
-      />
-      <View style={[styles.pieceMeterRest, { flex: restFlex }]} />
-    </View>
-  );
+  return difficulty.toUpperCase();
 }
 
 function TurnSeatChip({
   lane,
   avatarKind,
   role,
-  pieceCount,
   captured,
   turnTimer,
   lastMoveText,
@@ -242,7 +217,6 @@ function TurnSeatChip({
   lane: string;
   avatarKind: AvatarKind;
   role: string;
-  pieceCount: number;
   captured: number;
   turnTimer: string;
   lastMoveText?: string | null;
@@ -268,30 +242,11 @@ function TurnSeatChip({
         <PixelAvatar kind={avatarKind} tint={tint} active={active} />
         <View style={styles.turnSeatCopy}>
           <Text style={[styles.turnSeatText, { color: active ? WHITE : SOFT }]}>
-            {lane}
+            {lane} · {role}
           </Text>
-          <View style={styles.seatBoxRow}>
-            <View style={[styles.seatInfoBox, { borderColor: active ? tint : LINE }]}>
-              <Text style={[styles.turnSeatRole, { color: active ? tint : SOFT }]}>
-                {role}
-              </Text>
-            </View>
-            <View style={[styles.seatInfoBox, { borderColor: active ? tint : LINE }]}>
-              <Text style={styles.seatInfoText}>CAP x{captured}</Text>
-            </View>
-            <View style={[styles.seatInfoBox, { borderColor: active ? tint : LINE }]}>
-              <Text style={styles.seatInfoText}>T {turnTimer}</Text>
-            </View>
-            <View style={[styles.seatInfoBox, styles.seatInfoBoxWide, { borderColor: active ? GOLD : LINE }]}>
-              <Text style={styles.seatInfoText}>
-                {lastMoveText ? `LAST ${lastMoveText}` : 'LAST -'}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.pieceMeterRow}>
-            <Text style={styles.pieceMeterLabel}>UNITS {pieceCount}/{INITIAL_PIECES_PER_SIDE}</Text>
-            <PieceMeter pieceCount={pieceCount} active={active} tint={tint} />
-          </View>
+          <Text style={[styles.turnSeatRole, { color: active ? tint : SOFT }]}>
+            CAP x{captured} · TURN {turnTimer}{lastMoveText ? ` · LAST ${lastMoveText}` : ''}
+          </Text>
         </View>
         {showTelemetryToggle && onToggleTelemetry ? (
           <Pressable
@@ -593,7 +548,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     if (thinking) return;
     if (posHistory.length <= 1) return;
 
-    const undoLockedByMode = !isHvH && difficulty === 'hard';
+    const undoLockedByMode = !isHvH && (difficulty === 'expert' || difficulty === 'master');
     if (undoLockedByMode) {
       Alert.alert('Undo Locked', 'Hard mode locks undo to keep the challenge fair.');
       return;
@@ -664,22 +619,10 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const liveTurn = formatTurnSeconds(turnElapsedMs);
   const p1Turn = pos.side === 1 ? liveTurn : '--';
   const p2Turn = pos.side === -1 ? liveTurn : '--';
-  const undoLockedByMode = !isHvH && difficulty === 'hard';
+  const undoLockedByMode = !isHvH && (difficulty === 'expert' || difficulty === 'master');
   const canUndoNow = !thinking && posHistory.length > 1;
-  const undoBtnText = undoLockedByMode ? '🔒 UNDO' : 'UNDO';
-  const modeLabel = isHvH ? 'LOCAL DUEL' : `YOU VS ${aiLevelTag(difficulty)}`;
-  const stateLabel = gameResult ? gameResult.label : pos.side === 1 ? 'P1 TURN' : 'P2 TURN';
-  const recentMovesText = moveHistory.length
-    ? moveHistory.slice(-4).map(m => formatLastMoveCompact(m)).join(' | ')
-    : '-';
-  const forcedFrom = useMemo(() => {
-    if (!canHumanMove || sel !== null) return null;
-    const fromSet = new Set(myMoves.map(m => m.from));
-    if (fromSet.size !== 1) return null;
-    const [onlyFrom] = Array.from(fromSet);
-    return onlyFrom ?? null;
-  }, [canHumanMove, myMoves, sel]);
-  const suggestedFrom = sel === null ? forcedFrom : null;
+  const canHintNow = canHumanMove && !thinking && myMoves.length > 0;
+  const undoBtnText = undoLockedByMode ? 'LOCK' : 'UNDO';
 
   function onExitBoard() {
     cancel();
@@ -691,26 +634,32 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     onBack();
   }
 
+  function onPressHint() {
+    if (!canHintNow) return;
+    if (myMoves.length === 1) {
+      setSel(myMoves[0].from);
+      return;
+    }
+    const posSnapshot = pos;
+    const histSnapshot = hashHistory;
+    think(posSnapshot, Math.min(1200, thinkMs), histSnapshot, undefined, difficulty).then(best => {
+      if (!best) return;
+      setSel(best.from);
+      Alert.alert('Hint', `Try ${best.from} -> ${best.to}`);
+    });
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View pointerEvents="none" style={styles.bgAuraLarge} />
+      <View pointerEvents="none" style={styles.bgAuraSmall} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.edgeSpacer} />
-
-        <View style={styles.matchHeaderPanel}>
-          <View style={styles.matchHeaderCopy}>
-            <Text style={styles.matchHeaderMode}>{modeLabel}</Text>
-            <Text style={styles.matchHeaderState}>{stateLabel}</Text>
-          </View>
-          <Pressable style={styles.matchHeaderExitBtn} onPress={onExitBoard}>
-            <Text style={styles.matchHeaderExitText}>EXIT</Text>
-          </Pressable>
-        </View>
 
         <TurnSeatChip
           lane="P2"
           avatarKind={p2AvatarKind}
           role={p2Role}
-          pieceCount={p2PieceCount}
           captured={p2Captured}
           turnTimer={p2Turn}
           lastMoveText={p2Last}
@@ -740,7 +689,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
             <Board
               pos={pos}
               onTapSquare={onTapSquare}
-              fromSquares={suggestedFrom !== null ? [suggestedFrom] : []}
+              fromSquares={[]}
               selectedFrom={sel}
               destSquares={sel !== null ? myMoves.filter(m => m.from === sel).map(m => ({ to: m.to, caps: m.captured.length })) : []}
               lastMove={lastMove}
@@ -758,23 +707,13 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
                   ]}
                 >
                   <Text style={styles.resultOverlayTitle}>{gameResult.label}</Text>
-                  {'avatarKind' in gameResult && gameResult.avatarKind ? (
-                    <View style={styles.resultOverlayAvatarRow}>
-                      <View style={styles.resultOverlayAvatarWrap}>
-                        <PixelAvatar
-                          kind={gameResult.avatarKind}
-                          tint={gameResult.tone === 'win' ? MINT : PINK}
-                          active
-                        />
-                        {gameResult.tone === 'loss' ? (
-                          <View pointerEvents="none" style={styles.lossCrossOverlay}>
-                            <View style={[styles.lossCrossLine, styles.lossCrossLineA]} />
-                            <View style={[styles.lossCrossLine, styles.lossCrossLineB]} />
-                          </View>
-                        ) : null}
-                      </View>
-                    </View>
-                  ) : null}
+                  <Text style={styles.resultOverlaySub}>
+                    {gameResult.tone === 'win'
+                      ? 'Great run. Push to the next level.'
+                      : gameResult.tone === 'loss'
+                        ? 'Try Hint or Undo, then run it back.'
+                        : 'Even match. One more round?'}
+                  </Text>
                 </View>
               </View>
             ) : null}
@@ -782,16 +721,10 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
 
         </View>
 
-        <View style={styles.recentMovesPanel}>
-          <Text style={styles.recentMovesTitle}>RECENT MOVES</Text>
-          <Text style={styles.recentMovesText}>{recentMovesText}</Text>
-        </View>
-
         <TurnSeatChip
           lane="P1"
           avatarKind={p1AvatarKind}
           role={p1Role}
-          pieceCount={p1PieceCount}
           captured={p1Captured}
           turnTimer={p1Turn}
           lastMoveText={p1Last}
@@ -820,20 +753,33 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
         <View style={styles.actionRow}>
           <Pressable
             style={[
-              styles.secondaryButton,
+              styles.roundButton,
+              !canHintNow && styles.btnDisabled,
+            ]}
+            onPress={onPressHint}
+            disabled={!canHintNow}
+          >
+            <Text style={styles.roundButtonTitle}>HINT</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.roundButton,
               undoLockedByMode && styles.undoBtnLockedLook,
               !canUndoNow && styles.btnDisabled,
             ]}
             onPress={onPressUndo}
             disabled={!canUndoNow}
           >
-            <Text style={styles.secondaryButtonText}>{undoBtnText}</Text>
+            <Text style={styles.roundButtonTitle}>{undoBtnText}</Text>
           </Pressable>
+        </View>
+
+        <View style={styles.bottomPillRow}>
           <Pressable style={styles.primaryButton} onPress={onNewGame}>
             <Text style={styles.primaryButtonText}>NEW GAME</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={onExitBoard}>
-            <Text style={styles.secondaryButtonText}>EXIT BOARD</Text>
+            <Text style={styles.secondaryButtonText}>EXIT</Text>
           </Pressable>
         </View>
 
@@ -848,70 +794,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
+  bgAuraLarge: {
+    position: 'absolute',
+    width: 540,
+    height: 540,
+    borderRadius: 270,
+    backgroundColor: 'rgba(174, 235, 223, 0.17)',
+    top: -260,
+    left: -90,
+  },
+  bgAuraSmall: {
+    position: 'absolute',
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: 'rgba(98, 174, 163, 0.26)',
+    bottom: -140,
+    right: -100,
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 16,
-    gap: 10,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 22,
+    gap: 12,
     alignItems: 'center',
   },
   edgeSpacer: {
     flexGrow: 1,
     minHeight: 0,
   },
-  matchHeaderPanel: {
-    width: '100%',
-    backgroundColor: PANEL,
-    borderWidth: 3,
-    borderColor: LINE,
-    minHeight: 44,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  matchHeaderCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  matchHeaderMode: {
-    color: GOLD,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.9,
-  },
-  matchHeaderState: {
-    color: WHITE,
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  matchHeaderExitBtn: {
-    minWidth: 58,
-    minHeight: 30,
-    borderWidth: 2,
-    borderColor: LINE,
-    backgroundColor: PANEL_DARK,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  matchHeaderExitText: {
-    color: WHITE,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-  },
   turnSeatChip: {
     width: '100%',
-    minHeight: 58,
-    borderWidth: 3,
+    minHeight: 54,
+    borderWidth: 1,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'stretch',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   turnSeatInner: {
     flexDirection: 'row',
@@ -921,7 +842,7 @@ const styles = StyleSheet.create({
   turnSeatCopy: {
     flex: 1,
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
   },
   seatBoxRow: {
     flexDirection: 'row',
@@ -946,70 +867,45 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.3,
   },
-  pieceMeterRow: {
-    marginTop: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  pieceMeterLabel: {
-    width: 50,
-    color: SOFT,
-    fontSize: 7,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-  pieceMeterTrack: {
-    flex: 1,
-    height: 8,
-    borderWidth: 1,
-    borderColor: LINE,
-    backgroundColor: '#161022',
-    flexDirection: 'row',
-  },
-  pieceMeterFill: {
-    height: '100%',
-  },
-  pieceMeterRest: {
-    height: '100%',
-  },
   telemetryToggleBtn: {
-    minWidth: 62,
-    minHeight: 26,
-    borderWidth: 2,
+    minWidth: 56,
+    minHeight: 24,
+    borderWidth: 1,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
   telemetryToggleBtnOn: {
     borderColor: MINT,
-    backgroundColor: '#19392e',
+    backgroundColor: '#2f6b62',
   },
   telemetryToggleBtnOff: {
     borderColor: LINE,
-    backgroundColor: '#1b1330',
+    backgroundColor: '#285650',
   },
   telemetryToggleText: {
     color: WHITE,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-  },
-  turnSeatText: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    lineHeight: 13,
-  },
-  turnSeatRole: {
     fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.3,
+  },
+  turnSeatText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    lineHeight: 15,
+  },
+  turnSeatRole: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   avatarShell: {
-    width: 40,
-    height: 40,
-    borderWidth: 2,
+    width: 42,
+    height: 42,
+    borderWidth: 1.5,
+    borderRadius: 9,
     backgroundColor: PANEL_DARK,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1027,19 +923,24 @@ const styles = StyleSheet.create({
   },
   boardPanel: {
     width: '100%',
-    backgroundColor: PANEL,
-    borderWidth: 3,
-    borderColor: LINE,
-    padding: 10,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 4,
     alignItems: 'center',
     overflow: 'hidden',
   },
   boardFrame: {
-    padding: 10,
-    backgroundColor: PANEL_DARK,
-    borderWidth: 3,
-    borderColor: GOLD,
+    padding: 8,
+    backgroundColor: '#3e6d66',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.34,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 9,
   },
   resultOverlay: {
     position: 'absolute',
@@ -1047,19 +948,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(20, 46, 43, 0.56)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   resultOverlayBox: {
-    minWidth: 140,
-    minHeight: 72,
-    borderWidth: 3,
+    minWidth: 210,
+    minHeight: 96,
+    borderWidth: 1,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#130d1e',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(27,69,64,0.94)',
   },
   resultOverlayWin: {
     borderColor: MINT,
@@ -1072,133 +974,119 @@ const styles = StyleSheet.create({
   },
   resultOverlayTitle: {
     color: WHITE,
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '900',
-    letterSpacing: 1.4,
+    letterSpacing: 1.1,
   },
-  resultOverlayAvatarRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  resultOverlayAvatarWrap: {
-    width: 40,
-    height: 40,
-    position: 'relative',
-  },
-  lossCrossOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lossCrossLine: {
-    position: 'absolute',
-    width: 58,
-    height: 4,
-    backgroundColor: '#000000',
-    opacity: 0.95,
-  },
-  lossCrossLineA: {
-    transform: [{ rotate: '45deg' }],
-  },
-  lossCrossLineB: {
-    transform: [{ rotate: '-45deg' }],
+  resultOverlaySub: {
+    marginTop: 6,
+    color: SOFT,
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   comboBadge: {
     position: 'absolute',
     top: 8,
     zIndex: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 2,
-    borderColor: GOLD,
-    backgroundColor: '#ff4fa3',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(28, 79, 74, 0.92)',
   },
   comboBadgeText: {
-    color: WHITE,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-  },
-  recentMovesPanel: {
-    width: '100%',
-    backgroundColor: PANEL,
-    borderWidth: 2,
-    borderColor: LINE,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    gap: 3,
-  },
-  recentMovesTitle: {
     color: GOLD,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.7,
   },
-  recentMovesText: {
-    color: SOFT,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
   telemetryPanel: {
     width: '100%',
-    backgroundColor: PANEL,
-    borderWidth: 3,
+    backgroundColor: 'rgba(27,69,64,0.7)',
+    borderWidth: 1,
+    borderRadius: 12,
     borderColor: LINE,
-    padding: 12,
+    padding: 10,
     gap: 4,
   },
   telemetryTitle: {
-    color: PINK,
-    fontSize: 12,
+    color: GOLD,
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   telemetryLine: {
     color: WHITE,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10,
+    lineHeight: 15,
   },
   actionRow: {
     width: '100%',
     flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 14,
+    marginTop: 2,
+  },
+  roundButton: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#f2f3ef',
+    borderWidth: 1,
+    borderColor: 'rgba(53,87,82,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
+  },
+  roundButtonTitle: {
+    color: '#4e5d5a',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  bottomPillRow: {
+    width: '100%',
+    flexDirection: 'row',
     gap: 8,
+    marginTop: 10,
   },
   primaryButton: {
     flex: 1,
-    minHeight: 46,
-    backgroundColor: PANEL_ALT,
-    borderWidth: 3,
-    borderColor: GOLD,
+    minHeight: 40,
+    backgroundColor: 'rgba(22,64,59,0.9)',
+    borderWidth: 1,
+    borderColor: LINE,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButtonText: {
     color: WHITE,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   secondaryButton: {
     flex: 1,
-    minHeight: 46,
-    backgroundColor: PANEL,
-    borderWidth: 2,
+    minHeight: 40,
+    backgroundColor: 'rgba(22,64,59,0.7)',
+    borderWidth: 1,
     borderColor: LINE,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
     color: SOFT,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontWeight: '900',
+    letterSpacing: 0.4,
   },
   undoBtnLockedLook: {
     opacity: 0.7,

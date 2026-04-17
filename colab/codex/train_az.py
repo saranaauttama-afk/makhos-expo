@@ -358,7 +358,7 @@ def mine_losses_vs_minimax(net: AZNetwork, mm_depth: int, n_games: int) -> list:
             continue
         tail_positions = net_positions[-LOSS_MINING_POSITIONS_PER_GAME:]
         for pos in tail_positions:
-            move = _minimax_best_move(pos, LOSS_MINING_DEPTH)
+            move = _minimax_best_move(pos, mm_depth)
             if move is None:
                 continue
             samples.append((get_features(pos).copy(), one_hot_policy(pos, move), np.float32(-1.0)))

@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './src/ui/HomeScreen';
 import HumanVsCodexArenaScreen from './src/ui/HumanVsCodexArenaScreen';
 import ArenaScreen from './src/ui/ArenaScreen';
-import ConceptScreen from './src/ui/ConceptScreen';
 import SetupScreen from './src/ui/SetupScreen';
-import ShopScreen from './src/ui/ShopScreen';
-import SettingsScreen from './src/ui/SettingsScreen';
-import ResultScreen from './src/ui/ResultScreen';
+import AccountScreen from './src/ui/AccountScreen';
 import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTablebase';
-import { GameConfig } from './src/ui/types';
+import { getActiveAZModelId, getAvailableAZModels, setActiveAZModel } from './src/coreClaude/azNet';
+import { GameConfig, MonetizationState } from './src/ui/types';
 
 type ErrorBoundaryState = { error: Error | null };
 export type AppLanguage = 'th' | 'en';
@@ -45,41 +43,74 @@ export default function App() {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [draftConfig, setDraftConfig] = useState<GameConfig | null>(null);
   const [language, setLanguage] = useState<AppLanguage>('th');
-  const [screen, setScreen] = useState<'home' | 'arena' | 'concept' | 'setup' | 'shop' | 'settings' | 'result'>('home');
+  const [aiModelId, setAiModelId] = useState<string>(() => getActiveAZModelId());
+  const [monetization, setMonetization] = useState<MonetizationState>({
+    noAds: false,
+    consent: 'unknown',
+    coins: 120,
+    rewardedHints: 0,
+    rewardedUndos: 0,
+    interstitialCounter: 0,
+    interstitialSeen: 0,
+    rewardedSeen: 0,
+  });
+  const [screen, setScreen] = useState<'home' | 'arena' | 'setup' | 'account'>('home');
+  const aiModels = getAvailableAZModels();
 
   useEffect(() => { precomputeEndgameTablebase(); }, []);
+
+  function handleBuyNoAds() {
+    setMonetization(prev => ({ ...prev, noAds: true }));
+    Alert.alert('Purchase simulated', 'No Ads is now active.');
+  }
+
+  function handleBuyStarterPack() {
+    setMonetization(prev => ({
+      ...prev,
+      noAds: true,
+      coins: prev.coins + 500,
+      rewardedHints: prev.rewardedHints + 2,
+      rewardedUndos: prev.rewardedUndos + 2,
+    }));
+    Alert.alert('Purchase simulated', 'Starter Pack granted: No Ads + credits.');
+  }
+
+  function handleRestorePurchase() {
+    setMonetization(prev => ({ ...prev, noAds: true }));
+    Alert.alert('Restore complete', 'Restored No Ads entitlement (simulated).');
+  }
 
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
       <ErrorBoundary>
         {screen === 'arena' ? (
           <ArenaScreen onBack={() => setScreen('home')} />
-        ) : screen === 'concept' ? (
-          <ConceptScreen onBack={() => setScreen('home')} />
         ) : screen === 'setup' && draftConfig ? (
           <SetupScreen
             initialConfig={draftConfig}
+            monetization={monetization}
             onBack={() => setScreen('home')}
             onPlay={config => {
               setGameConfig(config);
               setScreen('home');
             }}
-            onPreviewResult={() => setScreen('result')}
-            onOpenShop={() => setScreen('shop')}
+            onOpenAccount={() => setScreen('account')}
           />
-        ) : screen === 'shop' ? (
-          <ShopScreen onBack={() => setScreen('home')} />
-        ) : screen === 'settings' ? (
-          <SettingsScreen
+        ) : screen === 'account' ? (
+          <AccountScreen
             language={language}
             onLanguageChange={setLanguage}
+            monetization={monetization}
+            onAdConsentChange={consent => setMonetization(prev => ({ ...prev, consent }))}
+            aiModels={aiModels}
+            aiModelId={aiModelId}
+            onAiModelChange={modelId => {
+              if (setActiveAZModel(modelId)) setAiModelId(modelId);
+            }}
+            onBuyNoAds={handleBuyNoAds}
+            onBuyStarterPack={handleBuyStarterPack}
+            onRestorePurchase={handleRestorePurchase}
             onBack={() => setScreen('home')}
-          />
-        ) : screen === 'result' ? (
-          <ResultScreen
-            onBack={() => setScreen('home')}
-            onOpenShop={() => setScreen('shop')}
-            onReplay={() => setScreen(draftConfig ? 'setup' : 'home')}
           />
         ) : gameConfig ? (
           <HumanVsCodexArenaScreen
@@ -92,15 +123,13 @@ export default function App() {
         ) : (
           <HomeScreen
             language={language}
+            onQuickPlay={config => setGameConfig(config)}
             onStart={config => {
               setDraftConfig(config);
               setScreen('setup');
             }}
             onArena={() => setScreen('arena')}
-            onConcept={() => setScreen('concept')}
-            onShop={() => setScreen('shop')}
-            onSettings={() => setScreen('settings')}
-            onResultPreview={() => setScreen('result')}
+            onAccount={() => setScreen('account')}
           />
         )}
       </ErrorBoundary>
