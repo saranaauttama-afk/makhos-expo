@@ -34,9 +34,9 @@ const COPY = {
     subtitle: 'จัดการภาษา เสียง และตัวเลือกระบบ',
     preferences: 'PREFERENCES',
     language: 'Language',
-    languageSub: 'เปลี่ยนภาษาแอปแบบทันที',
+    languageSub: 'สลับภาษาแอปได้ทันที',
     model: 'AI Model',
-    modelSub: 'เลือกโมเดล ONNX ที่ใช้ตอนเล่นจริง',
+    modelSub: 'เลือก ONNX model ที่ใช้ตอนเล่นจริง',
     sound: 'Sound',
     soundSub: 'เสียงเอฟเฟกต์ตอนเดินและผลเกม',
     vibration: 'Vibration',
@@ -45,8 +45,12 @@ const COPY = {
     retroFxSub: 'เอฟเฟกต์พิกเซลและสไตล์อาร์เคด',
     account: 'ACCOUNT / PURCHASE',
     adConsent: 'Ad Consent',
-    adConsentSub: 'Allow ads and rewarded videos. Needed for ad-based rewards.',
+    adConsentSub: 'อนุญาตโฆษณาและ rewarded video สำหรับรับรางวัล',
+    allow: 'ALLOW',
+    deny: 'DENY',
     noAdsState: 'No Ads Status',
+    noAdsActive: 'ACTIVE',
+    noAdsFree: 'FREE MODE',
     restore: 'Restore Purchase',
     premium: 'Manage Premium Access',
     info: 'INFO',
@@ -73,8 +77,12 @@ const COPY = {
     retroFxSub: 'Pixel overlays and arcade effects.',
     account: 'ACCOUNT / PURCHASE',
     adConsent: 'Ad Consent',
-    adConsentSub: 'Allow ads and rewarded videos. Needed for ad-based rewards.',
+    adConsentSub: 'Allow ads and rewarded videos for ad-based rewards.',
+    allow: 'ALLOW',
+    deny: 'DENY',
     noAdsState: 'No Ads Status',
+    noAdsActive: 'ACTIVE',
+    noAdsFree: 'FREE MODE',
     restore: 'Restore Purchase',
     premium: 'Manage Premium Access',
     info: 'INFO',
@@ -151,11 +159,15 @@ function LanguageRow({
 function ConsentRow({
   title,
   subtitle,
+  allowText,
+  denyText,
   value,
   onChange,
 }: {
   title: string;
   subtitle: string;
+  allowText: string;
+  denyText: string;
   value: AdConsentStatus;
   onChange: (v: AdConsentStatus) => void;
 }) {
@@ -167,10 +179,10 @@ function ConsentRow({
       </View>
       <View style={styles.modelButtons}>
         <Pressable style={[styles.modelButton, value === 'granted' && styles.modelButtonActive]} onPress={() => onChange('granted')}>
-          <Text style={[styles.modelButtonText, value === 'granted' && styles.modelButtonTextActive]}>ALLOW</Text>
+          <Text style={[styles.modelButtonText, value === 'granted' && styles.modelButtonTextActive]}>{allowText}</Text>
         </Pressable>
         <Pressable style={[styles.modelButton, value === 'denied' && styles.modelButtonActive]} onPress={() => onChange('denied')}>
-          <Text style={[styles.modelButtonText, value === 'denied' && styles.modelButtonTextActive]}>DENY</Text>
+          <Text style={[styles.modelButtonText, value === 'denied' && styles.modelButtonTextActive]}>{denyText}</Text>
         </Pressable>
       </View>
     </View>
@@ -265,10 +277,16 @@ export default function SettingsScreen({
           <ConsentRow
             title={t.adConsent}
             subtitle={t.adConsentSub}
-            value={monetization.consent}
+            allowText={t.allow}
+            denyText={t.deny}
+            value={monetization.adConsent}
             onChange={onAdConsentChange}
           />
-          <ActionRow title={`${t.noAdsState}: ${monetization.noAds ? 'ACTIVE' : 'FREE MODE'}`} tint={MINT} openText={t.open} />
+          <ActionRow
+            title={`${t.noAdsState}: ${monetization.noAdsUnlocked ? t.noAdsActive : t.noAdsFree}`}
+            tint={MINT}
+            openText={t.open}
+          />
           <ActionRow title={t.restore} tint={CYAN} openText={t.open} onPress={onRestorePurchase} />
           <ActionRow title={t.premium} tint={GOLD} openText={t.open} onPress={onManagePremium} />
         </View>

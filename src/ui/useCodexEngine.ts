@@ -7,19 +7,21 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { TT } from '../coreClaude/search/tt';
-import { CancelToken, SearchInfo } from '../coreClaude/search/alphabeta';
+import { CancelToken, iterativeDeepening, SearchInfo } from '../coreClaude/search/alphabeta';
 import { Position } from '../coreClaude/position';
 import { Move } from '../coreClaude/movegen';
 import { preloadAZModel } from '../coreClaude/azNet';
 import { HybridDifficulty, HybridPlan, hybridBestMove } from '../coreClaude/search/hybrid';
 import { Difficulty } from './types';
 
+// Production profile: keep turns responsive on mobile while giving higher
+// levels enough budget to avoid shallow tactical blunders.
 const HYBRID_PROFILE: Record<Difficulty, { hybridDifficulty: HybridDifficulty; budgetMs: number }> = {
-  easy: { hybridDifficulty: 'medium', budgetMs: 900 },
-  normal: { hybridDifficulty: 'medium', budgetMs: 1400 },
-  hard: { hybridDifficulty: 'hard', budgetMs: 2200 },
-  expert: { hybridDifficulty: 'hard', budgetMs: 3200 },
-  master: { hybridDifficulty: 'hard', budgetMs: 4500 },
+  easy: { hybridDifficulty: 'medium', budgetMs: 700 },
+  normal: { hybridDifficulty: 'medium', budgetMs: 1200 },
+  hard: { hybridDifficulty: 'hard', budgetMs: 2000 },
+  expert: { hybridDifficulty: 'hard', budgetMs: 3000 },
+  master: { hybridDifficulty: 'hard', budgetMs: 4000 },
 };
 
 export function useCodexEngine() {
@@ -76,5 +78,43 @@ export function useCodexEngine() {
     });
   }, [cancel]);
 
-  return { think, thinking, lastInfo, lastPlan, cancel };
+  const thinkStrict = useCallback((
+    pos: Position,
+    ms = 2000,
+    historyHashes: number[] = [],
+    maxDepth = 7,
+    onInfo?: (info: SearchInfo) => void,
+  ): Promise<Move | undefined> => {
+    cancel();
+
+    const token: CancelToken = { cancelled: false };
+    cancelRef.current = token;
+    setThinking(true);
+
+    const budgetMs = Math.max(400, ms);
+    return iterativeDeepening(
+      pos,
+      budgetMs,
+      ttRef.current,
+      onInfo,
+      historyHashes,
+      token,
+      maxDepth,
+    ).then(res => {
+      setThinking(false);
+      if (token.cancelled) return undefined;
+      setLastPlan({ mode: 'alphabeta', reason: `strict mm depth ${maxDepth}` });
+      const info: SearchInfo | null = res.depth > 0
+        ? { depth: res.depth, score: res.score, nodes: res.nodes, pv: res.best ? [res.best] : [] }
+        : null;
+      setLastInfo(info);
+      if (info) onInfo?.(info);
+      return res.best;
+    }).catch(() => {
+      setThinking(false);
+      return undefined;
+    });
+  }, [cancel]);
+
+  return { think, thinkStrict, thinking, lastInfo, lastPlan, cancel };
 }

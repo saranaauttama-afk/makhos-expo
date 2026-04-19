@@ -1,34 +1,56 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { AppLanguage } from '../../App';
 import { applyMove, generateMoves, Move } from '../coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position } from '../coreClaude/position';
 import { hashPosition } from '../coreClaude/search/zobrist';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../coreClaude/search/repetition';
 import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
-import { azBestMove } from '../coreClaude/azMcts';
-import { preloadAZModel } from '../coreClaude/azNet';
 import { usePixelGameFx } from './usePixelGameFx';
+import { Difficulty } from './types';
 
-type AgentType = 'human' | 'hand' | 'az';
-
-const AGENT_LABELS: Record<AgentType, string> = {
-  human: 'Human',
-  hand: 'AB',
-  az: 'AZ',
+type ArenaLevel = Difficulty;
+const ARENA_LEVELS: { id: ArenaLevel; label: string }[] = [
+  { id: 'easy', label: 'MM5' },
+  { id: 'normal', label: 'MM7' },
+  { id: 'hard', label: 'MM9' },
+  { id: 'expert', label: 'MM11' },
+  { id: 'master', label: 'HYBRID' },
+];
+const THINK_MS: Record<ArenaLevel, number> = {
+  easy: 1800,
+  normal: 2600,
+  hard: 3600,
+  expert: 5200,
+  master: 4500,
 };
-
-const THINK_MS: Record<AgentType, number> = {
-  human: 0,
-  hand: 2000,
-  az: 10000,
+const LEVEL_LABEL: Record<ArenaLevel, string> = {
+  easy: 'MM5',
+  normal: 'MM7',
+  hard: 'MM9',
+  expert: 'MM11',
+  master: 'HYBRID',
+};
+const STRICT_MM_DEPTH: Record<Exclude<ArenaLevel, 'master'>, number> = {
+  easy: 5,
+  normal: 7,
+  hard: 9,
+  expert: 11,
+};
+const LEVEL_MODE_TAG: Record<ArenaLevel, string> = {
+  easy: 'STRICT',
+  normal: 'STRICT',
+  hard: 'STRICT',
+  expert: 'STRICT',
+  master: 'HYBRID',
 };
 
 interface LogEntry {
   ply: number;
   side: 1 | -1;
-  agent: AgentType;
+  agent: ArenaLevel;
   move: Move;
 }
 
@@ -38,19 +60,58 @@ function fmtMove(m: Move): string {
   return `${m.from}->${m.to}${cap}${promo}`;
 }
 
-function AgentBtn({ type, active, onPress }: { type: AgentType; active: boolean; onPress: () => void }) {
+function LevelBtn({ level, active, onPress }: { level: ArenaLevel; active: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={[styles.agentBtn, active && styles.agentBtnActive]}>
-      <Text style={[styles.agentText, active && styles.agentTextActive]}>{AGENT_LABELS[type]}</Text>
+      <Text style={[styles.agentText, active && styles.agentTextActive]}>{LEVEL_LABEL[level]}</Text>
     </Pressable>
   );
 }
 
-interface Props { onBack: () => void }
+interface Props {
+  language: AppLanguage;
+  onBack: () => void;
+}
 
-export default function ArenaScreen({ onBack }: Props) {
-  const [p1Agent, setP1Agent] = useState<AgentType>('hand');
-  const [p2Agent, setP2Agent] = useState<AgentType>('az');
+const COPY = {
+  th: {
+    back: 'BACK',
+    title: 'Arena Lab',
+    reset: 'RESET',
+    moveLog: 'Move Log',
+    draw: 'Draw',
+    wins: 'wins',
+    stop: 'STOP',
+    autoPlay: 'AUTO PLAY',
+    step: 'STEP',
+    thinking: 'คิด',
+    turn: 'ตา',
+    ply: 'ply',
+    p1: 'P1',
+    p2: 'P2',
+  },
+  en: {
+    back: 'BACK',
+    title: 'Arena Lab',
+    reset: 'RESET',
+    moveLog: 'Move Log',
+    draw: 'Draw',
+    wins: 'wins',
+    stop: 'STOP',
+    autoPlay: 'AUTO PLAY',
+    step: 'STEP',
+    thinking: 'thinking',
+    turn: 'Turn',
+    ply: 'ply',
+    p1: 'P1',
+    p2: 'P2',
+  },
+} as const;
+
+export default function ArenaScreen({ language, onBack }: Props) {
+  const t = COPY[language];
+  const [p1Level, setP1Level] = useState<ArenaLevel>('normal');
+  const [p2Level, setP2Level] = useState<ArenaLevel>('master');
 
   const [pos, setPos] = useState<Position>(() => initialPosition());
   const [hashHistory, setHashHistory] = useState<number[]>(() => [hashPosition(initialPosition())]);
@@ -63,10 +124,8 @@ export default function ArenaScreen({ onBack }: Props) {
   const [comboFrame, setComboFrame] = useState(0);
   const [comboText, setComboText] = useState('');
 
-  const { think, thinking } = useCodexEngine();
+  const { think, thinkStrict, thinking } = useCodexEngine();
   const { triggerFx } = usePixelGameFx();
-
-  useEffect(() => { preloadAZModel(); }, []);
 
   const steppingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -81,7 +140,7 @@ export default function ArenaScreen({ onBack }: Props) {
     [curHash, hashHistory],
   );
   const gameOver = isDraw || isThreefold || moves.length === 0;
-  const currentAgent = pos.side === 1 ? p1Agent : p2Agent;
+  const currentLevel = pos.side === 1 ? p1Level : p2Level;
   const shakeX = [0, -6, 5, -4, 3, -2, 0][Math.min(shakeFrame, 6)];
   const comboOpacity = [0, 0.75, 1, 1, 0.9, 0.7, 0.45, 0.2, 0][Math.min(comboFrame, 8)];
   const comboLift = [24, 18, 14, 10, 6, 2, -2, -6, -10][Math.min(comboFrame, 8)];
@@ -106,21 +165,13 @@ export default function ArenaScreen({ onBack }: Props) {
   const step = useCallback(async (curPos: Position, curHistory: number[]) => {
     if (steppingRef.current) return;
 
-    const agent = curPos.side === 1 ? p1Agent : p2Agent;
-    if (agent === 'human') return;
+    const agent = curPos.side === 1 ? p1Level : p2Level;
 
     steppingRef.current = true;
 
-    let move: Move | undefined;
-    if (agent === 'az') {
-      try {
-        move = await azBestMove(curPos);
-      } catch {
-        move = await think(curPos, THINK_MS.hand, curHistory);
-      }
-    } else {
-      move = await think(curPos, THINK_MS[agent], curHistory);
-    }
+    const move = agent === 'master'
+      ? await think(curPos, THINK_MS[agent], curHistory, undefined, 'master')
+      : await thinkStrict(curPos, THINK_MS[agent], curHistory, STRICT_MM_DEPTH[agent], undefined);
     steppingRef.current = false;
 
     if (!move) return;
@@ -147,22 +198,20 @@ export default function ArenaScreen({ onBack }: Props) {
 
     if (!nextMoves.length || draw || rep) {
       const label = curPos.side === 1 ? 'P1' : 'P2';
-      if (!nextMoves.length) setGameResult(`${label} (${AGENT_LABELS[agent]}) wins`);
-      else setGameResult('Draw');
+      if (!nextMoves.length) setGameResult(`${label} (${LEVEL_LABEL[agent]}) ${t.wins}`);
+      else setGameResult(t.draw);
       setAutoPlay(false);
     }
-  }, [p1Agent, p2Agent, think]);
+  }, [p1Level, p2Level, t.draw, t.wins, think, thinkStrict]);
 
   useEffect(() => {
     if (!autoPlay || gameOver || thinking || steppingRef.current) return;
-    if (currentAgent === 'human') return;
-
     const delay = setTimeout(() => {
       void step(pos, hashHistory);
     }, 300);
 
     return () => clearTimeout(delay);
-  }, [autoPlay, pos, thinking, gameOver, step, currentAgent, hashHistory]);
+  }, [autoPlay, pos, thinking, gameOver, step, hashHistory]);
 
   useEffect(() => {
     if (!lastMove) {
@@ -241,7 +290,7 @@ export default function ArenaScreen({ onBack }: Props) {
 
   const sideLabel = pos.side === 1 ? 'P1' : 'P2';
   const thinkSeconds = (elapsed / 1000).toFixed(1);
-  const limitSeconds = (THINK_MS[currentAgent] / 1000).toFixed(0);
+  const limitSeconds = (THINK_MS[currentLevel] / 1000).toFixed(0);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -250,25 +299,25 @@ export default function ArenaScreen({ onBack }: Props) {
 
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>BACK</Text>
+          <Text style={styles.backText}>{t.back}</Text>
         </Pressable>
-        <Text style={styles.title}>Arena Lab</Text>
+        <Text style={styles.title}>{t.title}</Text>
         <Pressable onPress={reset} style={styles.resetBtn}>
-          <Text style={styles.resetText}>RESET</Text>
+          <Text style={styles.resetText}>{t.reset}</Text>
         </Pressable>
       </View>
 
       <View style={styles.agentRow}>
         <View style={styles.agentCol}>
-          <Text style={styles.sideLabel}>P1 TOP</Text>
-          {(['hand', 'az', 'human'] as AgentType[]).map(t => (
-            <AgentBtn key={t} type={t} active={p1Agent === t} onPress={() => setP1Agent(t)} />
+          <Text style={styles.sideLabel}>P1</Text>
+          {ARENA_LEVELS.map(level => (
+            <LevelBtn key={level.id} level={level.id} active={p1Level === level.id} onPress={() => setP1Level(level.id)} />
           ))}
         </View>
         <View style={styles.agentCol}>
-          <Text style={styles.sideLabel}>P2 BOT</Text>
-          {(['hand', 'az', 'human'] as AgentType[]).map(t => (
-            <AgentBtn key={t} type={t} active={p2Agent === t} onPress={() => setP2Agent(t)} />
+          <Text style={styles.sideLabel}>P2</Text>
+          {ARENA_LEVELS.map(level => (
+            <LevelBtn key={level.id} level={level.id} active={p2Level === level.id} onPress={() => setP2Level(level.id)} />
           ))}
         </View>
       </View>
@@ -302,7 +351,7 @@ export default function ArenaScreen({ onBack }: Props) {
         </View>
 
         <View style={styles.logPanel}>
-          <Text style={styles.logTitle}>Move Log</Text>
+          <Text style={styles.logTitle}>{t.moveLog}</Text>
           <ScrollView ref={logScrollRef} style={styles.logScroll} showsVerticalScrollIndicator={false}>
             {log.map(entry => (
               <View key={entry.ply} style={styles.logEntry}>
@@ -322,11 +371,11 @@ export default function ArenaScreen({ onBack }: Props) {
           <Text style={styles.resultText}>{gameResult}</Text>
         ) : thinking ? (
           <Text style={styles.thinkText}>
-            {sideLabel} ({AGENT_LABELS[currentAgent]}) thinking {thinkSeconds}s / {limitSeconds}s
+            {sideLabel} ({LEVEL_LABEL[currentLevel]} {LEVEL_MODE_TAG[currentLevel]}) {t.thinking} {thinkSeconds}s / {limitSeconds}s
           </Text>
         ) : (
           <Text style={styles.turnText}>
-            Turn {sideLabel} ({AGENT_LABELS[currentAgent]}) - ply {log.length + 1}
+            {t.turn} {sideLabel} ({LEVEL_LABEL[currentLevel]} {LEVEL_MODE_TAG[currentLevel]}) - {t.ply} {log.length + 1}
           </Text>
         )}
       </View>
@@ -337,16 +386,16 @@ export default function ArenaScreen({ onBack }: Props) {
           disabled={gameOver}
           style={[styles.playBtn, autoPlay && styles.stopBtn, gameOver && styles.btnDisabled]}
         >
-          <Text style={styles.playText}>{autoPlay ? 'STOP' : 'AUTO PLAY'}</Text>
+          <Text style={styles.playText}>{autoPlay ? t.stop : t.autoPlay}</Text>
         </Pressable>
 
-        {!autoPlay && !gameOver && currentAgent !== 'human' && (
+        {!autoPlay && !gameOver && (
           <Pressable
             onPress={() => { void step(pos, hashHistory); }}
             disabled={thinking || steppingRef.current}
             style={[styles.stepBtn, (thinking || steppingRef.current) && styles.btnDisabled]}
           >
-            <Text style={styles.stepText}>STEP</Text>
+            <Text style={styles.stepText}>{t.step}</Text>
           </Pressable>
         )}
       </View>
@@ -429,4 +478,3 @@ const styles = StyleSheet.create({
   playText: { fontSize: 12, fontWeight: '800', color: WHITE, letterSpacing: 0.5 },
   stepText: { fontSize: 12, fontWeight: '800', color: WHITE, letterSpacing: 0.5 },
 });
-

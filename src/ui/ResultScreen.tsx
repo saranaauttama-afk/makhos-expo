@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { AppLanguage } from '../../App';
 import { MonetizationState } from './types';
 
 type RewardKind = 'hint' | 'undo';
 
 interface Props {
+  language: AppLanguage;
   monetization: MonetizationState;
   onBack: () => void;
   onOpenShop: () => void;
@@ -26,7 +28,78 @@ const ORANGE = '#f4c88e';
 const WHITE = '#f5f2e8';
 const SOFT = '#d7efe8';
 
-const MARQUEE = ['VICTORY', 'CLEAR', 'LEVEL UP', 'PIXEL WIN'];
+const COPY = {
+  th: {
+    marquee: ['VICTORY', 'CLEAR', 'LEVEL UP', 'PIXEL WIN'],
+    back: 'BACK',
+    kicker: 'POST MATCH ARCADE',
+    title: 'RESULT CHAMBER',
+    subtitle: 'หน้าสรุปผลหลังเกม รวมรางวัลและทางเลือกซื้อไว้ที่เดียว โดยไม่รบกวนหน้ากระดาน',
+    heroWord: 'VICTORY',
+    heroCaption: 'คุณผ่านคู่แข่งรอบนี้แล้ว เตรียมท้าชั้นถัดไปได้เลย',
+    rank: 'RANK',
+    time: 'TIME',
+    caps: 'CAPS',
+    ladderTitle: 'AI LADDER',
+    ladderMm5: 'CLEARED',
+    ladderMm7: 'DOMINATED',
+    ladderMm9: 'NOW OPEN',
+    ladderMm11: 'LOCKED BOSS',
+    payoutTitle: 'MATCH PAYOUT',
+    noAdsActive: 'เปิด No Ads แล้ว',
+    freeMode: 'โหมดฟรี (มี interstitial หลังจบบางแมตช์)',
+    freeFlowTitle: 'FREE FLOW',
+    freeFlowCopy: 'เล่นต่อแมตช์ปกติได้ทันทีตาม flow ของโหมดฟรี',
+    premiumFlowTitle: 'PREMIUM FLOW',
+    premiumFlowCopy: 'ปลด No Ads เพื่อเล่นต่อแบบลื่นและเข้าถึงคู่แข่งโหดขึ้นได้สะดวก',
+    offerTitle: 'AD SLOT / PREMIUM GATE',
+    offerCopy: 'โซนนี้ใช้วาง interstitial, rewarded, หรือข้อเสนอ No Ads หลังจบเกมเท่านั้น',
+    removeAds: 'REMOVE ADS + STRONG AI',
+    loadingHint: 'LOADING HINT...',
+    loadingUndo: 'LOADING UNDO...',
+    watchHint: 'WATCH AD: +1 HINT',
+    watchUndo: 'WATCH AD: +1 UNDO',
+    rewardAdded: (kind: RewardKind) => `รับรางวัลแล้ว: +1 ${kind.toUpperCase()}`,
+    rewardFailed: 'โฆษณาไม่พร้อม ตรวจ Ad Consent ใน Settings',
+    playAgain: 'PLAY AGAIN',
+    returnHome: 'RETURN HOME',
+  },
+  en: {
+    marquee: ['VICTORY', 'CLEAR', 'LEVEL UP', 'PIXEL WIN'],
+    back: 'BACK',
+    kicker: 'POST MATCH ARCADE',
+    title: 'RESULT CHAMBER',
+    subtitle: 'High-energy post-match screen with rewards and premium options, without interrupting board play.',
+    heroWord: 'VICTORY',
+    heroCaption: 'You pushed past this rival. The next ladder rung is open.',
+    rank: 'RANK',
+    time: 'TIME',
+    caps: 'CAPS',
+    ladderTitle: 'AI LADDER',
+    ladderMm5: 'CLEARED',
+    ladderMm7: 'DOMINATED',
+    ladderMm9: 'NOW OPEN',
+    ladderMm11: 'LOCKED BOSS',
+    payoutTitle: 'MATCH PAYOUT',
+    noAdsActive: 'No Ads active',
+    freeMode: 'Free mode with interstitial ads',
+    freeFlowTitle: 'FREE FLOW',
+    freeFlowCopy: 'Play the next regular match with standard post-result ad slots.',
+    premiumFlowTitle: 'PREMIUM FLOW',
+    premiumFlowCopy: 'Remove ads permanently and unlock stronger rematches with less friction.',
+    offerTitle: 'AD SLOT / PREMIUM GATE',
+    offerCopy: 'Use this area for interstitials, rewarded boosts, or one-time No Ads offers after emotional payoff.',
+    removeAds: 'REMOVE ADS + STRONG AI',
+    loadingHint: 'LOADING HINT...',
+    loadingUndo: 'LOADING UNDO...',
+    watchHint: 'WATCH AD: +1 HINT',
+    watchUndo: 'WATCH AD: +1 UNDO',
+    rewardAdded: (kind: RewardKind) => `Reward added: +1 ${kind.toUpperCase()}`,
+    rewardFailed: 'Reward ad unavailable. Check consent in Settings.',
+    playAgain: 'PLAY AGAIN',
+    returnHome: 'RETURN HOME',
+  },
+} as const;
 
 function RewardChip({ value, label, tint }: { value: string; label: string; tint: string }) {
   return (
@@ -54,7 +127,8 @@ function LadderRow({
   );
 }
 
-export default function ResultScreen({ monetization, onBack, onOpenShop, onWatchReward, onReplay }: Props) {
+export default function ResultScreen({ language, monetization, onBack, onOpenShop, onWatchReward, onReplay }: Props) {
+  const t = COPY[language];
   const [marqueeFrame, setMarqueeFrame] = useState(0);
   const [badgeFrame, setBadgeFrame] = useState(0);
   const [busyReward, setBusyReward] = useState<RewardKind | null>(null);
@@ -62,7 +136,7 @@ export default function ResultScreen({ monetization, onBack, onOpenShop, onWatch
 
   useEffect(() => {
     const marqueeId = setInterval(() => {
-      setMarqueeFrame(frame => (frame + 1) % MARQUEE.length);
+      setMarqueeFrame(frame => (frame + 1) % t.marquee.length);
     }, 900);
     const badgeId = setInterval(() => {
       setBadgeFrame(frame => (frame + 1) % 6);
@@ -71,18 +145,18 @@ export default function ResultScreen({ monetization, onBack, onOpenShop, onWatch
       clearInterval(marqueeId);
       clearInterval(badgeId);
     };
-  }, []);
+  }, [t.marquee.length]);
 
   const badgeScale = [1, 1.04, 1.08, 1.04, 1, 0.98][badgeFrame];
   const badgeGlow = [0.35, 0.48, 0.62, 0.48, 0.35, 0.28][badgeFrame];
-  const noAdsLine = monetization.noAds ? 'No Ads active' : 'Free mode with interstitial ads';
+  const noAdsLine = monetization.noAdsUnlocked ? t.noAdsActive : t.freeMode;
 
   async function runReward(kind: RewardKind) {
     if (busyReward) return;
     setBusyReward(kind);
     const ok = await onWatchReward(kind);
     setBusyReward(null);
-    setRewardNote(ok ? `Reward added: +1 ${kind.toUpperCase()}` : 'Reward ad not available. Check consent in Settings.');
+    setRewardNote(ok ? t.rewardAdded(kind) : t.rewardFailed);
   }
 
   return (
@@ -93,18 +167,16 @@ export default function ResultScreen({ monetization, onBack, onOpenShop, onWatch
         <View style={styles.headerPanel}>
           <View style={styles.headerTop}>
             <Pressable style={styles.backButton} onPress={onBack}>
-              <Text style={styles.backButtonText}>BACK</Text>
+              <Text style={styles.backButtonText}>{t.back}</Text>
             </Pressable>
             <View style={styles.marquee}>
-              <Text style={styles.marqueeText}>{MARQUEE[marqueeFrame]}</Text>
+              <Text style={styles.marqueeText}>{t.marquee[marqueeFrame]}</Text>
             </View>
           </View>
 
-          <Text style={styles.kicker}>POST MATCH ARCADE</Text>
-          <Text style={styles.title}>RESULT CHAMBER</Text>
-          <Text style={styles.subtitle}>
-            This is the high-energy finish screen. Rewards, upsell, and ad moments live here instead of interrupting the board.
-          </Text>
+          <Text style={styles.kicker}>{t.kicker}</Text>
+          <Text style={styles.title}>{t.title}</Text>
+          <Text style={styles.subtitle}>{t.subtitle}</Text>
         </View>
 
         <View style={styles.heroPanel}>
@@ -120,56 +192,52 @@ export default function ResultScreen({ monetization, onBack, onOpenShop, onWatch
             <Text style={styles.heroBadgeText}>V</Text>
           </View>
 
-          <Text style={styles.heroWord}>VICTORY</Text>
-          <Text style={styles.heroCaption}>
-            You pushed past the current rival and unlocked the next danger rung in the ladder.
-          </Text>
+          <Text style={styles.heroWord}>{t.heroWord}</Text>
+          <Text style={styles.heroCaption}>{t.heroCaption}</Text>
 
           <View style={styles.rewardRow}>
-            <RewardChip value="+18" label="RANK" tint={CYAN} />
-            <RewardChip value="12:34" label="TIME" tint={MINT} />
-            <RewardChip value="07" label="CAPS" tint={ORANGE} />
+            <RewardChip value="+18" label={t.rank} tint={CYAN} />
+            <RewardChip value="12:34" label={t.time} tint={MINT} />
+            <RewardChip value="07" label={t.caps} tint={ORANGE} />
           </View>
         </View>
 
         <View style={styles.ladderPanel}>
-          <Text style={styles.sectionTitle}>AI LADDER</Text>
-          <LadderRow label="MM5" status="CLEARED" />
-          <LadderRow label="MM7" status="DOMINATED" />
-          <LadderRow label="MM9" status="NOW OPEN" active />
-          <LadderRow label="MM11" status="LOCKED BOSS" />
+          <Text style={styles.sectionTitle}>{t.ladderTitle}</Text>
+          <LadderRow label="MM5" status={t.ladderMm5} />
+          <LadderRow label="MM7" status={t.ladderMm7} />
+          <LadderRow label="MM9" status={t.ladderMm9} active />
+          <LadderRow label="MM11" status={t.ladderMm11} />
         </View>
 
         <View style={styles.rewardPanel}>
-          <Text style={styles.sectionTitle}>MATCH PAYOUT</Text>
+          <Text style={styles.sectionTitle}>{t.payoutTitle}</Text>
           <Text style={styles.payoutBanner}>{noAdsLine}</Text>
           <View style={styles.payoutGrid}>
             <View style={styles.payoutCard}>
-              <Text style={styles.payoutTitle}>FREE FLOW</Text>
-              <Text style={styles.payoutCopy}>Play the next regular match with the standard post-result ad slot.</Text>
+              <Text style={styles.payoutTitle}>{t.freeFlowTitle}</Text>
+              <Text style={styles.payoutCopy}>{t.freeFlowCopy}</Text>
             </View>
             <View style={styles.payoutCard}>
-              <Text style={styles.payoutTitle}>PREMIUM FLOW</Text>
-              <Text style={styles.payoutCopy}>Remove ads permanently and unlock stronger AI rematches without friction.</Text>
+              <Text style={styles.payoutTitle}>{t.premiumFlowTitle}</Text>
+              <Text style={styles.payoutCopy}>{t.premiumFlowCopy}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.offerPanel}>
-          <Text style={styles.offerTitle}>AD SLOT / PREMIUM GATE</Text>
-          <Text style={styles.offerCopy}>
-            Use this zone for interstitial ads, rewarded rematches, or a one-time remove-ads offer. Keep the board clean and place monetization only after the emotional payoff.
-          </Text>
+          <Text style={styles.offerTitle}>{t.offerTitle}</Text>
+          <Text style={styles.offerCopy}>{t.offerCopy}</Text>
           <View style={styles.offerButtons}>
             <Pressable style={styles.primaryOfferButton} onPress={onOpenShop}>
-              <Text style={styles.primaryOfferText}>REMOVE ADS + STRONG AI</Text>
+              <Text style={styles.primaryOfferText}>{t.removeAds}</Text>
             </Pressable>
             <Pressable
               style={[styles.secondaryOfferButton, busyReward === 'hint' && styles.offerButtonDisabled]}
               onPress={() => { void runReward('hint'); }}
             >
               <Text style={styles.secondaryOfferText}>
-                {busyReward === 'hint' ? 'LOADING HINT...' : 'WATCH AD: +1 HINT'}
+                {busyReward === 'hint' ? t.loadingHint : t.watchHint}
               </Text>
             </Pressable>
             <Pressable
@@ -177,7 +245,7 @@ export default function ResultScreen({ monetization, onBack, onOpenShop, onWatch
               onPress={() => { void runReward('undo'); }}
             >
               <Text style={styles.secondaryOfferText}>
-                {busyReward === 'undo' ? 'LOADING UNDO...' : 'WATCH AD: +1 UNDO'}
+                {busyReward === 'undo' ? t.loadingUndo : t.watchUndo}
               </Text>
             </Pressable>
             {!!rewardNote && <Text style={styles.rewardNote}>{rewardNote}</Text>}
@@ -186,10 +254,10 @@ export default function ResultScreen({ monetization, onBack, onOpenShop, onWatch
 
         <View style={styles.ctaPanel}>
           <Pressable style={styles.primaryButton} onPress={onReplay}>
-            <Text style={styles.primaryButtonText}>PLAY AGAIN</Text>
+            <Text style={styles.primaryButtonText}>{t.playAgain}</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>RETURN HOME</Text>
+            <Text style={styles.secondaryButtonText}>{t.returnHome}</Text>
           </Pressable>
         </View>
       </ScrollView>

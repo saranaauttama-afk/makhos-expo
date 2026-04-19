@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { AppLanguage } from '../../App';
 import { Difficulty, GameConfig, GameMode, MonetizationState } from './types';
 
 interface Props {
+  language: AppLanguage;
   initialConfig: GameConfig;
   monetization: MonetizationState;
   onBack: () => void;
@@ -22,13 +24,84 @@ const PINK = '#f2c5c5';
 const WHITE = '#f5f2e8';
 const SOFT = '#d7efe8';
 
-const LEVELS: Array<{ id: Difficulty; label: string; hint: string; tint: string }> = [
-  { id: 'easy', label: 'EASY', hint: 'Friendly', tint: MINT },
-  { id: 'normal', label: 'NORMAL', hint: 'Balanced', tint: CYAN },
-  { id: 'hard', label: 'HARD', hint: 'Tactical', tint: GOLD },
-  { id: 'expert', label: 'EXPERT', hint: 'Sharp', tint: PINK },
-  { id: 'master', label: 'MASTER', hint: 'Maximum', tint: '#ff8a5e' },
+const LEVELS: Array<{ id: Difficulty; tint: string }> = [
+  { id: 'easy', tint: MINT },
+  { id: 'normal', tint: CYAN },
+  { id: 'hard', tint: GOLD },
+  { id: 'expert', tint: PINK },
+  { id: 'master', tint: '#ff8a5e' },
 ];
+
+const COPY = {
+  th: {
+    back: 'BACK',
+    title: 'SETUP',
+    subtitle: 'โหมด ฝั่ง และระดับ',
+    mode: 'MODE',
+    side: 'SIDE',
+    level: 'LEVEL',
+    modeAi: 'VS AI',
+    modeHuman: 'VS HUMAN',
+    selected: 'เลือกแล้ว',
+    selectedLabel: 'ระดับที่เลือก',
+    start: 'START MATCH',
+    adPlan: 'AD PLAN',
+    noAdsActive: 'เปิด No Ads แล้ว - มีเฉพาะโฆษณาแบบสมัครใจ',
+    freeMode: 'โหมดฟรี - มี interstitial หลังจบบางแมตช์',
+    rewardCredits: 'เครดิตรางวัล',
+    hint: 'Hint',
+    undo: 'Undo',
+    account: 'ACCOUNT',
+    levelLabels: {
+      easy: 'EASY',
+      normal: 'NORMAL',
+      hard: 'HARD',
+      expert: 'EXPERT',
+      master: 'MASTER',
+    },
+    levelHints: {
+      easy: 'Friendly',
+      normal: 'Balanced',
+      hard: 'Tactical',
+      expert: 'Sharp',
+      master: 'Maximum',
+    },
+  },
+  en: {
+    back: 'BACK',
+    title: 'SETUP',
+    subtitle: 'mode, side, level',
+    mode: 'MODE',
+    side: 'SIDE',
+    level: 'LEVEL',
+    modeAi: 'VS AI',
+    modeHuman: 'VS HUMAN',
+    selected: 'SELECTED',
+    selectedLabel: 'Selected',
+    start: 'START MATCH',
+    adPlan: 'AD PLAN',
+    noAdsActive: 'No Ads active - only optional rewarded ads',
+    freeMode: 'Free mode - interstitial ads after some matches',
+    rewardCredits: 'Reward credits',
+    hint: 'Hint',
+    undo: 'Undo',
+    account: 'ACCOUNT',
+    levelLabels: {
+      easy: 'EASY',
+      normal: 'NORMAL',
+      hard: 'HARD',
+      expert: 'EXPERT',
+      master: 'MASTER',
+    },
+    levelHints: {
+      easy: 'Friendly',
+      normal: 'Balanced',
+      hard: 'Tactical',
+      expert: 'Sharp',
+      master: 'Maximum',
+    },
+  },
+} as const;
 
 function Chip({
   title,
@@ -48,22 +121,23 @@ function Chip({
   );
 }
 
-export default function SetupScreen({ initialConfig, monetization, onBack, onPlay, onOpenAccount }: Props) {
+export default function SetupScreen({ language, initialConfig, monetization, onBack, onPlay, onOpenAccount }: Props) {
   const [mode, setMode] = useState<GameMode>(initialConfig.mode);
   const [difficulty, setDifficulty] = useState<Difficulty>(initialConfig.difficulty);
   const [humanSide, setHumanSide] = useState<1 | -1>(initialConfig.humanSide);
+  const t = COPY[language];
 
   const levelHint = useMemo(
-    () => LEVELS.find(x => x.id === difficulty)?.hint ?? '',
-    [difficulty],
+    () => t.levelHints[difficulty],
+    [difficulty, t.levelHints],
   );
   const levelTint = useMemo(
     () => LEVELS.find(x => x.id === difficulty)?.tint ?? CYAN,
     [difficulty],
   );
-  const monetizationLine = monetization.noAds
-    ? 'No Ads active - only optional rewarded ads'
-    : 'Free mode - interstitial ads after some matches';
+  const monetizationLine = monetization.noAdsUnlocked
+    ? t.noAdsActive
+    : t.freeMode;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -72,22 +146,22 @@ export default function SetupScreen({ initialConfig, monetization, onBack, onPla
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backText}>BACK</Text>
+            <Text style={styles.backText}>{t.back}</Text>
           </Pressable>
-          <Text style={styles.title}>SETUP</Text>
-          <Text style={styles.subtitle}>mode, side, level</Text>
+          <Text style={styles.title}>{t.title}</Text>
+          <Text style={styles.subtitle}>{t.subtitle}</Text>
         </View>
 
         <View style={styles.panel}>
-          <Text style={styles.sectionLabel}>MODE</Text>
+          <Text style={styles.sectionLabel}>{t.mode}</Text>
           <View style={styles.row}>
-            <Chip title="VS AI" active={mode === 'vs-ai'} tint={GOLD} onPress={() => setMode('vs-ai')} />
-            <Chip title="VS HUMAN" active={mode === 'vs-human'} tint={MINT} onPress={() => setMode('vs-human')} />
+            <Chip title={t.modeAi} active={mode === 'vs-ai'} tint={GOLD} onPress={() => setMode('vs-ai')} />
+            <Chip title={t.modeHuman} active={mode === 'vs-human'} tint={MINT} onPress={() => setMode('vs-human')} />
           </View>
         </View>
 
         <View style={styles.panel}>
-          <Text style={styles.sectionLabel}>SIDE</Text>
+          <Text style={styles.sectionLabel}>{t.side}</Text>
           <View style={styles.row}>
             <Chip title="P1" active={humanSide === 1} tint={CYAN} onPress={() => setHumanSide(1)} />
             <Chip title="P2" active={humanSide === -1} tint={PINK} onPress={() => setHumanSide(-1)} />
@@ -95,34 +169,45 @@ export default function SetupScreen({ initialConfig, monetization, onBack, onPla
         </View>
 
         <View style={styles.panel}>
-          <Text style={styles.sectionLabel}>LEVEL</Text>
+          <Text style={styles.sectionLabel}>{t.level}</Text>
           <View style={styles.levelGrid}>
             {LEVELS.map(level => (
               <Pressable
                 key={level.id}
                 onPress={() => setDifficulty(level.id)}
-                style={[styles.levelCard, difficulty === level.id && { borderColor: level.tint }]}
+                style={[
+                  styles.levelCard,
+                  difficulty === level.id && styles.levelCardActive,
+                  difficulty === level.id && { borderColor: level.tint, backgroundColor: '#2a6159' },
+                ]}
               >
-                <Text style={[styles.levelTitle, difficulty === level.id && { color: level.tint }]}>{level.label}</Text>
-                <Text style={styles.levelHint}>{level.hint}</Text>
+                <Text style={[styles.levelTitle, difficulty === level.id && { color: level.tint }]}>
+                  {t.levelLabels[level.id]}
+                </Text>
+                <Text style={styles.levelHint}>{t.levelHints[level.id]}</Text>
+                {difficulty === level.id ? <Text style={[styles.levelSelectedTag, { color: level.tint }]}>{t.selected}</Text> : null}
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.levelCurrent, { color: levelTint }]}>Selected: {difficulty.toUpperCase()} - {levelHint}</Text>
+          <Text style={[styles.levelCurrent, { color: levelTint }]}>
+            {t.selectedLabel}: {t.levelLabels[difficulty]} - {levelHint}
+          </Text>
         </View>
 
         <Pressable style={[styles.playButton, { borderColor: levelTint }]} onPress={() => onPlay({ mode, difficulty, humanSide })}>
-          <Text style={styles.playText}>START MATCH</Text>
+          <Text style={styles.playText}>{t.start}</Text>
         </Pressable>
 
         <View style={styles.panel}>
-          <Text style={styles.sectionLabel}>AD PLAN</Text>
+          <Text style={styles.sectionLabel}>{t.adPlan}</Text>
           <Text style={styles.helperText}>{monetizationLine}</Text>
-          <Text style={styles.helperText}>Reward credits: Hint {monetization.rewardedHints} | Undo {monetization.rewardedUndos}</Text>
+          <Text style={styles.helperText}>
+            {t.rewardCredits}: {t.hint} {monetization.hintCredits} | {t.undo} {monetization.undoCredits}
+          </Text>
         </View>
 
         <Pressable style={styles.secondaryButton} onPress={onOpenAccount}>
-          <Text style={styles.secondaryText}>ACCOUNT</Text>
+          <Text style={styles.secondaryText}>{t.account}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -203,9 +288,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     justifyContent: 'center',
+    gap: 1,
+  },
+  levelCardActive: {
+    shadowColor: '#000',
+    shadowOpacity: 0.24,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   levelTitle: { color: WHITE, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
   levelHint: { color: SOFT, fontSize: 10 },
+  levelSelectedTag: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   levelCurrent: { fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
   playButton: {
     minHeight: 48,

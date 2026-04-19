@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AppLanguage } from '../../App';
+import PurchaseCard from './components/PurchaseCard';
+import RewardActionRow from './components/RewardActionRow';
+import WalletStatCard from './components/WalletStatCard';
+import { ACCOUNT_TEXT } from './i18n/accountText';
 import { AdConsentStatus, MonetizationState } from './types';
+import { RewardKind } from './walletStore';
 
 interface Props {
   language: AppLanguage;
@@ -12,6 +17,7 @@ interface Props {
   aiModels: Array<{ id: string; label: string }>;
   aiModelId: string;
   onAiModelChange: (modelId: string) => void;
+  onClaimFreeReward: (kind: RewardKind) => Promise<boolean>;
   onBuyNoAds: () => void;
   onBuyStarterPack: () => void;
   onRestorePurchase: () => void;
@@ -20,7 +26,6 @@ interface Props {
 
 const BG = '#3f837b';
 const PANEL = 'rgba(27, 69, 64, 0.74)';
-const PANEL_ALT = '#2b5f59';
 const PANEL_DARK = '#214b46';
 const LINE = 'rgba(223, 247, 240, 0.34)';
 const GOLD = '#f6e2aa';
@@ -29,59 +34,6 @@ const MINT = '#b8f3df';
 const PINK = '#f2c5c5';
 const WHITE = '#f5f2e8';
 const SOFT = '#d7efe8';
-
-const COPY = {
-  th: {
-    title: 'ACCOUNT',
-    subtitle: 'Settings + Shop in one place',
-    app: 'APP SETTINGS',
-    monetization: 'PURCHASE & ADS',
-    language: 'Language',
-    languageSub: 'Switch app language instantly.',
-    model: 'AI Model',
-    modelSub: 'Choose ONNX model used in gameplay.',
-    sound: 'Sound',
-    vibration: 'Vibration',
-    retroFx: 'Retro FX',
-    consent: 'Ad Consent',
-    consentSub: 'Allow ads and rewarded videos for ad-based rewards.',
-    noAds: 'No Ads',
-    active: 'ACTIVE',
-    free: 'FREE MODE',
-    buyNoAds: 'BUY NO ADS',
-    starterPack: 'STARTER PACK',
-    restore: 'RESTORE PURCHASE',
-    coins: 'Coins',
-    hintCredits: 'Hint Credits',
-    undoCredits: 'Undo Credits',
-    back: 'BACK',
-  },
-  en: {
-    title: 'ACCOUNT',
-    subtitle: 'Settings + Shop in one place',
-    app: 'APP SETTINGS',
-    monetization: 'PURCHASE & ADS',
-    language: 'Language',
-    languageSub: 'Switch app language instantly.',
-    model: 'AI Model',
-    modelSub: 'Choose ONNX model used in gameplay.',
-    sound: 'Sound',
-    vibration: 'Vibration',
-    retroFx: 'Retro FX',
-    consent: 'Ad Consent',
-    consentSub: 'Allow ads and rewarded videos for ad-based rewards.',
-    noAds: 'No Ads',
-    active: 'ACTIVE',
-    free: 'FREE MODE',
-    buyNoAds: 'BUY NO ADS',
-    starterPack: 'STARTER PACK',
-    restore: 'RESTORE PURCHASE',
-    coins: 'Coins',
-    hintCredits: 'Hint Credits',
-    undoCredits: 'Undo Credits',
-    back: 'BACK',
-  },
-} as const;
 
 function ToggleRow({
   title,
@@ -102,32 +54,6 @@ function ToggleRow({
   );
 }
 
-function OfferCard({
-  title,
-  copy,
-  tint,
-  cta,
-  onPress,
-  owned = false,
-}: {
-  title: string;
-  copy: string;
-  tint: string;
-  cta: string;
-  onPress: () => void;
-  owned?: boolean;
-}) {
-  return (
-    <View style={[styles.offerCard, { borderColor: tint }]}>
-      <Text style={[styles.offerTitle, { color: tint }]}>{title}</Text>
-      <Text style={styles.offerCopy}>{copy}</Text>
-      <Pressable style={[styles.offerButton, { borderColor: tint }, owned && styles.offerButtonOwned]} onPress={onPress}>
-        <Text style={[styles.offerButtonText, { color: tint }]}>{owned ? 'OWNED' : cta}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 export default function AccountScreen({
   language,
   onLanguageChange,
@@ -136,6 +62,7 @@ export default function AccountScreen({
   aiModels,
   aiModelId,
   onAiModelChange,
+  onClaimFreeReward,
   onBuyNoAds,
   onBuyStarterPack,
   onRestorePurchase,
@@ -144,7 +71,16 @@ export default function AccountScreen({
   const [soundOn, setSoundOn] = useState(true);
   const [vibrationOn, setVibrationOn] = useState(true);
   const [retroFx, setRetroFx] = useState(true);
-  const t = COPY[language];
+  const [busyReward, setBusyReward] = useState<RewardKind | null>(null);
+  const t = ACCOUNT_TEXT[language];
+
+  async function claim(kind: RewardKind) {
+    if (busyReward) return;
+    setBusyReward(kind);
+    const ok = await onClaimFreeReward(kind);
+    setBusyReward(null);
+    if (!ok) Alert.alert(t.adUnavailableTitle, t.adUnavailableBody);
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -158,6 +94,12 @@ export default function AccountScreen({
           </Pressable>
           <Text style={styles.title}>{t.title}</Text>
           <Text style={styles.subtitle}>{t.subtitle}</Text>
+        </View>
+
+        <View style={styles.walletRow}>
+          <WalletStatCard value={monetization.coins} label={t.coins} accent={GOLD} />
+          <WalletStatCard value={monetization.hintCredits} label={t.hintCredits} accent={CYAN} />
+          <WalletStatCard value={monetization.undoCredits} label={t.undoCredits} accent={MINT} />
         </View>
 
         <View style={styles.panel}>
@@ -203,71 +145,96 @@ export default function AccountScreen({
         </View>
 
         <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>{t.monetization}</Text>
+          <Text style={styles.sectionTitle}>{t.rewards}</Text>
+          <RewardActionRow
+            title={t.adCoins}
+            subtitle={t.optionalText}
+            cta={busyReward === 'coins' ? t.loading : t.watchAd}
+            tint={GOLD}
+            disabled={!!busyReward}
+            onPress={() => {
+              void claim('coins');
+            }}
+          />
+          <RewardActionRow
+            title={t.adHint}
+            subtitle={t.optionalText}
+            cta={busyReward === 'hint' ? t.loading : t.watchAd}
+            tint={CYAN}
+            disabled={!!busyReward}
+            onPress={() => {
+              void claim('hint');
+            }}
+          />
+          <RewardActionRow
+            title={t.adUndo}
+            subtitle={t.optionalText}
+            cta={busyReward === 'undo' ? t.loading : t.watchAd}
+            tint={MINT}
+            disabled={!!busyReward}
+            onPress={() => {
+              void claim('undo');
+            }}
+          />
+        </View>
+
+        <View style={styles.panel}>
+          <Text style={styles.sectionTitle}>{t.purchases}</Text>
 
           <View style={styles.rowCardColumn}>
             <Text style={styles.rowTitle}>{t.consent}</Text>
             <Text style={styles.rowSub}>{t.consentSub}</Text>
             <View style={styles.modelButtons}>
               <Pressable
-                style={[styles.modelButton, monetization.consent === 'granted' && styles.modelButtonActive]}
+                style={[styles.modelButton, monetization.adConsent === 'granted' && styles.modelButtonActive]}
                 onPress={() => onAdConsentChange('granted')}
               >
-                <Text style={[styles.modelButtonText, monetization.consent === 'granted' && styles.modelButtonTextActive]}>ALLOW</Text>
+                <Text style={[styles.modelButtonText, monetization.adConsent === 'granted' && styles.modelButtonTextActive]}>{t.allow}</Text>
               </Pressable>
               <Pressable
-                style={[styles.modelButton, monetization.consent === 'denied' && styles.modelButtonActive]}
+                style={[styles.modelButton, monetization.adConsent === 'denied' && styles.modelButtonActive]}
                 onPress={() => onAdConsentChange('denied')}
               >
-                <Text style={[styles.modelButtonText, monetization.consent === 'denied' && styles.modelButtonTextActive]}>DENY</Text>
+                <Text style={[styles.modelButtonText, monetization.adConsent === 'denied' && styles.modelButtonTextActive]}>{t.deny}</Text>
               </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.walletRow}>
-            <View style={styles.walletCard}>
-              <Text style={styles.walletValue}>{monetization.coins}</Text>
-              <Text style={styles.walletLabel}>{t.coins}</Text>
-            </View>
-            <View style={styles.walletCard}>
-              <Text style={styles.walletValue}>{monetization.rewardedHints}</Text>
-              <Text style={styles.walletLabel}>{t.hintCredits}</Text>
-            </View>
-            <View style={styles.walletCard}>
-              <Text style={styles.walletValue}>{monetization.rewardedUndos}</Text>
-              <Text style={styles.walletLabel}>{t.undoCredits}</Text>
             </View>
           </View>
 
           <View style={styles.rowCard}>
             <Text style={styles.rowTitle}>{t.noAds}</Text>
-            <Text style={[styles.statusPill, monetization.noAds ? styles.statusActive : styles.statusFree]}>
-              {monetization.noAds ? t.active : t.free}
+            <Text style={[styles.statusPill, monetization.noAdsUnlocked ? styles.statusActive : styles.statusFree]}>
+              {monetization.noAdsUnlocked ? t.active : t.free}
             </Text>
           </View>
 
-          <OfferCard
-            title={t.buyNoAds}
-            copy="Disable interstitial ads for smoother play."
+          <PurchaseCard
+            title={t.noAdsTitle}
+            subtitle={t.noAdsSub}
+            price={t.noAdsPrice}
+            copy={t.noAdsCopy}
+            cta={t.noAdsCta}
             tint={PINK}
-            cta={t.buyNoAds}
             onPress={onBuyNoAds}
-            owned={monetization.noAds}
+            owned={monetization.noAdsUnlocked}
+            ownedLabel={t.owned}
           />
 
-          <OfferCard
-            title={t.starterPack}
-            copy="+500 coins, +2 hint credits, +2 undo credits, and No Ads unlock."
+          <PurchaseCard
+            title={t.starterTitle}
+            subtitle={t.starterSub}
+            price={t.starterPrice}
+            copy={t.starterCopy}
+            cta={t.starterCta}
             tint={CYAN}
-            cta={t.starterPack}
             onPress={onBuyStarterPack}
           />
 
-          <OfferCard
-            title={t.restore}
-            copy="Restore purchases for returning users."
+          <PurchaseCard
+            title={t.restoreTitle}
+            price={t.restorePrice}
+            copy={t.restoreCopy}
+            cta={t.restoreCta}
             tint={GOLD}
-            cta={t.restore}
             onPress={onRestorePurchase}
           />
         </View>
@@ -305,6 +272,7 @@ const styles = StyleSheet.create({
 
   panel: { backgroundColor: PANEL, borderWidth: 1, borderColor: LINE, borderRadius: 14, padding: 12, gap: 8 },
   sectionTitle: { color: WHITE, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
+  walletRow: { flexDirection: 'row', gap: 8 },
   rowCard: {
     minHeight: 52,
     borderWidth: 1,
@@ -365,20 +333,6 @@ const styles = StyleSheet.create({
   toggleKnob: { width: 16, height: 16, backgroundColor: SOFT, borderRadius: 8 },
   toggleKnobActive: { backgroundColor: MINT, alignSelf: 'flex-end' },
 
-  walletRow: { flexDirection: 'row', gap: 8 },
-  walletCard: {
-    flex: 1,
-    minHeight: 62,
-    borderWidth: 1,
-    borderColor: LINE,
-    borderRadius: 12,
-    backgroundColor: PANEL_DARK,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 2,
-  },
-  walletValue: { color: GOLD, fontSize: 17, fontWeight: '900', letterSpacing: 0.6 },
-  walletLabel: { color: SOFT, fontSize: 10 },
   statusPill: {
     minHeight: 28,
     borderRadius: 999,
@@ -392,19 +346,4 @@ const styles = StyleSheet.create({
   },
   statusActive: { color: MINT, backgroundColor: '#2f6b62' },
   statusFree: { color: SOFT, backgroundColor: PANEL },
-
-  offerCard: { borderWidth: 1, borderRadius: 12, backgroundColor: PANEL_DARK, padding: 10, gap: 6 },
-  offerTitle: { fontSize: 12, fontWeight: '900', letterSpacing: 0.7 },
-  offerCopy: { color: SOFT, fontSize: 11, lineHeight: 16 },
-  offerButton: {
-    minHeight: 38,
-    borderWidth: 1,
-    borderRadius: 999,
-    backgroundColor: PANEL,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  offerButtonOwned: { opacity: 0.65 },
-  offerButtonText: { fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
 });
-

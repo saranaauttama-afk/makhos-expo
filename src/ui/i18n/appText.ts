@@ -1,0 +1,26 @@
+export const APP_TEXT = {
+  th: {
+    purchaseSimulated: 'จำลองการซื้อสำเร็จ',
+    noAdsActive: 'เปิดใช้งาน No Ads แล้ว',
+    starterGranted: 'รับ Starter Pack แล้ว: No Ads + เครดิต',
+    restoreDone: 'กู้คืนสิทธิ์สำเร็จ',
+    restoreBody: 'กู้คืนสิทธิ์ No Ads แล้ว (โหมดจำลอง)',
+    rewardUnavailableTitle: 'รับรางวัลไม่ได้',
+    rewardUnavailableBody: 'กรุณาอนุญาต Ad Consent ในหน้า Account ก่อนใช้งานรางวัลจากโฆษณา',
+    adUnavailableTitle: 'โฆษณายังไม่พร้อม',
+    adUnavailableBody: 'ผู้ให้บริการโฆษณายังไม่พร้อม ลองใหม่อีกครั้งในอีกสักครู่',
+    loadingWallet: 'กำลังโหลดกระเป๋า...',
+  },
+  en: {
+    purchaseSimulated: 'Purchase simulated',
+    noAdsActive: 'No Ads is now active.',
+    starterGranted: 'Starter Pack granted: No Ads + credits.',
+    restoreDone: 'Restore complete',
+    restoreBody: 'Restored No Ads entitlement (simulated).',
+    rewardUnavailableTitle: 'Reward unavailable',
+    rewardUnavailableBody: 'Please allow Ad Consent in Account to use rewarded actions.',
+    adUnavailableTitle: 'Ad unavailable',
+    adUnavailableBody: 'Ad provider is not ready yet. Please try again in a moment.',
+    loadingWallet: 'Loading wallet...',
+  },
+} as const;

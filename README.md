@@ -310,7 +310,7 @@ If the immediate goal is to build the new interface first, the best order is:
 6. Settings screen skeleton
 
 cd "d:\My App\makhos-v2"
-$env:REACT_NATIVE_PACKAGER_HOSTNAME="10.28.15.44"
+$env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.10"
 npx expo start --lan -c
 
 cd /d "d:\My App\makhos-v2"

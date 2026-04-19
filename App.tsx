@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initializeAdService, prepareInterstitialAfterMatch, showRewardedAd } from './src/ads/adService';
+import { getActiveAZModelId, getAvailableAZModels, setActiveAZModel } from './src/coreClaude/azNet';
+import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTablebase';
+import AccountScreen from './src/ui/AccountScreen';
+import ArenaScreen from './src/ui/ArenaScreen';
 import HomeScreen from './src/ui/HomeScreen';
 import HumanVsCodexArenaScreen from './src/ui/HumanVsCodexArenaScreen';
-import ArenaScreen from './src/ui/ArenaScreen';
+import { APP_TEXT } from './src/ui/i18n/appText';
 import SetupScreen from './src/ui/SetupScreen';
-import AccountScreen from './src/ui/AccountScreen';
-import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTablebase';
-import { getActiveAZModelId, getAvailableAZModels, setActiveAZModel } from './src/coreClaude/azNet';
-import { GameConfig, MonetizationState } from './src/ui/types';
+import { GameConfig } from './src/ui/types';
+import { MatchOutcome, RewardKind, SpendKind, useWalletStore } from './src/ui/walletStore';
 
 type ErrorBoundaryState = { error: Error | null };
 export type AppLanguage = 'th' | 'en';
@@ -44,93 +47,150 @@ export default function App() {
   const [draftConfig, setDraftConfig] = useState<GameConfig | null>(null);
   const [language, setLanguage] = useState<AppLanguage>('th');
   const [aiModelId, setAiModelId] = useState<string>(() => getActiveAZModelId());
-  const [monetization, setMonetization] = useState<MonetizationState>({
-    noAds: false,
-    consent: 'unknown',
-    coins: 120,
-    rewardedHints: 0,
-    rewardedUndos: 0,
-    interstitialCounter: 0,
-    interstitialSeen: 0,
-    rewardedSeen: 0,
-  });
+  const {
+    monetization,
+    walletHydrated,
+    setAdConsent,
+    consumeSpend,
+    claimReward,
+    applyMatchOutcome,
+    setInterstitialCounter,
+    markInterstitialShown,
+    buyNoAds,
+    buyStarterPack,
+    restorePurchase,
+  } = useWalletStore();
   const [screen, setScreen] = useState<'home' | 'arena' | 'setup' | 'account'>('home');
   const aiModels = getAvailableAZModels();
+  const t = APP_TEXT[language];
 
-  useEffect(() => { precomputeEndgameTablebase(); }, []);
+  useEffect(() => {
+    precomputeEndgameTablebase();
+    void initializeAdService();
+  }, []);
 
   function handleBuyNoAds() {
-    setMonetization(prev => ({ ...prev, noAds: true }));
-    Alert.alert('Purchase simulated', 'No Ads is now active.');
+    buyNoAds();
+    Alert.alert(t.purchaseSimulated, t.noAdsActive);
   }
 
   function handleBuyStarterPack() {
-    setMonetization(prev => ({
-      ...prev,
-      noAds: true,
-      coins: prev.coins + 500,
-      rewardedHints: prev.rewardedHints + 2,
-      rewardedUndos: prev.rewardedUndos + 2,
-    }));
-    Alert.alert('Purchase simulated', 'Starter Pack granted: No Ads + credits.');
+    buyStarterPack();
+    Alert.alert(t.purchaseSimulated, t.starterGranted);
   }
 
   function handleRestorePurchase() {
-    setMonetization(prev => ({ ...prev, noAds: true }));
-    Alert.alert('Restore complete', 'Restored No Ads entitlement (simulated).');
+    restorePurchase();
+    Alert.alert(t.restoreDone, t.restoreBody);
   }
+
+  const runRewarded = useCallback(
+    async (kind: RewardKind): Promise<boolean> => {
+      const adResult = await showRewardedAd({
+        placement: kind,
+        adConsent: monetization.adConsent,
+      });
+      if (!adResult.granted) {
+        if (adResult.reason === 'consent_denied') {
+          Alert.alert(t.rewardUnavailableTitle, t.rewardUnavailableBody);
+        } else {
+          Alert.alert(t.adUnavailableTitle, t.adUnavailableBody);
+        }
+        return false;
+      }
+      claimReward(kind);
+      return true;
+    },
+    [claimReward, monetization.adConsent, t.adUnavailableBody, t.adUnavailableTitle, t.rewardUnavailableBody, t.rewardUnavailableTitle],
+  );
+
+  const handleMatchComplete = useCallback(
+    async (outcome: MatchOutcome) => {
+      applyMatchOutcome(outcome);
+
+      const interstitial = await prepareInterstitialAfterMatch({
+        noAdsUnlocked: monetization.noAdsUnlocked,
+        adConsent: monetization.adConsent,
+        interstitialEveryMatches: 3,
+        completedMatches: monetization.interstitialCounter,
+      });
+
+      setInterstitialCounter(interstitial.nextCompletedMatches);
+      if (interstitial.shown) markInterstitialShown();
+    },
+    [applyMatchOutcome, markInterstitialShown, monetization.adConsent, monetization.interstitialCounter, monetization.noAdsUnlocked, setInterstitialCounter],
+  );
+
+  const handleConsumeSpend = useCallback((kind: SpendKind) => consumeSpend(kind), [consumeSpend]);
+
+  const screenContent =
+    screen === 'arena' ? (
+      <ArenaScreen language={language} onBack={() => setScreen('home')} />
+    ) : screen === 'setup' && draftConfig ? (
+      <SetupScreen
+        language={language}
+        initialConfig={draftConfig}
+        monetization={monetization}
+        onBack={() => setScreen('home')}
+        onPlay={config => {
+          setGameConfig(config);
+          setScreen('home');
+        }}
+        onOpenAccount={() => setScreen('account')}
+      />
+    ) : screen === 'account' ? (
+      <AccountScreen
+        language={language}
+        onLanguageChange={setLanguage}
+        monetization={monetization}
+        onAdConsentChange={setAdConsent}
+        aiModels={aiModels}
+        aiModelId={aiModelId}
+        onAiModelChange={modelId => {
+          if (setActiveAZModel(modelId)) setAiModelId(modelId);
+        }}
+        onClaimFreeReward={runRewarded}
+        onBuyNoAds={handleBuyNoAds}
+        onBuyStarterPack={handleBuyStarterPack}
+        onRestorePurchase={handleRestorePurchase}
+        onBack={() => setScreen('home')}
+      />
+    ) : gameConfig ? (
+      <HumanVsCodexArenaScreen
+        language={language}
+        config={gameConfig}
+        monetization={monetization}
+        onConsumeSpend={handleConsumeSpend}
+        onWatchRewarded={runRewarded}
+        onMatchComplete={handleMatchComplete}
+        onBack={() => {
+          setGameConfig(null);
+          setScreen('home');
+        }}
+      />
+    ) : (
+      <HomeScreen
+        language={language}
+        monetization={monetization}
+        onQuickPlay={config => setGameConfig(config)}
+        onStart={config => {
+          setDraftConfig(config);
+          setScreen('setup');
+        }}
+        onArena={() => setScreen('arena')}
+        onAccount={() => setScreen('account')}
+      />
+    );
 
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
       <ErrorBoundary>
-        {screen === 'arena' ? (
-          <ArenaScreen onBack={() => setScreen('home')} />
-        ) : screen === 'setup' && draftConfig ? (
-          <SetupScreen
-            initialConfig={draftConfig}
-            monetization={monetization}
-            onBack={() => setScreen('home')}
-            onPlay={config => {
-              setGameConfig(config);
-              setScreen('home');
-            }}
-            onOpenAccount={() => setScreen('account')}
-          />
-        ) : screen === 'account' ? (
-          <AccountScreen
-            language={language}
-            onLanguageChange={setLanguage}
-            monetization={monetization}
-            onAdConsentChange={consent => setMonetization(prev => ({ ...prev, consent }))}
-            aiModels={aiModels}
-            aiModelId={aiModelId}
-            onAiModelChange={modelId => {
-              if (setActiveAZModel(modelId)) setAiModelId(modelId);
-            }}
-            onBuyNoAds={handleBuyNoAds}
-            onBuyStarterPack={handleBuyStarterPack}
-            onRestorePurchase={handleRestorePurchase}
-            onBack={() => setScreen('home')}
-          />
-        ) : gameConfig ? (
-          <HumanVsCodexArenaScreen
-            config={gameConfig}
-            onBack={() => {
-              setGameConfig(null);
-              setScreen('home');
-            }}
-          />
+        {walletHydrated ? (
+          screenContent
         ) : (
-          <HomeScreen
-            language={language}
-            onQuickPlay={config => setGameConfig(config)}
-            onStart={config => {
-              setDraftConfig(config);
-              setScreen('setup');
-            }}
-            onArena={() => setScreen('arena')}
-            onAccount={() => setScreen('account')}
-          />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <Text style={{ fontSize: 14, opacity: 0.8 }}>{t.loadingWallet}</Text>
+          </View>
         )}
       </ErrorBoundary>
     </SafeAreaProvider>

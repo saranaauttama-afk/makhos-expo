@@ -8,12 +8,20 @@ export interface GameConfig {
   humanSide: 1 | -1;
 }
 
-export interface MonetizationState {
-  noAds: boolean;
-  consent: AdConsentStatus;
+export interface WalletModel {
   coins: number;
-  rewardedHints: number;
-  rewardedUndos: number;
+  hintCredits: number;
+  undoCredits: number;
+  noAdsUnlocked: boolean;
+  adConsent: AdConsentStatus;
+}
+
+export interface MonetizationState {
+  coins: number;
+  hintCredits: number;
+  undoCredits: number;
+  noAdsUnlocked: boolean;
+  adConsent: AdConsentStatus;
   interstitialCounter: number;
   interstitialSeen: number;
   rewardedSeen: number;

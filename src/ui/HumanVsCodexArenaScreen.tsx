@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { AppLanguage } from '../../App';
 import { bitCount } from '../coreClaude/bitboards';
 import { applyMove, generateMoves, Move } from '../coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position } from '../coreClaude/position';
@@ -8,15 +9,17 @@ import { buildRepetitionCounts, isThreefoldRepetition } from '../coreClaude/sear
 import { hashPosition } from '../coreClaude/search/zobrist';
 import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
-import { Difficulty, GameConfig } from './types';
+import { Difficulty, GameConfig, MonetizationState } from './types';
 import { usePixelGameFx } from './usePixelGameFx';
+import SpendOrWatchAdModal from './components/SpendOrWatchAdModal';
+import { HINT_COST, LOSE_REWARD, makeSpendPreview, MatchOutcome, SpendKind, SpendSource, UNDO_COST, WIN_REWARD } from './walletStore';
 
 const THINK_MS: Record<Difficulty, number> = {
-  easy: 900,
-  normal: 1400,
-  hard: 2200,
-  expert: 3200,
-  master: 4500,
+  easy: 700,
+  normal: 1200,
+  hard: 2000,
+  expert: 3000,
+  master: 4000,
 };
 const MOVE_ANIM_GUARD_MS = 560;
 const INITIAL_PIECES_PER_SIDE = 8;
@@ -32,6 +35,98 @@ const MINT = '#b8f3df';
 const PINK = '#f2c5c5';
 const WHITE = '#f5f2e8';
 const SOFT = '#d7efe8';
+
+const COPY = {
+  th: {
+    draw: 'เสมอ',
+    p1Win: 'P1 ชนะ',
+    p2Win: 'P2 ชนะ',
+    youWin: 'YOU WIN',
+    youLose: 'YOU LOSE',
+    human: 'HUMAN',
+    cap: 'CAP',
+    turn: 'TURN',
+    last: 'LAST',
+    forced: 'FORCED',
+    telOn: 'TEL ON',
+    telOff: 'TEL OFF',
+    rewardWin: `Match reward +${WIN_REWARD} coins`,
+    rewardLose: `Match reward +${LOSE_REWARD} coins`,
+    rewardDraw: 'Match reward +0 coins',
+    winSub: 'เล่นได้ดีมาก ลุยระดับต่อไปได้เลย',
+    loseSub: 'ลองใช้ Hint หรือ Undo แล้วสู้ใหม่',
+    drawSub: 'สูสีมาก เล่นอีกตาไหม',
+    forcedCapture: 'ถูกบังคับกิน: เลือกตัวหมากที่ถูกไฮไลท์',
+    forcedMove: 'ถูกบังคับเดิน: เดินได้เฉพาะตัวที่ถูกไฮไลท์',
+    telemetryTitle: 'ENGINE TELEMETRY',
+    telemetryPending: 'จะแสดงหลัง AI คิดจบอย่างน้อย 1 ครั้ง',
+    hint: 'Hint',
+    hintTry: (from: number, to: number) => `ลองเดิน ${from} -> ${to}`,
+    actionUnavailableTitle: 'ยังใช้งานไม่ได้',
+    actionUnavailableBody: 'ลองอีกครั้ง',
+    notEnoughCoinsTitle: 'เหรียญไม่พอ',
+    notEnoughCoinsBody: 'ดูโฆษณาฟรี หรือเล่นแมตช์เพื่อรับเหรียญเพิ่ม',
+    hintButton: `HINT • ${HINT_COST}`,
+    undoButton: `UNDO • ${UNDO_COST}`,
+    walletLine: (coins: number, hintCredits: number, undoCredits: number) =>
+      `เหรียญ ${coins} | Hint ${hintCredits} | Undo ${undoCredits}`,
+    modalHintTitle: 'ใช้ Hint',
+    modalUndoTitle: 'ใช้ Undo',
+    loadingAd: 'กำลังโหลดโฆษณา...',
+    hintCost: `Hint ใช้ ${HINT_COST} เหรียญ หรือดูโฆษณาแทน`,
+    undoCost: `Undo ใช้ ${UNDO_COST} เหรียญ หรือดูโฆษณาแทน`,
+    spendCoins: (cost: number) => `ใช้ ${cost} เหรียญ`,
+    watchAdFree: 'ดูโฆษณาใช้ฟรี',
+    cancel: 'ยกเลิก',
+    newGame: 'NEW GAME',
+    exit: 'EXIT',
+  },
+  en: {
+    draw: 'DRAW',
+    p1Win: 'P1 WIN',
+    p2Win: 'P2 WIN',
+    youWin: 'YOU WIN',
+    youLose: 'YOU LOSE',
+    human: 'HUMAN',
+    cap: 'CAP',
+    turn: 'TURN',
+    last: 'LAST',
+    forced: 'FORCED',
+    telOn: 'TEL ON',
+    telOff: 'TEL OFF',
+    rewardWin: `Match reward +${WIN_REWARD} coins`,
+    rewardLose: `Match reward +${LOSE_REWARD} coins`,
+    rewardDraw: 'Match reward +0 coins',
+    winSub: 'Great run. Push to the next level.',
+    loseSub: 'Try Hint or Undo, then run it back.',
+    drawSub: 'Even match. One more round?',
+    forcedCapture: 'forced capture: pick a highlighted piece.',
+    forcedMove: 'forced move: only highlighted piece can move.',
+    telemetryTitle: 'ENGINE TELEMETRY',
+    telemetryPending: 'Telemetry appears after the first AI search completes.',
+    hint: 'Hint',
+    hintTry: (from: number, to: number) => `Try ${from} -> ${to}`,
+    actionUnavailableTitle: 'Action unavailable',
+    actionUnavailableBody: 'Please try again.',
+    notEnoughCoinsTitle: 'Not enough coins',
+    notEnoughCoinsBody: 'Watch ad for free, or earn more coins from matches.',
+    hintButton: `HINT • ${HINT_COST}`,
+    undoButton: `UNDO • ${UNDO_COST}`,
+    walletLine: (coins: number, hintCredits: number, undoCredits: number) =>
+      `Coins ${coins} | Hint credits ${hintCredits} | Undo credits ${undoCredits}`,
+    modalHintTitle: 'Use Hint',
+    modalUndoTitle: 'Use Undo',
+    loadingAd: 'Loading rewarded ad...',
+    hintCost: `Hint uses ${HINT_COST} coins unless you watch an ad.`,
+    undoCost: `Undo uses ${UNDO_COST} coins unless you watch an ad.`,
+    spendCoins: (cost: number) => `Spend ${cost} coins`,
+    watchAdFree: 'Watch Ad for free',
+    cancel: 'Cancel',
+    newGame: 'NEW GAME',
+    exit: 'EXIT',
+  },
+} as const;
+type ScreenCopy = (typeof COPY)[keyof typeof COPY];
 
 function posKey(p: Position) {
   return [p.side, p.p1Men, p.p1Kings, p.p2Men, p.p2Kings, p.halfmoveClock].join(':');
@@ -49,7 +144,12 @@ function formatTurnSeconds(ms: number) {
 }
 
 interface Props {
+  language: AppLanguage;
   config: GameConfig;
+  monetization: MonetizationState;
+  onConsumeSpend: (kind: SpendKind) => SpendSource;
+  onWatchRewarded: (kind: SpendKind) => Promise<boolean>;
+  onMatchComplete: (outcome: MatchOutcome) => void | Promise<void>;
   onBack: () => void;
 }
 
@@ -201,7 +301,7 @@ function aiLevelTag(difficulty: Difficulty) {
   return difficulty.toUpperCase();
 }
 
-function TurnSeatChip({
+function TurnSeatChipLegacy({
   lane,
   avatarKind,
   role,
@@ -209,7 +309,9 @@ function TurnSeatChip({
   turnTimer,
   lastMoveText,
   active,
+  forced = false,
   tint,
+  copy,
   showTelemetryToggle = false,
   telemetryEnabled = false,
   onToggleTelemetry,
@@ -221,7 +323,9 @@ function TurnSeatChip({
   turnTimer: string;
   lastMoveText?: string | null;
   active: boolean;
+  forced?: boolean;
   tint: string;
+  copy: ScreenCopy;
   showTelemetryToggle?: boolean;
   telemetryEnabled?: boolean;
   onToggleTelemetry?: () => void;
@@ -231,7 +335,7 @@ function TurnSeatChip({
       style={[
         styles.turnSeatChip,
         {
-          borderColor: active ? tint : LINE,
+          borderColor: active ? (forced ? GOLD : tint) : LINE,
           backgroundColor: active ? PANEL_ALT : PANEL_DARK,
           opacity: active ? 1 : 0.68,
           transform: [{ scale: active ? 1 : 0.98 }],
@@ -248,6 +352,11 @@ function TurnSeatChip({
             CAP x{captured} · TURN {turnTimer}{lastMoveText ? ` · LAST ${lastMoveText}` : ''}
           </Text>
         </View>
+        {forced ? (
+          <View style={styles.forcedBadge}>
+            <Text style={styles.forcedBadgeText}>{copy.forced}</Text>
+          </View>
+        ) : null}
         {showTelemetryToggle && onToggleTelemetry ? (
           <Pressable
             onPress={onToggleTelemetry}
@@ -257,7 +366,7 @@ function TurnSeatChip({
             ]}
           >
             <Text style={styles.telemetryToggleText}>
-              {telemetryEnabled ? 'TEL ON' : 'TEL OFF'}
+              {telemetryEnabled ? copy.telOn : copy.telOff}
             </Text>
           </Pressable>
         ) : null}
@@ -266,7 +375,90 @@ function TurnSeatChip({
   );
 }
 
-export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
+function TurnSeatChip({
+  lane,
+  avatarKind,
+  role,
+  captured,
+  turnTimer,
+  lastMoveText,
+  active,
+  forced = false,
+  tint,
+  copy,
+  showTelemetryToggle = false,
+  telemetryEnabled = false,
+  onToggleTelemetry,
+}: {
+  lane: string;
+  avatarKind: AvatarKind;
+  role: string;
+  captured: number;
+  turnTimer: string;
+  lastMoveText?: string | null;
+  active: boolean;
+  forced?: boolean;
+  tint: string;
+  copy: ScreenCopy;
+  showTelemetryToggle?: boolean;
+  telemetryEnabled?: boolean;
+  onToggleTelemetry?: () => void;
+}) {
+  return (
+    <View
+      style={[
+        styles.turnSeatChip,
+        {
+          borderColor: active ? (forced ? GOLD : tint) : LINE,
+          backgroundColor: active ? PANEL_ALT : PANEL_DARK,
+          opacity: active ? 1 : 0.68,
+          transform: [{ scale: active ? 1 : 0.98 }],
+        },
+      ]}
+    >
+      <View style={styles.turnSeatInner}>
+        <PixelAvatar kind={avatarKind} tint={tint} active={active} />
+        <View style={styles.turnSeatCopy}>
+          <Text style={[styles.turnSeatText, { color: active ? WHITE : SOFT }]}>
+            {lane} · {role}
+          </Text>
+          <Text style={[styles.turnSeatRole, { color: active ? tint : SOFT }]}>
+            {copy.cap} x{captured} · {copy.turn} {turnTimer}{lastMoveText ? ` · ${copy.last} ${lastMoveText}` : ''}
+          </Text>
+        </View>
+        {forced ? (
+          <View style={styles.forcedBadge}>
+            <Text style={styles.forcedBadgeText}>{copy.forced}</Text>
+          </View>
+        ) : null}
+        {showTelemetryToggle && onToggleTelemetry ? (
+          <Pressable
+            onPress={onToggleTelemetry}
+            style={[
+              styles.telemetryToggleBtn,
+              telemetryEnabled ? styles.telemetryToggleBtnOn : styles.telemetryToggleBtnOff,
+            ]}
+          >
+            <Text style={styles.telemetryToggleText}>
+              {telemetryEnabled ? copy.telOn : copy.telOff}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export default function HumanVsCodexArenaScreen({
+  language,
+  config,
+  monetization,
+  onConsumeSpend,
+  onWatchRewarded,
+  onMatchComplete,
+  onBack,
+}: Props) {
+  const t = COPY[language];
   const { mode, difficulty, humanSide } = config;
   const isHvH = mode === 'vs-human';
   const aiSide = (-humanSide) as 1 | -1;
@@ -282,10 +474,12 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const [comboFrame, setComboFrame] = useState(0);
   const [comboText, setComboText] = useState('');
   const [showTelemetry, setShowTelemetry] = useState(false);
-  const [premiumUndo, setPremiumUndo] = useState(false);
   const [turnElapsedMs, setTurnElapsedMs] = useState(0);
   const [isAnimLocked, setIsAnimLocked] = useState(false);
+  const [spendModalKind, setSpendModalKind] = useState<SpendKind | null>(null);
+  const [rewardLoadingKind, setRewardLoadingKind] = useState<SpendKind | null>(null);
   const turnStartRef = useRef<number>(Date.now());
+  const reportedResultKeyRef = useRef<string | null>(null);
 
   const { think, thinking, lastInfo, lastPlan, cancel } = useCodexEngine();
   const { triggerFx } = usePixelGameFx();
@@ -296,6 +490,15 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const animLockUntilRef = useRef<number>(0);
 
   const myMoves = useMemo(() => generateMoves(pos), [pos]);
+  const forcedFromSquares = useMemo(() => {
+    if (!myMoves.length) return [];
+    const fromSquares = Array.from(new Set(myMoves.map(m => m.from)));
+    const forcedCapture = myMoves[0].captured.length > 0;
+    if (forcedCapture || fromSquares.length === 1) return fromSquares;
+    return [];
+  }, [myMoves]);
+  const isForcedTurn = forcedFromSquares.length > 0;
+  const isForcedCaptureTurn = isForcedTurn && myMoves.length > 0 && myMoves[0].captured.length > 0;
   const isDraw = useMemo(() => isDrawByInactivity(pos), [pos]);
   const curHash = useMemo(() => hashPosition(pos), [pos]);
   const isThreefold = useMemo(
@@ -303,15 +506,15 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     [curHash, hashHistory],
   );
   const gameResult = useMemo(() => {
-    if (isDraw || isThreefold) return { label: 'DRAW', tone: 'draw' as const };
+    if (isDraw || isThreefold) return { label: t.draw, tone: 'draw' as const };
     if (myMoves.length > 0) return null;
 
     const winnerSide = (pos.side === 1 ? -1 : 1) as 1 | -1;
-    if (isHvH) return { label: winnerSide === 1 ? 'P1 WIN' : 'P2 WIN', tone: 'win' as const };
+    if (isHvH) return { label: winnerSide === 1 ? t.p1Win : t.p2Win, tone: 'win' as const };
     return winnerSide === humanSide
-      ? { label: 'YOU WIN', tone: 'win' as const, avatarKind: 'human' as AvatarKind }
-      : { label: 'YOU LOSE', tone: 'loss' as const, avatarKind: 'human-sad' as AvatarKind };
-  }, [humanSide, isDraw, isHvH, isThreefold, myMoves.length, pos.side]);
+      ? { label: t.youWin, tone: 'win' as const, avatarKind: 'human' as AvatarKind }
+      : { label: t.youLose, tone: 'loss' as const, avatarKind: 'human-sad' as AvatarKind };
+  }, [humanSide, isDraw, isHvH, isThreefold, myMoves.length, pos.side, t.draw, t.p1Win, t.p2Win, t.youLose, t.youWin]);
 
   const canHumanMove =
     (isHvH || pos.side === humanSide) &&
@@ -545,40 +748,69 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   }
 
   function onPressUndo() {
-    if (thinking) return;
-    if (posHistory.length <= 1) return;
+    if (!canUndoNow || thinking) return;
+    if (undoPreview.availableCredits > 0) {
+      const source = onConsumeSpend('undo');
+      if (source !== 'none') runUndo();
+      return;
+    }
+    setSpendModalKind('undo');
+  }
 
-    const undoLockedByMode = !isHvH && (difficulty === 'expert' || difficulty === 'master');
-    if (undoLockedByMode) {
-      Alert.alert('Undo Locked', 'Hard mode locks undo to keep the challenge fair.');
+  function runHintNow() {
+    if (myMoves.length === 1) {
+      setSel(myMoves[0].from);
+      return;
+    }
+    const posSnapshot = pos;
+    const histSnapshot = hashHistory;
+    think(posSnapshot, Math.min(1200, thinkMs), histSnapshot, undefined, difficulty).then(best => {
+      if (!best) return;
+      setSel(best.from);
+      Alert.alert(t.hint, t.hintTry(best.from, best.to));
+    });
+  }
+
+  function onPressHint() {
+    if (!canHintNow) return;
+    if (hintPreview.availableCredits > 0) {
+      const source = onConsumeSpend('hint');
+      if (source !== 'none') runHintNow();
+      return;
+    }
+    setSpendModalKind('hint');
+  }
+
+  async function onSpendModalWatchAd() {
+    if (!spendModalKind) return;
+    setRewardLoadingKind(spendModalKind);
+    const ok = await onWatchRewarded(spendModalKind);
+    setRewardLoadingKind(null);
+    if (!ok) return;
+
+    const source = onConsumeSpend(spendModalKind);
+    if (source === 'none') {
+      Alert.alert(t.actionUnavailableTitle, t.actionUnavailableBody);
       return;
     }
 
-    if (premiumUndo) {
-      runUndo();
+    const kind = spendModalKind;
+    setSpendModalKind(null);
+    if (kind === 'hint') runHintNow();
+    else runUndo();
+  }
+
+  function onSpendModalSpendCoins() {
+    if (!spendModalKind) return;
+    const source = onConsumeSpend(spendModalKind);
+    if (source === 'none') {
+      Alert.alert(t.notEnoughCoinsTitle, t.notEnoughCoinsBody);
       return;
     }
-
-    Alert.alert(
-      'Unlock Undo',
-      'Watch an ad to get 1 undo or unlock premium for unlimited undo.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Go Premium',
-          onPress: () => {
-            setPremiumUndo(true);
-            runUndo();
-          },
-        },
-        {
-          text: 'Watch Ad',
-          onPress: () => {
-            runUndo();
-          },
-        },
-      ],
-    );
+    const kind = spendModalKind;
+    setSpendModalKind(null);
+    if (kind === 'hint') runHintNow();
+    else runUndo();
   }
 
   function onNewGame() {
@@ -596,14 +828,16 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     setHashHistory([hashPosition(next)]);
     setMoveHistory([]);
     setLastMove(null);
+    setSpendModalKind(null);
+    reportedResultKeyRef.current = null;
   }
 
   const pvText = lastInfo?.pv.map((m: Move) => `${m.from}->${m.to}`).join(' ');
 
   const p1IsHuman = isHvH || humanSide === 1;
   const p2IsHuman = isHvH || humanSide === -1;
-  const p1Role = p1IsHuman ? 'HUMAN' : aiLevelTag(difficulty);
-  const p2Role = p2IsHuman ? 'HUMAN' : aiLevelTag(difficulty);
+  const p1Role = p1IsHuman ? t.human : aiLevelTag(difficulty);
+  const p2Role = p2IsHuman ? t.human : aiLevelTag(difficulty);
   const p1AvatarKind: AvatarKind = p1IsHuman ? 'human' : avatarKindByDifficulty(difficulty);
   const p2AvatarKind: AvatarKind = p2IsHuman ? 'human' : avatarKindByDifficulty(difficulty);
   const p1IsBot = !p1IsHuman;
@@ -619,10 +853,29 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
   const liveTurn = formatTurnSeconds(turnElapsedMs);
   const p1Turn = pos.side === 1 ? liveTurn : '--';
   const p2Turn = pos.side === -1 ? liveTurn : '--';
-  const undoLockedByMode = !isHvH && (difficulty === 'expert' || difficulty === 'master');
   const canUndoNow = !thinking && posHistory.length > 1;
   const canHintNow = canHumanMove && !thinking && myMoves.length > 0;
-  const undoBtnText = undoLockedByMode ? 'LOCK' : 'UNDO';
+  const hintPreview = makeSpendPreview(monetization, 'hint');
+  const undoPreview = makeSpendPreview(monetization, 'undo');
+  const rewardLine = gameResult
+    ? gameResult.tone === 'win'
+      ? t.rewardWin
+      : gameResult.tone === 'loss'
+        ? t.rewardLose
+        : t.rewardDraw
+    : null;
+  const hintBtnText = t.hintButton;
+  const undoBtnText = t.undoButton;
+
+  useEffect(() => {
+    if (!gameResult) return;
+    const outcome: MatchOutcome =
+      gameResult.tone === 'win' ? 'win' : gameResult.tone === 'loss' ? 'loss' : 'draw';
+    const resultKey = `${outcome}:${moveHistory.length}:${pos.side}`;
+    if (reportedResultKeyRef.current === resultKey) return;
+    reportedResultKeyRef.current = resultKey;
+    void onMatchComplete(outcome);
+  }, [gameResult, moveHistory.length, onMatchComplete, pos.side]);
 
   function onExitBoard() {
     cancel();
@@ -632,21 +885,6 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
     animLockUntilRef.current = 0;
     setIsAnimLocked(false);
     onBack();
-  }
-
-  function onPressHint() {
-    if (!canHintNow) return;
-    if (myMoves.length === 1) {
-      setSel(myMoves[0].from);
-      return;
-    }
-    const posSnapshot = pos;
-    const histSnapshot = hashHistory;
-    think(posSnapshot, Math.min(1200, thinkMs), histSnapshot, undefined, difficulty).then(best => {
-      if (!best) return;
-      setSel(best.from);
-      Alert.alert('Hint', `Try ${best.from} -> ${best.to}`);
-    });
   }
 
   return (
@@ -664,7 +902,9 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
           turnTimer={p2Turn}
           lastMoveText={p2Last}
           active={pos.side === -1}
+          forced={pos.side === -1 && isForcedTurn}
           tint={PINK}
+          copy={t}
           showTelemetryToggle={p2IsBot}
           telemetryEnabled={showTelemetry}
           onToggleTelemetry={() => setShowTelemetry(v => !v)}
@@ -689,7 +929,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
             <Board
               pos={pos}
               onTapSquare={onTapSquare}
-              fromSquares={[]}
+              fromSquares={isForcedTurn ? forcedFromSquares : []}
               selectedFrom={sel}
               destSquares={sel !== null ? myMoves.filter(m => m.from === sel).map(m => ({ to: m.to, caps: m.captured.length })) : []}
               lastMove={lastMove}
@@ -709,17 +949,25 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
                   <Text style={styles.resultOverlayTitle}>{gameResult.label}</Text>
                   <Text style={styles.resultOverlaySub}>
                     {gameResult.tone === 'win'
-                      ? 'Great run. Push to the next level.'
+                      ? t.winSub
                       : gameResult.tone === 'loss'
-                        ? 'Try Hint or Undo, then run it back.'
-                        : 'Even match. One more round?'}
+                        ? t.loseSub
+                        : t.drawSub}
                   </Text>
+                  {rewardLine ? <Text style={styles.resultOverlayReward}>{rewardLine}</Text> : null}
                 </View>
               </View>
             ) : null}
           </View>
 
         </View>
+        {isForcedTurn && !gameResult ? (
+          <Text style={styles.forcedTurnHelper}>
+            {isForcedCaptureTurn
+              ? `${pos.side === 1 ? 'P1' : 'P2'} ${t.forcedCapture}`
+              : `${pos.side === 1 ? 'P1' : 'P2'} ${t.forcedMove}`}
+          </Text>
+        ) : null}
 
         <TurnSeatChip
           lane="P1"
@@ -729,7 +977,9 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
           turnTimer={p1Turn}
           lastMoveText={p1Last}
           active={pos.side === 1}
+          forced={pos.side === 1 && isForcedTurn}
           tint={CYAN}
+          copy={t}
           showTelemetryToggle={p1IsBot}
           telemetryEnabled={showTelemetry}
           onToggleTelemetry={() => setShowTelemetry(v => !v)}
@@ -737,7 +987,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
 
         {showTelemetry ? (
           <View style={styles.telemetryPanel}>
-            <Text style={styles.telemetryTitle}>ENGINE TELEMETRY</Text>
+            <Text style={styles.telemetryTitle}>{t.telemetryTitle}</Text>
             {!isHvH && lastInfo ? (
               <>
                 <Text style={styles.telemetryLine}>depth {lastInfo.depth} | score {lastInfo.score} | nodes {lastInfo.nodes}</Text>
@@ -745,7 +995,7 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
                 {pvText ? <Text style={styles.telemetryLine}>pv {pvText}</Text> : null}
               </>
             ) : (
-              <Text style={styles.telemetryLine}>Telemetry appears after the first AI search completes.</Text>
+              <Text style={styles.telemetryLine}>{t.telemetryPending}</Text>
             )}
           </View>
         ) : null}
@@ -759,12 +1009,11 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
             onPress={onPressHint}
             disabled={!canHintNow}
           >
-            <Text style={styles.roundButtonTitle}>HINT</Text>
+            <Text style={styles.roundButtonTitle}>{hintBtnText}</Text>
           </Pressable>
           <Pressable
             style={[
               styles.roundButton,
-              undoLockedByMode && styles.undoBtnLockedLook,
               !canUndoNow && styles.btnDisabled,
             ]}
             onPress={onPressUndo}
@@ -773,13 +1022,38 @@ export default function HumanVsCodexArenaScreen({ config, onBack }: Props) {
             <Text style={styles.roundButtonTitle}>{undoBtnText}</Text>
           </Pressable>
         </View>
+        <Text style={styles.actionHelperText}>
+          {t.walletLine(monetization.coins, monetization.hintCredits, monetization.undoCredits)}
+        </Text>
+
+        <SpendOrWatchAdModal
+          visible={spendModalKind !== null}
+          title={spendModalKind === 'hint' ? t.modalHintTitle : t.modalUndoTitle}
+          helperText={
+            rewardLoadingKind
+              ? t.loadingAd
+              : spendModalKind === 'hint'
+                ? t.hintCost
+                : t.undoCost
+          }
+          cost={spendModalKind === 'hint' ? HINT_COST : UNDO_COST}
+          canSpendCoins={spendModalKind === 'hint' ? hintPreview.canSpendCoins : undoPreview.canSpendCoins}
+          spendLabel={t.spendCoins(spendModalKind === 'hint' ? HINT_COST : UNDO_COST)}
+          watchAdLabel={t.watchAdFree}
+          cancelLabel={t.cancel}
+          onSpendCoins={onSpendModalSpendCoins}
+          onWatchAd={() => { void onSpendModalWatchAd(); }}
+          onCancel={() => {
+            if (!rewardLoadingKind) setSpendModalKind(null);
+          }}
+        />
 
         <View style={styles.bottomPillRow}>
           <Pressable style={styles.primaryButton} onPress={onNewGame}>
-            <Text style={styles.primaryButtonText}>NEW GAME</Text>
+            <Text style={styles.primaryButtonText}>{t.newGame}</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={onExitBoard}>
-            <Text style={styles.secondaryButtonText}>EXIT</Text>
+            <Text style={styles.secondaryButtonText}>{t.exit}</Text>
           </Pressable>
         </View>
 
@@ -890,6 +1164,23 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.3,
   },
+  forcedBadge: {
+    minWidth: 56,
+    minHeight: 24,
+    borderWidth: 1,
+    borderRadius: 999,
+    borderColor: 'rgba(255,240,197,0.95)',
+    backgroundColor: 'rgba(126,88,22,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 7,
+  },
+  forcedBadgeText: {
+    color: '#fff4d2',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
   turnSeatText: {
     fontSize: 12,
     fontWeight: '900',
@@ -942,6 +1233,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 9 },
     elevation: 9,
   },
+  forcedTurnHelper: {
+    color: GOLD,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.25,
+    marginTop: -2,
+  },
   resultOverlay: {
     position: 'absolute',
     top: 0,
@@ -984,6 +1282,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  resultOverlayReward: {
+    marginTop: 6,
+    color: GOLD,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.35,
   },
   comboBadge: {
     position: 'absolute',
@@ -1050,6 +1355,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.6,
   },
+  actionHelperText: {
+    color: SOFT,
+    fontSize: 11,
+    marginTop: 2,
+  },
   bottomPillRow: {
     width: '100%',
     flexDirection: 'row',
@@ -1087,9 +1397,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.4,
-  },
-  undoBtnLockedLook: {
-    opacity: 0.7,
   },
   btnDisabled: {
     opacity: 0.45,

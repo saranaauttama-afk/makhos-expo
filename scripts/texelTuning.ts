@@ -274,12 +274,17 @@ function tuneParams(samples: Sample[], baseParams: EvalParams): EvalParams {
       }
     }
     // Tune scalar params
-    const scalars: (keyof EvalParams)[] = ['mobilityW', 'backRank', 'protected', 'simplify', 'kegDistW'];
+    const scalars: Array<'mobilityW' | 'backRank' | 'protected' | 'simplify' | 'kegDistW'> = [
+      'mobilityW',
+      'backRank',
+      'protected',
+      'simplify',
+      'kegDistW',
+    ];
     for (const key of scalars) {
       for (const delta of [step, -step]) {
         const candidate = cloneParams(ep);
-        (candidate as Record<string, number>)[key as string] =
-          Math.max(0, (ep as Record<string, number>)[key as string] + delta);
+        candidate[key] = Math.max(0, ep[key] + delta);
         if (mse(samples, candidate, K) < baseMSE) { ep = candidate; improved = true; break; }
       }
     }

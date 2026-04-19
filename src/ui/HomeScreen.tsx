@@ -2,10 +2,11 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AppLanguage } from '../../App';
-import { GameConfig } from './types';
+import { GameConfig, MonetizationState } from './types';
 
 interface Props {
   language: AppLanguage;
+  monetization: MonetizationState;
   onQuickPlay: (config: GameConfig) => void;
   onStart: (config: GameConfig) => void;
   onArena: () => void;
@@ -25,7 +26,11 @@ const SOFT = '#d7efe8';
 const COPY = {
   th: {
     title: 'MAKHOS',
-    subtitle: 'พร้อมเล่น • พร้อมขาย',
+    subtitle: 'พร้อมเล่น พร้อมลุย',
+    statusPrefix: 'กระเป๋า',
+    coins: 'เหรียญ',
+    noAdsActive: 'เปิด No Ads แล้ว',
+    freeMode: 'โหมดฟรี',
     play: 'PLAY NOW',
     setup: 'CUSTOM MATCH',
     account: 'ACCOUNT',
@@ -33,7 +38,11 @@ const COPY = {
   },
   en: {
     title: 'MAKHOS',
-    subtitle: 'Fast launch control center',
+    subtitle: 'Quiet board. Sharp moves.',
+    statusPrefix: 'Wallet',
+    coins: 'coins',
+    noAdsActive: 'No Ads active',
+    freeMode: 'Free mode',
     play: 'PLAY NOW',
     setup: 'CUSTOM MATCH',
     account: 'ACCOUNT',
@@ -41,16 +50,34 @@ const COPY = {
   },
 } as const;
 
-function MenuButton({ title, onPress, tint = SOFT }: { title: string; onPress: () => void; tint?: string }) {
+function MenuButton({
+  title,
+  onPress,
+  tint = SOFT,
+  primary = false,
+}: {
+  title: string;
+  onPress: () => void;
+  tint?: string;
+  primary?: boolean;
+}) {
   return (
-    <Pressable style={[styles.menuButton, { borderColor: tint }]} onPress={onPress}>
-      <Text style={[styles.menuButtonText, { color: tint }]}>{title}</Text>
+    <Pressable
+      style={[
+        styles.menuButton,
+        { borderColor: tint },
+        primary && styles.menuButtonPrimary,
+      ]}
+      onPress={onPress}
+    >
+      <Text style={[styles.menuButtonText, { color: tint }, primary && styles.menuButtonTextPrimary]}>{title}</Text>
     </Pressable>
   );
 }
 
 export default function HomeScreen({
   language,
+  monetization,
   onQuickPlay,
   onStart,
   onArena,
@@ -59,6 +86,7 @@ export default function HomeScreen({
   const t = COPY[language];
   const openSetup = () => onStart({ mode: 'vs-ai', difficulty: 'normal', humanSide: 1 });
   const quickPlay = () => onQuickPlay({ mode: 'vs-ai', difficulty: 'easy', humanSide: 1 });
+  const statusLine = `${t.statusPrefix}: ${monetization.coins} ${t.coins} · ${monetization.noAdsUnlocked ? t.noAdsActive : t.freeMode}`;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -68,9 +96,10 @@ export default function HomeScreen({
         <View style={styles.headerPanel}>
           <Text style={styles.title}>{t.title}</Text>
           <Text style={styles.subtitle}>{t.subtitle}</Text>
+          <Text style={styles.statusLine}>{statusLine}</Text>
         </View>
 
-        <MenuButton title={t.play} onPress={quickPlay} tint={GOLD} />
+        <MenuButton title={t.play} onPress={quickPlay} tint={BG} primary />
         <MenuButton title={t.setup} onPress={openSetup} tint={CYAN} />
         <MenuButton title={t.account} onPress={onAccount} />
         <MenuButton title={t.arena} onPress={onArena} tint={MINT} />
@@ -119,8 +148,13 @@ const styles = StyleSheet.create({
     color: SOFT,
     fontSize: 12,
   },
+  statusLine: {
+    color: SOFT,
+    fontSize: 11,
+    opacity: 0.9,
+  },
   menuButton: {
-    minHeight: 48,
+    minHeight: 46,
     backgroundColor: PANEL_DARK,
     borderWidth: 1,
     borderRadius: 12,
@@ -132,9 +166,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
+  menuButtonPrimary: {
+    minHeight: 56,
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    elevation: 6,
+  },
   menuButtonText: {
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+  menuButtonTextPrimary: {
+    color: '#264742',
+    fontSize: 15,
+    letterSpacing: 1,
   },
 });

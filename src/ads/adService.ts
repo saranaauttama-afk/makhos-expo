@@ -1,56 +1,132 @@
 import type { AdConsentStatus } from '../ui/types';
 
-export interface InterstitialGateInput {
-  noAds: boolean;
-  consent: AdConsentStatus;
-  interstitialEvery: number;
-  interstitialCounter: number;
+export type RewardedPlacement = 'hint' | 'undo' | 'coins';
+export type InterstitialPlacement = 'post_match';
+
+export interface RewardedAdProviderResult {
+  completed: boolean;
 }
 
-export interface InterstitialGateResult {
+export interface InterstitialAdProviderResult {
   shown: boolean;
-  reason: 'shown' | 'no_ads' | 'consent_denied' | 'throttled';
-  nextCounter: number;
 }
 
-export interface RewardedGateInput {
-  consent: AdConsentStatus;
+export interface AdServiceProvider {
+  name: string;
+  initialize?: () => Promise<void> | void;
+  showRewardedAd: (placement: RewardedPlacement) => Promise<RewardedAdProviderResult>;
+  showInterstitialAd: (placement: InterstitialPlacement) => Promise<InterstitialAdProviderResult>;
 }
 
-export interface RewardedGateResult {
+export interface RewardedAdInput {
+  placement: RewardedPlacement;
+  adConsent: AdConsentStatus;
+}
+
+export interface RewardedAdResult {
   granted: boolean;
-  reason: 'completed' | 'consent_denied';
+  placement: RewardedPlacement;
+  reason: 'completed' | 'consent_denied' | 'provider_error';
+}
+
+export interface MatchEndInterstitialInput {
+  noAdsUnlocked: boolean;
+  adConsent: AdConsentStatus;
+  interstitialEveryMatches: number;
+  completedMatches: number;
+}
+
+export interface MatchEndInterstitialResult {
+  shown: boolean;
+  reason: 'shown' | 'no_ads' | 'consent_denied' | 'throttled' | 'provider_error';
+  nextCompletedMatches: number;
 }
 
 function sleep(ms: number) {
   return new Promise<void>(resolve => setTimeout(resolve, ms));
 }
 
-export async function maybeShowInterstitialAd(input: InterstitialGateInput): Promise<InterstitialGateResult> {
-  if (input.noAds) {
-    return { shown: false, reason: 'no_ads', nextCounter: input.interstitialCounter };
-  }
-  if (input.consent !== 'granted') {
-    return { shown: false, reason: 'consent_denied', nextCounter: input.interstitialCounter };
-  }
+const mockAdProvider: AdServiceProvider = {
+  name: 'mock',
+  async initialize() {
+    await sleep(30);
+  },
+  async showRewardedAd() {
+    await sleep(1200);
+    return { completed: true };
+  },
+  async showInterstitialAd() {
+    await sleep(900);
+    return { shown: true };
+  },
+};
 
-  const every = Math.max(1, input.interstitialEvery);
-  const nextCounter = input.interstitialCounter + 1;
-  if (nextCounter % every !== 0) {
-    return { shown: false, reason: 'throttled', nextCounter };
-  }
+let adProvider: AdServiceProvider = mockAdProvider;
+let adProviderInitialized = false;
+let adProviderInitPromise: Promise<void> | null = null;
 
-  // Mock ad latency. Replace with real SDK call later.
-  await sleep(900);
-  return { shown: true, reason: 'shown', nextCounter };
+export function setAdProvider(provider: AdServiceProvider) {
+  adProvider = provider;
+  adProviderInitialized = false;
+  adProviderInitPromise = null;
 }
 
-export async function showRewardedAd(input: RewardedGateInput): Promise<RewardedGateResult> {
-  if (input.consent !== 'granted') {
-    return { granted: false, reason: 'consent_denied' };
-  }
-  // Mock rewarded ad playback.
-  await sleep(1200);
-  return { granted: true, reason: 'completed' };
+export function getAdProviderName() {
+  return adProvider.name;
 }
 
+export async function initializeAdService() {
+  if (adProviderInitialized) return;
+  if (adProviderInitPromise) return adProviderInitPromise;
+  adProviderInitPromise = (async () => {
+    await adProvider.initialize?.();
+    adProviderInitialized = true;
+  })().finally(() => {
+    adProviderInitPromise = null;
+  });
+  return adProviderInitPromise;
+}
+
+export async function prepareInterstitialAfterMatch(input: MatchEndInterstitialInput): Promise<MatchEndInterstitialResult> {
+  if (input.noAdsUnlocked) {
+    return { shown: false, reason: 'no_ads', nextCompletedMatches: input.completedMatches };
+  }
+  if (input.adConsent !== 'granted') {
+    return { shown: false, reason: 'consent_denied', nextCompletedMatches: input.completedMatches };
+  }
+
+  const every = Math.max(2, input.interstitialEveryMatches);
+  const nextCompletedMatches = input.completedMatches + 1;
+  if (nextCompletedMatches % every !== 0) {
+    return { shown: false, reason: 'throttled', nextCompletedMatches };
+  }
+
+  try {
+    // TODO(ad-sdk): setAdProvider(...) from your real SDK bridge.
+    // Interstitial is intentionally requested only after match end.
+    await initializeAdService();
+    const result = await adProvider.showInterstitialAd('post_match');
+    return { shown: result.shown, reason: result.shown ? 'shown' : 'throttled', nextCompletedMatches };
+  } catch {
+    return { shown: false, reason: 'provider_error', nextCompletedMatches };
+  }
+}
+
+export async function showRewardedAd(input: RewardedAdInput): Promise<RewardedAdResult> {
+  if (input.adConsent !== 'granted') {
+    return { granted: false, placement: input.placement, reason: 'consent_denied' };
+  }
+  try {
+    // TODO(ad-sdk): map rewarded unit ids by placement:
+    // hint | undo | coins. Must remain user-triggered only.
+    await initializeAdService();
+    const result = await adProvider.showRewardedAd(input.placement);
+    return {
+      granted: result.completed,
+      placement: input.placement,
+      reason: result.completed ? 'completed' : 'provider_error',
+    };
+  } catch {
+    return { granted: false, placement: input.placement, reason: 'provider_error' };
+  }
+}
