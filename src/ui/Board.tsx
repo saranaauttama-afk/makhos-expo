@@ -26,6 +26,8 @@ interface Props {
 }
 
 const HILITE_FROM = '#8ecbc2';
+const HILITE_FORCED = '#ff5a58';
+const HILITE_FORCED_DARK = '#7a2528';
 const HILITE_SELECTED = '#d8f2eb';
 const HILITE_DEST = '#b8a777';
 const HILITE_LAST = '#84c8bd';
@@ -139,6 +141,8 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
   useEffect(() => () => stopMoveAnimation(), []);
 
   const fromAlpha = [0.5, 0.65, 0.82, 1, 0.82, 0.65][animFrame];
+  const forcedPulse = [0.62, 0.76, 0.92, 1, 0.9, 0.74][animFrame];
+  const forcedRing = [0.39, 0.41, 0.44, 0.46, 0.44, 0.41][animFrame];
   const selectedThickness = [3, 3, 4, 4, 3, 3][animFrame];
   const destSize = [0.28, 0.31, 0.34, 0.36, 0.34, 0.31][animFrame];
   const destAlpha = [0.55, 0.68, 0.82, 1, 0.82, 0.68][animFrame];
@@ -245,15 +249,40 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
                   )}
 
                   {isFrom && (
-                    <Circle
-                      cx={x + S * 0.5}
-                      cy={y + S * 0.5}
-                      r={S * 0.31}
-                      fill="none"
-                      stroke={HILITE_FROM}
-                      strokeWidth={3}
-                      opacity={fromAlpha}
-                    />
+                    <>
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.5}
+                        r={S * forcedRing}
+                        fill={HILITE_FORCED}
+                        opacity={0.16 * forcedPulse}
+                      />
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.5}
+                        r={S * 0.38}
+                        fill="none"
+                        stroke={HILITE_FORCED_DARK}
+                        strokeWidth={S * 0.045}
+                        opacity={0.58 * forcedPulse}
+                      />
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.5}
+                        r={S * 0.31}
+                        fill="none"
+                        stroke={HILITE_FORCED}
+                        strokeWidth={S * 0.055}
+                        opacity={fromAlpha}
+                      />
+                      <Circle
+                        cx={x + S * 0.5}
+                        cy={y + S * 0.18}
+                        r={S * 0.055}
+                        fill={HILITE_FORCED}
+                        opacity={0.95}
+                      />
+                    </>
                   )}
 
                   {isSelected && (

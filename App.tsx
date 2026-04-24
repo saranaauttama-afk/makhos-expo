@@ -5,7 +5,6 @@ import { initializeAdService, prepareInterstitialAfterMatch, showRewardedAd } fr
 import { getActiveAZModelId, getAvailableAZModels, setActiveAZModel } from './src/coreClaude/azNet';
 import { precomputeEndgameTablebase } from './src/coreClaude/search/endgameTablebase';
 import AccountScreen from './src/ui/AccountScreen';
-import ArenaScreen from './src/ui/ArenaScreen';
 import HomeScreen from './src/ui/HomeScreen';
 import HumanVsCodexArenaScreen from './src/ui/HumanVsCodexArenaScreen';
 import { APP_TEXT } from './src/ui/i18n/appText';
@@ -60,7 +59,7 @@ export default function App() {
     buyStarterPack,
     restorePurchase,
   } = useWalletStore();
-  const [screen, setScreen] = useState<'home' | 'arena' | 'setup' | 'account'>('home');
+  const [screen, setScreen] = useState<'home' | 'setup' | 'account'>('home');
   const aiModels = getAvailableAZModels();
   const t = APP_TEXT[language];
 
@@ -124,9 +123,7 @@ export default function App() {
   const handleConsumeSpend = useCallback((kind: SpendKind) => consumeSpend(kind), [consumeSpend]);
 
   const screenContent =
-    screen === 'arena' ? (
-      <ArenaScreen language={language} onBack={() => setScreen('home')} />
-    ) : screen === 'setup' && draftConfig ? (
+    screen === 'setup' && draftConfig ? (
       <SetupScreen
         language={language}
         initialConfig={draftConfig}
@@ -177,7 +174,6 @@ export default function App() {
           setDraftConfig(config);
           setScreen('setup');
         }}
-        onArena={() => setScreen('arena')}
         onAccount={() => setScreen('account')}
       />
     );

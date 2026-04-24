@@ -38,6 +38,7 @@ const AB_BUDGET_MS: Record<HybridDifficulty, { tactical: number; endgame: number
   medium: { tactical: 1200, endgame: 1600 },
   hard: { tactical: 2200, endgame: 3200 },
 };
+const NO_LIMIT_BUDGET_MS = 24 * 60 * 60 * 1000;
 
 function pieceCounts(pos: Position) {
   const men = bitCount(pos.p1Men | pos.p2Men);
@@ -91,6 +92,7 @@ export async function hybridBestMove(
   cancel?: CancelToken,
   difficulty: HybridDifficulty = 'medium',
 ): Promise<HybridResult> {
+  const noTimeLimit = !Number.isFinite(ms) || ms <= 0;
   const plan = classifyPosition(pos, difficulty, historyHashes);
   const moves = generateMoves(pos);
 
@@ -119,8 +121,9 @@ export async function hybridBestMove(
     const budget = plan.reason.includes('endgame')
       ? AB_BUDGET_MS[difficulty].endgame
       : AB_BUDGET_MS[difficulty].tactical;
-    // Keep search responsive to UI budget on mobile screens.
-    const searchMs = Math.max(250, Math.min(ms, budget));
+    const searchMs = noTimeLimit
+      ? NO_LIMIT_BUDGET_MS
+      : Math.max(250, Math.min(ms, budget));
     const result = await iterativeDeepening(pos, searchMs, tt, undefined, historyHashes, cancel);
     return {
       move: result.best,
@@ -136,7 +139,9 @@ export async function hybridBestMove(
     move = undefined;
   }
   if (!isAZRuntimeAvailable() || !move) {
-    const fallbackMs = Math.max(250, Math.min(ms, AB_BUDGET_MS[difficulty].tactical));
+    const fallbackMs = noTimeLimit
+      ? NO_LIMIT_BUDGET_MS
+      : Math.max(250, Math.min(ms, AB_BUDGET_MS[difficulty].tactical));
     const fallback = await iterativeDeepening(pos, fallbackMs, tt, undefined, historyHashes, cancel);
     return {
       move: fallback.best,

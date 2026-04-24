@@ -314,4 +314,4 @@ $env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.10"
 npx expo start --lan -c
 
 cd /d "d:\My App\makhos-v2"
-python newAz\eval_local.py --drive-dir "G:\My Drive\makhos_az_v5" --checkpoint iter_0099 
+python newAz\eval_local.py --drive-dir "G:\My Drive\makhos_az_v5" --checkpoint iter_0079

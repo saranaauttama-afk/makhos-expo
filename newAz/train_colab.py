@@ -73,22 +73,22 @@ MAX_GAME_LEN = 250    # hard cap per game (safety)
 REPLAY_SIZE  = 200_000  # v4: start moderate, will grow (was 350k)
 BATCH_SIZE   = 256
 TRAIN_STEPS  = 500      # optimizer steps per iteration
-LR           = 1e-4     # round-2 resume: slower updates to break the mm7 plateau
+LR           = 8e-5     # rollback-from-79 tune: smaller step to reduce regression
 WD           = 1e-4
 MIN_BUFFER_TO_TRAIN = 8_192
-SELFPLAY_ANCHOR_FRACTION = 0.25
-SELFPLAY_POOL_FRACTION = 0.35
-SELFPLAY_MINIMAX_FRACTION = 0.10
+SELFPLAY_ANCHOR_FRACTION = 0.30
+SELFPLAY_POOL_FRACTION = 0.25
+SELFPLAY_MINIMAX_FRACTION = 0.20
 SELFPLAY_MINIMAX_DEPTHS = [5, 7]
 OPPONENT_POOL_MAX = 6
 POOL_REFRESH_EVERY = 1
-LOSS_MINING_DEPTH = 9
-LOSS_MINING_GAMES = 4
+LOSS_MINING_DEPTH = 7
+LOSS_MINING_GAMES = 3
 LOSS_MINING_POSITIONS_PER_GAME = 6
-LOSS_MINING_MAX_SAMPLES = 48
-LOSS_MINING_SAMPLE_WEIGHT = 0.60  # down-weight mined labels to reduce catastrophic drift
+LOSS_MINING_MAX_SAMPLES = 36
+LOSS_MINING_SAMPLE_WEIGHT = 0.50  # conservative weighting to reduce regression from mined samples
 OVERRIDE_LR_ON_RESUME = True
-STABILITY_REG_WEIGHT = 0.03       # KL + value anchor to target_net on each train batch
+STABILITY_REG_WEIGHT = 0.07       # slightly stronger anchor to stabilize policy/value while climbing
 STABILITY_VALUE_WEIGHT = 0.25
 
 # Evaluation
@@ -114,14 +114,18 @@ QUICK_EVAL_RANDOM_GAMES = 6
 QUICK_EVAL_MINIMAX_PLAN = [
     (MINIMAX_DEPTH, 6),
     (MINIMAX_DEPTH_5, 4),
+    (MINIMAX_DEPTH_7, 4),
 ]
 QUICK_EVAL_USE_OPENING_SUITE = False
-ENABLE_LOSS_MINING = False
+ENABLE_LOSS_MINING = True
 AUTO_LOSS_MINING_FROM_DECISIONS = True
-DEFAULT_LOSS_MINING_DEPTH = 5
-DEFAULT_LOSS_MINING_GAMES = 0
-DEFAULT_LOSS_MINING_POSITIONS_PER_GAME = 0
-DEFAULT_LOSS_MINING_MAX_SAMPLES = 0
+DEFAULT_LOSS_MINING_DEPTH = 7
+DEFAULT_LOSS_MINING_GAMES = 3
+DEFAULT_LOSS_MINING_POSITIONS_PER_GAME = 6
+DEFAULT_LOSS_MINING_MAX_SAMPLES = 36
+QUICK_GATE_FOR_EXTERNAL_EVAL = True
+QUICK_GATE_MIN_MM3 = 0.75
+QUICK_GATE_MIN_MM5 = 0.60
 
 # External eval handshake (local machine reads requests and writes results/decisions).
 REQUEST_EXTERNAL_EVAL = True
@@ -159,6 +163,8 @@ print(f'  eval     : every {EVAL_INTERVAL} iterations, quick eval on Colab')
 print(f'  external : requests -> {EXTERNAL_REQUESTS_DIR}')
 print(f'  target   : full decisions come from local eval vs minimax-{TARGET_MINIMAX_DEPTH}')
 print(f'  mining   : {"auto-from-decisions" if AUTO_LOSS_MINING_FROM_DECISIONS else ("enabled" if ENABLE_LOSS_MINING else "disabled")}')
+if QUICK_GATE_FOR_EXTERNAL_EVAL:
+    print(f'  q-gate   : external eval requires mm3>={QUICK_GATE_MIN_MM3:.0%} and mm5>={QUICK_GATE_MIN_MM5:.0%}')
 print(f'  run      : blocks of {RUN_BLOCK_ITERS} iterations (cap {MAX_TOTAL_ITERS})')
 print(f'  force    : baseline={FORCE_BASELINE_ITER} reset_state={FORCE_RESET_TRAIN_STATE} clear_buf={FORCE_CLEAR_REPLAY_BUFFER}')
 print(f'  guard    : ignore_old_decisions={FORCE_IGNORE_OLD_DECISIONS}')
@@ -1116,7 +1122,8 @@ for it in range(start_iter, N_ITER):
 
         iter_path = checkpoint_path_for_iter(it)
         curr_net.save(iter_path)
-        write_external_eval_request(it, iter_path)
+        external_eval_queued = False
+        external_eval_status = f'skipped for iter {it:04d}'
 
         wr_net = 0.0
         wr_rand = 0.0
@@ -1159,6 +1166,27 @@ for it in range(start_iter, N_ITER):
         else:
             scheduler.step(wr_net)
 
+        should_queue_external_eval = REQUEST_EXTERNAL_EVAL
+        if should_queue_external_eval and QUICK_EVAL_ENABLED and QUICK_GATE_FOR_EXTERNAL_EVAL:
+            mm3_quick = mm_results.get(MINIMAX_DEPTH)
+            mm5_quick = mm_results.get(MINIMAX_DEPTH_5)
+            if mm3_quick is not None and mm3_quick < QUICK_GATE_MIN_MM3:
+                should_queue_external_eval = False
+                print(
+                    f'  external eval gate : skip (quick mm3 {mm3_quick:.1%} < {QUICK_GATE_MIN_MM3:.0%})'
+                )
+            elif mm5_quick is not None and mm5_quick < QUICK_GATE_MIN_MM5:
+                should_queue_external_eval = False
+                print(
+                    f'  external eval gate : skip (quick mm5 {mm5_quick:.1%} < {QUICK_GATE_MIN_MM5:.0%})'
+                )
+
+        if should_queue_external_eval:
+            write_external_eval_request(it, iter_path)
+            external_eval_queued = True
+            external_eval_status = f'queued for iter {it:04d}'
+        log['external_eval_queued'] = bool(external_eval_queued)
+
         if current_loss_mining_enabled and current_loss_mining_depth <= 7:
             lr_now = get_current_lr(optimizer)
             if lr_now < MIN_FRONTIER_LR:
@@ -1196,7 +1224,7 @@ for it in range(start_iter, N_ITER):
         opponent_pool = refresh_opponent_pool(opponent_pool, best_net, target_net, curr_net, it)
 
         print(f'  LR now             : {get_current_lr(optimizer):.2e}')
-        print(f'  external eval      : waiting for local machine to process iter {it:04d}')
+        print(f'  external eval      : {external_eval_status}')
         print(f'  GPU                : {gpu_info}')
         extra = (
             f'quick vs best   : {wr_net:.1%}\n'
@@ -1211,7 +1239,7 @@ for it in range(start_iter, N_ITER):
             f' t{current_loss_mining_positions_per_game}'
             f' m{current_loss_mining_max_samples}\n'
             f'LR              : {get_current_lr(optimizer):.2e}\n'
-            f'external eval   : queued for iter {it:04d}\n'
+            f'external eval   : {external_eval_status}\n'
             f'\nGPU: {gpu_info}'
         )
         send_iter_email(it, p_loss, v_loss, elapsed, extra)

@@ -6,6 +6,7 @@ export interface GameConfig {
   mode: GameMode;
   difficulty: Difficulty;
   humanSide: 1 | -1;
+  unlimitedThink: boolean;
 }
 
 export interface WalletModel {

@@ -14,13 +14,20 @@ import { usePixelGameFx } from './usePixelGameFx';
 import SpendOrWatchAdModal from './components/SpendOrWatchAdModal';
 import { HINT_COST, LOSE_REWARD, makeSpendPreview, MatchOutcome, SpendKind, SpendSource, UNDO_COST, WIN_REWARD } from './walletStore';
 
-const THINK_MS: Record<Difficulty, number> = {
-  easy: 700,
-  normal: 1200,
-  hard: 2000,
-  expert: 3000,
-  master: 4000,
+type StrictDifficulty = Exclude<Difficulty, 'master'>;
+const STRICT_MM_DEPTH: Record<StrictDifficulty, number> = {
+  easy: 5,
+  normal: 7,
+  hard: 9,
+  expert: 11,
 };
+const STRICT_FAST_MS: Record<StrictDifficulty, number> = {
+  easy: 600,
+  normal: 1400,
+  hard: 2800,
+  expert: 5000,
+};
+const AZ_ONLY_FAST_MS = 2800;
 const MOVE_ANIM_GUARD_MS = 560;
 const INITIAL_PIECES_PER_SIDE = 8;
 
@@ -268,6 +275,10 @@ function avatarKindByDifficulty(difficulty: Difficulty): AvatarKind {
   return 'bot-easy';
 }
 
+function isStrictDifficulty(difficulty: Difficulty): difficulty is StrictDifficulty {
+  return difficulty !== 'master';
+}
+
 function PixelAvatar({
   kind,
   tint,
@@ -298,7 +309,8 @@ function PixelAvatar({
 }
 
 function aiLevelTag(difficulty: Difficulty) {
-  return difficulty.toUpperCase();
+  if (!isStrictDifficulty(difficulty)) return 'AZ';
+  return `MM${STRICT_MM_DEPTH[difficulty]}`;
 }
 
 function TurnSeatChipLegacy({
@@ -459,10 +471,12 @@ export default function HumanVsCodexArenaScreen({
   onBack,
 }: Props) {
   const t = COPY[language];
-  const { mode, difficulty, humanSide } = config;
+  const { mode, difficulty, humanSide, unlimitedThink = false } = config;
   const isHvH = mode === 'vs-human';
   const aiSide = (-humanSide) as 1 | -1;
-  const thinkMs = THINK_MS[difficulty];
+  const aiThinkMs = !isStrictDifficulty(difficulty)
+    ? (unlimitedThink ? 0 : AZ_ONLY_FAST_MS)
+    : (unlimitedThink ? 0 : STRICT_FAST_MS[difficulty]);
 
   const [pos, setPos] = useState<Position>(() => initialPosition());
   const [posHistory, setPosHistory] = useState<Position[]>(() => [initialPosition()]);
@@ -481,7 +495,7 @@ export default function HumanVsCodexArenaScreen({
   const turnStartRef = useRef<number>(Date.now());
   const reportedResultKeyRef = useRef<string | null>(null);
 
-  const { think, thinking, lastInfo, lastPlan, cancel } = useCodexEngine();
+  const { think, thinkStrict, thinking, lastInfo, lastPlan, cancel } = useCodexEngine();
   const { triggerFx } = usePixelGameFx();
   const pendingRef = useRef<string | null>(null);
   const aiCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -581,6 +595,28 @@ export default function HumanVsCodexArenaScreen({
     }, delayMs);
   }
 
+  function computeAIMove(posSnapshot: Position, histSnapshot: number[]) {
+    if (isStrictDifficulty(difficulty)) {
+      return thinkStrict(
+        posSnapshot,
+        aiThinkMs,
+        histSnapshot,
+        STRICT_MM_DEPTH[difficulty],
+        undefined,
+      );
+    }
+    return think(posSnapshot, aiThinkMs, histSnapshot, undefined, difficulty);
+  }
+
+  function computeHintMove(posSnapshot: Position, histSnapshot: number[]) {
+    if (isStrictDifficulty(difficulty)) {
+      const hintBudget = Math.min(1200, STRICT_FAST_MS[difficulty]);
+      const hintDepth = Math.min(STRICT_MM_DEPTH[difficulty], 7);
+      return thinkStrict(posSnapshot, hintBudget, histSnapshot, hintDepth, undefined);
+    }
+    return think(posSnapshot, Math.min(1200, AZ_ONLY_FAST_MS), histSnapshot, undefined, difficulty);
+  }
+
   useEffect(() => {
     if (isHvH) {
       clearThinkStartTimer();
@@ -606,7 +642,7 @@ export default function HumanVsCodexArenaScreen({
     const runThink = () => {
       thinkStartTimerRef.current = null;
       if (pendingRef.current !== key) return;
-      think(posSnapshot, thinkMs, histSnapshot, undefined, difficulty).then(best => {
+      computeAIMove(posSnapshot, histSnapshot).then(best => {
         if (pendingRef.current !== key) return;
         const move = best ?? generateMoves(posSnapshot)[0];
         if (move) {
@@ -764,7 +800,7 @@ export default function HumanVsCodexArenaScreen({
     }
     const posSnapshot = pos;
     const histSnapshot = hashHistory;
-    think(posSnapshot, Math.min(1200, thinkMs), histSnapshot, undefined, difficulty).then(best => {
+    computeHintMove(posSnapshot, histSnapshot).then(best => {
       if (!best) return;
       setSel(best.from);
       Alert.alert(t.hint, t.hintTry(best.from, best.to));

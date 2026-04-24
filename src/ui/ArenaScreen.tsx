@@ -17,13 +17,13 @@ const ARENA_LEVELS: { id: ArenaLevel; label: string }[] = [
   { id: 'normal', label: 'MM7' },
   { id: 'hard', label: 'MM9' },
   { id: 'expert', label: 'MM11' },
-  { id: 'master', label: 'HYBRID' },
+  { id: 'master', label: 'AZ' },
 ];
 const THINK_MS: Record<ArenaLevel, number> = {
-  easy: 1800,
-  normal: 2600,
-  hard: 3600,
-  expert: 5200,
+  easy: 0,
+  normal: 0,
+  hard: 0,
+  expert: 0,
   master: 4500,
 };
 const LEVEL_LABEL: Record<ArenaLevel, string> = {
@@ -31,7 +31,7 @@ const LEVEL_LABEL: Record<ArenaLevel, string> = {
   normal: 'MM7',
   hard: 'MM9',
   expert: 'MM11',
-  master: 'HYBRID',
+  master: 'AZ',
 };
 const STRICT_MM_DEPTH: Record<Exclude<ArenaLevel, 'master'>, number> = {
   easy: 5,
@@ -44,7 +44,7 @@ const LEVEL_MODE_TAG: Record<ArenaLevel, string> = {
   normal: 'STRICT',
   hard: 'STRICT',
   expert: 'STRICT',
-  master: 'HYBRID',
+  master: 'AZ',
 };
 
 interface LogEntry {
@@ -290,7 +290,9 @@ export default function ArenaScreen({ language, onBack }: Props) {
 
   const sideLabel = pos.side === 1 ? 'P1' : 'P2';
   const thinkSeconds = (elapsed / 1000).toFixed(1);
-  const limitSeconds = (THINK_MS[currentLevel] / 1000).toFixed(0);
+  const limitLabel = THINK_MS[currentLevel] <= 0
+    ? '∞'
+    : `${(THINK_MS[currentLevel] / 1000).toFixed(0)}s`;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -371,7 +373,7 @@ export default function ArenaScreen({ language, onBack }: Props) {
           <Text style={styles.resultText}>{gameResult}</Text>
         ) : thinking ? (
           <Text style={styles.thinkText}>
-            {sideLabel} ({LEVEL_LABEL[currentLevel]} {LEVEL_MODE_TAG[currentLevel]}) {t.thinking} {thinkSeconds}s / {limitSeconds}s
+            {sideLabel} ({LEVEL_LABEL[currentLevel]} {LEVEL_MODE_TAG[currentLevel]}) {t.thinking} {thinkSeconds}s / {limitLabel}
           </Text>
         ) : (
           <Text style={styles.turnText}>

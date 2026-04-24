@@ -9,7 +9,6 @@ interface Props {
   monetization: MonetizationState;
   onQuickPlay: (config: GameConfig) => void;
   onStart: (config: GameConfig) => void;
-  onArena: () => void;
   onAccount: () => void;
 }
 
@@ -34,7 +33,6 @@ const COPY = {
     play: 'PLAY NOW',
     setup: 'CUSTOM MATCH',
     account: 'ACCOUNT',
-    arena: 'ARENA LAB',
   },
   en: {
     title: 'MAKHOS',
@@ -46,7 +44,6 @@ const COPY = {
     play: 'PLAY NOW',
     setup: 'CUSTOM MATCH',
     account: 'ACCOUNT',
-    arena: 'ARENA LAB',
   },
 } as const;
 
@@ -80,12 +77,11 @@ export default function HomeScreen({
   monetization,
   onQuickPlay,
   onStart,
-  onArena,
   onAccount,
 }: Props) {
   const t = COPY[language];
-  const openSetup = () => onStart({ mode: 'vs-ai', difficulty: 'normal', humanSide: 1 });
-  const quickPlay = () => onQuickPlay({ mode: 'vs-ai', difficulty: 'easy', humanSide: 1 });
+  const openSetup = () => onStart({ mode: 'vs-ai', difficulty: 'normal', humanSide: 1, unlimitedThink: false });
+  const quickPlay = () => onQuickPlay({ mode: 'vs-ai', difficulty: 'easy', humanSide: 1, unlimitedThink: false });
   const statusLine = `${t.statusPrefix}: ${monetization.coins} ${t.coins} · ${monetization.noAdsUnlocked ? t.noAdsActive : t.freeMode}`;
 
   return (
@@ -102,7 +98,6 @@ export default function HomeScreen({
         <MenuButton title={t.play} onPress={quickPlay} tint={BG} primary />
         <MenuButton title={t.setup} onPress={openSetup} tint={CYAN} />
         <MenuButton title={t.account} onPress={onAccount} />
-        <MenuButton title={t.arena} onPress={onArena} tint={MINT} />
       </ScrollView>
     </SafeAreaView>
   );

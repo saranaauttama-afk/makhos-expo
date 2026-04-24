@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -78,8 +78,20 @@ _INF = 10_000
 MINING_POLICY_WEAK = dict(depth=5, games=0, tail=0, max_samples=0, reason='mm5 below 20%; keep training on self-play only')
 MINING_POLICY_MID5 = dict(depth=5, games=3, tail=8, max_samples=32, reason='aggressive light mining at mm5 frontier')
 MINING_POLICY_MID7 = dict(depth=7, games=3, tail=6, max_samples=36, reason='aggressive mining at mm7 frontier')
-MINING_POLICY_MID9 = dict(depth=9, games=3, tail=8, max_samples=48, reason='deeper aggressive mining near mm11 frontier')
-MINING_POLICY_MAINT = dict(depth=9, games=1, tail=4, max_samples=8, reason='maintenance mining only; avoid overfitting late-stage checkpoints')
+MINING_POLICY_MID9 = dict(
+    depth=7,
+    games=2,
+    tail=6,
+    max_samples=24,
+    reason='conservative frontier mining near mm11 (cap at d7 to reduce regression risk)',
+)
+MINING_POLICY_MAINT = dict(
+    depth=7,
+    games=1,
+    tail=4,
+    max_samples=8,
+    reason='maintenance mining with d7 cap to avoid late-stage overfitting',
+)
 
 
 def parse_args():
@@ -211,7 +223,12 @@ def eval_net_vs_random(net: AZNetwork, n_games: int) -> float:
     return wins / n_games
 
 
-def eval_net_vs_minimax(net: AZNetwork, n_games: int, mm_depth: int) -> float:
+def eval_net_vs_minimax(
+    net: AZNetwork,
+    n_games: int,
+    mm_depth: int,
+    game_progress_cb: Optional[Callable[[int, int, float, str], None]] = None,
+) -> float:
     wins = 0.0
     for game in range(n_games):
         net_is_p1 = (game % 2 == 0)
@@ -238,9 +255,11 @@ def eval_net_vs_minimax(net: AZNetwork, n_games: int, mm_depth: int) -> float:
             game_score = 1.0
             outcome = 'W'
         wins += game_score
+        running = wins / (game + 1)
+        if game_progress_cb is not None:
+            game_progress_cb(game + 1, n_games, running, outcome)
         if mm_depth in VERBOSE_MINIMAX_DEPTHS:
             side = 'P1' if net_is_p1 else 'P2'
-            running = wins / (game + 1)
             print(f'    mm{mm_depth} game {game+1}/{n_games}  net={side}  result={outcome}  running={running:.1%}')
     return wins / n_games
 
@@ -301,6 +320,27 @@ def load_target_status(drive_dir: str) -> Optional[dict]:
 def write_target_status(drive_dir: str, payload: dict):
     path = os.path.join(drive_dir, 'external_eval', 'target_status.json')
     write_json(path, payload)
+
+
+def write_progress_snapshot(
+    progress_path: str,
+    checkpoint_name: str,
+    stage: str,
+    result: dict,
+    *,
+    status: str = 'in_progress',
+    error: Optional[str] = None,
+):
+    payload = {
+        'checkpoint_name': checkpoint_name,
+        'status': status,
+        'stage': stage,
+        'updated_at': int(time.time()),
+        'result': result,
+    }
+    if error is not None:
+        payload['error'] = error
+    write_json(progress_path, payload)
 
 
 def should_run_mm11(iter_idx: int) -> bool:
@@ -455,6 +495,7 @@ def evaluate_checkpoint(drive_dir: str, checkpoint_path: str) -> dict:
         'iter': int(checkpoint_name.split('_')[-1]) if checkpoint_name.startswith('iter_') else -1,
         'checkpoint': checkpoint_path,
         'checkpoint_name': checkpoint_name,
+        'checkpoint_mtime': int(os.path.getmtime(checkpoint_path)) if os.path.exists(checkpoint_path) else None,
         'evaluated_at': int(time.time()),
         'device': str(DEVICE),
     }
@@ -544,6 +585,163 @@ def evaluate_checkpoint(drive_dir: str, checkpoint_path: str) -> dict:
     return result
 
 
+def evaluate_checkpoint(
+    drive_dir: str,
+    checkpoint_path: str,
+    progress_cb: Optional[Callable[[str, dict], None]] = None,
+) -> dict:
+    models_dir = os.path.join(drive_dir, 'models')
+    best_path = os.path.join(models_dir, 'best.pt')
+    target_path = os.path.join(models_dir, 'target_best.pt')
+    checkpoint_name = os.path.splitext(os.path.basename(checkpoint_path))[0]
+    candidate = load_network(checkpoint_path)
+    suite = build_opening_suite()
+
+    result = {
+        'iter': int(checkpoint_name.split('_')[-1]) if checkpoint_name.startswith('iter_') else -1,
+        'checkpoint': checkpoint_path,
+        'checkpoint_name': checkpoint_name,
+        'evaluated_at': int(time.time()),
+        'device': str(DEVICE),
+        'progress': {'phase': 'init'},
+        'minimax_live': {},
+    }
+
+    def emit_progress(stage: str):
+        if progress_cb is not None:
+            progress_cb(stage, result)
+
+    emit_progress('init')
+
+    if os.path.exists(best_path) and os.path.abspath(best_path) != os.path.abspath(checkpoint_path):
+        print(f'  vs best ({FULL_NET_GAMES} games)...', flush=True)
+        result['progress'] = {'phase': 'vs_best'}
+        emit_progress('vs_best:start')
+        best_net = load_network(best_path)
+        result['wr_vs_best'] = round(eval_net_vs_net(candidate, best_net, FULL_NET_GAMES), 3)
+        print(f'    wr_vs_best = {result["wr_vs_best"]:.1%}', flush=True)
+        emit_progress('vs_best:done')
+    else:
+        result['wr_vs_best'] = None
+        emit_progress('vs_best:skipped')
+
+    print(f'  vs random ({FULL_RANDOM_GAMES} games)...', flush=True)
+    result['progress'] = {'phase': 'vs_random'}
+    emit_progress('vs_random:start')
+    result['wr_vs_random'] = round(eval_net_vs_random(candidate, FULL_RANDOM_GAMES), 3)
+    print(f'    wr_vs_random = {result["wr_vs_random"]:.1%}', flush=True)
+    emit_progress('vs_random:done')
+
+    mm_results = {}
+    gated_at_depth = None
+    run_mm11 = should_run_mm11(result['iter'])
+    for depth, n_games in FULL_MINIMAX_PLAN:
+        if depth == TARGET_MINIMAX_DEPTH and not run_mm11:
+            print(f'  skipping mm{depth} for iter {result["iter"]:04d} (heavy eval every {HEAVY_MM11_EVERY} iterations)', flush=True)
+            continue
+
+        print(f'  vs mm{depth} ({n_games} games)...', flush=True)
+        result['progress'] = {'phase': 'vs_minimax', 'depth': depth, 'completed_games': 0, 'total_games': n_games}
+        emit_progress(f'mm{depth}:start')
+
+        def on_mm_game(game_idx: int, total_games: int, running_wr: float, outcome: str):
+            result['minimax_live'][str(depth)] = {
+                'completed_games': game_idx,
+                'total_games': total_games,
+                'running_wr': round(running_wr, 3),
+                'last_outcome': outcome,
+            }
+            result['progress'] = {
+                'phase': 'vs_minimax',
+                'depth': depth,
+                'completed_games': game_idx,
+                'total_games': total_games,
+                'running_wr': round(running_wr, 3),
+                'last_outcome': outcome,
+            }
+            emit_progress(f'mm{depth}:game:{game_idx}/{total_games}')
+
+        mm_results[depth] = round(
+            eval_net_vs_minimax(candidate, n_games, depth, game_progress_cb=on_mm_game),
+            3,
+        )
+        result[f'wr_vs_minimax{depth}'] = mm_results[depth]
+        print(f'    wr_vs_mm{depth} = {mm_results[depth]:.1%}', flush=True)
+        result['progress'] = {'phase': 'vs_minimax', 'depth': depth, 'completed_games': n_games, 'total_games': n_games}
+        emit_progress(f'mm{depth}:done')
+
+        gate = FULL_EVAL_GATES.get(depth)
+        if gate is not None and mm_results[depth] < gate:
+            gated_at_depth = depth
+            print(f'  [gate] stop at mm{depth} (wr {mm_results[depth]:.1%} < {gate:.0%}) - skipping deeper', flush=True)
+            result['progress'] = {'phase': 'gate_stop', 'depth': depth, 'gate': gate, 'wr': mm_results[depth]}
+            emit_progress(f'mm{depth}:gated')
+            break
+
+    result['gated_at_depth'] = gated_at_depth
+    result['evaluated_minimax_depths'] = sorted(mm_results.keys())
+    result['skipped_minimax_depths'] = [depth for depth, _ in FULL_MINIMAX_PLAN if depth not in mm_results]
+
+    should_run_opening_suite = (
+        run_mm11
+        and gated_at_depth is None
+        and 11 in mm_results
+        and 7 in mm_results
+        and mm_results[7] >= FULL_EVAL_GATES[7]
+    )
+
+    if should_run_opening_suite:
+        print('  opening suite...', flush=True)
+        result['progress'] = {'phase': 'opening_suite'}
+        emit_progress('opening_suite:start')
+        suite_metrics = eval_net_on_opening_suite(candidate, TARGET_MINIMAX_DEPTH, suite)
+        result['wr_opening_suite'] = round(suite_metrics['overall'], 3)
+        result['wr_opening_p1'] = round(suite_metrics['p1'], 3)
+        result['wr_opening_p2'] = round(suite_metrics['p2'], 3)
+        result['wr_opening_floor'] = round(min(suite_metrics['p1'], suite_metrics['p2']), 3)
+        emit_progress('opening_suite:done')
+    else:
+        result['wr_opening_suite'] = None
+        result['wr_opening_p1'] = None
+        result['wr_opening_p2'] = None
+        result['wr_opening_floor'] = None
+        if not run_mm11:
+            print(f'  opening suite skipped for iter {result["iter"]:04d} (paired with mm11-only heavy eval)', flush=True)
+        elif gated_at_depth is not None:
+            print(f'  opening suite skipped (gated earlier at mm{gated_at_depth})', flush=True)
+        elif 11 not in mm_results:
+            print('  opening suite skipped (mm11 not evaluated)', flush=True)
+
+    target_baseline = {
+        'wr_vs_minimax11': -1.0,
+        'wr_opening_suite': -1.0,
+        'wr_opening_floor': -1.0,
+        'source': 'none',
+    }
+    target_status = load_target_status(drive_dir)
+    if target_status:
+        target_baseline['wr_vs_minimax11'] = float(target_status.get('wr_vs_minimax11', -1.0))
+        target_baseline['wr_opening_suite'] = float(target_status.get('wr_opening_suite', -1.0))
+        target_baseline['wr_opening_floor'] = float(target_status.get('wr_opening_floor', -1.0))
+        target_baseline['source'] = 'target_status'
+    elif os.path.exists(target_path) and os.path.abspath(target_path) != os.path.abspath(checkpoint_path):
+        result['progress'] = {'phase': 'target_reference_recompute'}
+        emit_progress('target_reference:start')
+        target_net = load_network(target_path)
+        target_baseline['wr_vs_minimax11'] = round(eval_net_vs_minimax(target_net, 8, TARGET_MINIMAX_DEPTH), 3)
+        target_suite = eval_net_on_opening_suite(target_net, TARGET_MINIMAX_DEPTH, suite)
+        target_baseline['wr_opening_suite'] = round(target_suite['overall'], 3)
+        target_baseline['wr_opening_floor'] = round(min(target_suite['p1'], target_suite['p2']), 3)
+        target_baseline['source'] = 'target_best_recomputed'
+        emit_progress('target_reference:done')
+
+    result['target_reference'] = target_baseline
+    result['run_mm11_this_checkpoint'] = run_mm11
+    result['progress'] = {'phase': 'checkpoint_eval_done'}
+    emit_progress('checkpoint_eval:done')
+    return result
+
+
 def make_decision(result: dict) -> dict:
     wr_best = result.get('wr_vs_best')
     wr_mm11 = float(result.get('wr_vs_minimax11', 0.0) or 0.0)
@@ -611,6 +809,14 @@ def resolve_checkpoint_arg(drive_dir: str, checkpoint_arg: str) -> str:
     if checkpoint_arg.endswith('.pt'):
         return os.path.join(drive_dir, 'models', checkpoint_arg)
     return os.path.join(drive_dir, 'models', f'{checkpoint_arg}.pt')
+
+
+def result_is_fresh_for_checkpoint(result_path: str, checkpoint_path: str, slack_seconds: float = 1.0) -> bool:
+    if not os.path.exists(result_path):
+        return False
+    if not os.path.exists(checkpoint_path):
+        return True
+    return os.path.getmtime(result_path) + slack_seconds >= os.path.getmtime(checkpoint_path)
 
 
 def process_checkpoint(drive_dir: str, checkpoint_path: str, *, ts_verify: bool, ts_games: int, ts_depth: int, ts_sims: int):
@@ -690,6 +896,136 @@ def process_checkpoint(drive_dir: str, checkpoint_path: str, *, ts_verify: bool,
         print(f'  ts verify -> {result["ts_verify"]}')
 
 
+def process_checkpoint(drive_dir: str, checkpoint_path: str, *, ts_verify: bool, ts_games: int, ts_depth: int, ts_sims: int):
+    external_dir = os.path.join(drive_dir, 'external_eval')
+    results_dir = os.path.join(external_dir, 'results')
+    decisions_dir = os.path.join(external_dir, 'decisions')
+    result_log = os.path.join(external_dir, 'external_eval_log.jsonl')
+    checkpoint_name = os.path.splitext(os.path.basename(checkpoint_path))[0]
+    progress_path = os.path.join(results_dir, f'{checkpoint_name}.progress.json')
+
+    def emit_progress(stage: str, snapshot: dict):
+        write_progress_snapshot(progress_path, checkpoint_name, stage, snapshot, status='in_progress')
+
+    write_progress_snapshot(
+        progress_path,
+        checkpoint_name,
+        'started',
+        {
+            'checkpoint': checkpoint_path,
+            'checkpoint_name': checkpoint_name,
+            'checkpoint_mtime': int(os.path.getmtime(checkpoint_path)) if os.path.exists(checkpoint_path) else None,
+            'iter': int(checkpoint_name.split('_')[-1]) if checkpoint_name.startswith('iter_') else -1,
+        },
+        status='in_progress',
+    )
+
+    try:
+        result = evaluate_checkpoint(drive_dir, checkpoint_path, progress_cb=emit_progress)
+        if should_run_practical_verify(result):
+            try:
+                result['progress'] = {'phase': 'practical_verify'}
+                emit_progress('practical_verify:start', result)
+                result['practical_verify'] = run_ts_verify(
+                    checkpoint_path,
+                    mm_depth=PRACTICAL_VERIFY_MM_DEPTH,
+                    n_games=PRACTICAL_VERIFY_GAMES,
+                    az_sims=PRACTICAL_VERIFY_SIMS,
+                )
+                emit_progress('practical_verify:done', result)
+            except Exception as exc:
+                result['practical_verify'] = {
+                    'error': str(exc),
+                    'games': PRACTICAL_VERIFY_GAMES,
+                    'depth': PRACTICAL_VERIFY_MM_DEPTH,
+                    'sims': PRACTICAL_VERIFY_SIMS,
+                }
+                emit_progress('practical_verify:error', result)
+        if should_run_ts_verify(result, ts_verify):
+            try:
+                result['progress'] = {'phase': 'ts_verify'}
+                emit_progress('ts_verify:start', result)
+                result['ts_verify'] = run_ts_verify(
+                    checkpoint_path,
+                    mm_depth=ts_depth,
+                    n_games=ts_games,
+                    az_sims=ts_sims,
+                )
+                emit_progress('ts_verify:done', result)
+            except Exception as exc:
+                result['ts_verify'] = {
+                    'error': str(exc),
+                    'games': ts_games,
+                    'depth': ts_depth,
+                    'sims': ts_sims,
+                }
+                emit_progress('ts_verify:error', result)
+        decision = make_decision(result)
+    except BaseException as exc:
+        write_progress_snapshot(
+            progress_path,
+            checkpoint_name,
+            'failed',
+            {
+                'checkpoint': checkpoint_path,
+                'checkpoint_name': checkpoint_name,
+            },
+            status='failed',
+            error=str(exc),
+        )
+        raise
+
+    result_path = os.path.join(results_dir, f'{checkpoint_name}.result.json')
+    decision_path = os.path.join(decisions_dir, f'{checkpoint_name}.decision.json')
+
+    write_json(result_path, result)
+    write_json(decision_path, decision)
+    append_jsonl(result_log, result)
+
+    if decision['promote_target']:
+        write_target_status(drive_dir, {
+            'iter': result['iter'],
+            'checkpoint': result['checkpoint'],
+            'wr_vs_minimax11': decision['wr_vs_minimax11'],
+            'wr_opening_suite': decision['wr_opening_suite'],
+            'wr_opening_floor': decision['wr_opening_floor'],
+            'updated_at': int(time.time()),
+            'source': 'eval_local',
+            'ts_verify': result.get('ts_verify'),
+            'loss_mining_policy': {
+                'enable_loss_mining': decision['enable_loss_mining'],
+                'loss_mining_depth': decision['loss_mining_depth'],
+                'loss_mining_games': decision['loss_mining_games'],
+                'loss_mining_positions_per_game': decision['loss_mining_positions_per_game'],
+                'loss_mining_max_samples': decision['loss_mining_max_samples'],
+                'loss_mining_reason': decision['loss_mining_reason'],
+            },
+        })
+
+    write_progress_snapshot(
+        progress_path,
+        checkpoint_name,
+        'completed',
+        {
+            **result,
+            'decision_summary': decision['summary'],
+            'result_path': result_path,
+            'decision_path': decision_path,
+        },
+        status='completed',
+    )
+
+    print(f'[done] {checkpoint_name}')
+    print(f'  result   -> {result_path}')
+    print(f'  decision -> {decision_path}')
+    print(f'  progress -> {progress_path}')
+    print(f'  summary  -> {decision["summary"]}')
+    if result.get('practical_verify'):
+        print(f'  practical verify -> {result["practical_verify"]}')
+    if result.get('ts_verify'):
+        print(f'  ts verify -> {result["ts_verify"]}')
+
+
 def watch_requests(drive_dir: str, poll_seconds: int, once: bool, *, ts_verify: bool, ts_games: int, ts_depth: int, ts_sims: int):
     requests_dir = os.path.join(drive_dir, 'external_eval', 'requests')
     results_dir = os.path.join(drive_dir, 'external_eval', 'results')
@@ -706,8 +1042,10 @@ def watch_requests(drive_dir: str, poll_seconds: int, once: bool, *, ts_verify: 
             checkpoint_path = os.path.join(drive_dir, 'models', checkpoint_filename)
             checkpoint_name = os.path.splitext(checkpoint_filename)[0]
             result_path = os.path.join(results_dir, f'{checkpoint_name}.result.json')
-            if os.path.exists(result_path):
+            if result_is_fresh_for_checkpoint(result_path, checkpoint_path):
                 continue
+            if os.path.exists(result_path):
+                print(f'[eval] stale result found for {checkpoint_name}; checkpoint is newer, re-evaluating')
             print(f'[eval] processing request {os.path.basename(request_path)}')
             process_checkpoint(
                 drive_dir,

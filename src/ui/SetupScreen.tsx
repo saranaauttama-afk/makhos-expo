@@ -40,6 +40,7 @@ const COPY = {
     mode: 'MODE',
     side: 'SIDE',
     level: 'LEVEL',
+    thinkBudget: 'ENGINE MODE',
     modeAi: 'VS AI',
     modeHuman: 'VS HUMAN',
     selected: 'เลือกแล้ว',
@@ -52,19 +53,21 @@ const COPY = {
     hint: 'Hint',
     undo: 'Undo',
     account: 'ACCOUNT',
+    thinkLimited: 'FAST',
+    thinkUnlimited: 'STRENGTH',
     levelLabels: {
-      easy: 'EASY',
-      normal: 'NORMAL',
-      hard: 'HARD',
-      expert: 'EXPERT',
-      master: 'MASTER',
+      easy: 'MM5',
+      normal: 'MM7',
+      hard: 'MM9',
+      expert: 'MM11',
+      master: 'AZ',
     },
     levelHints: {
       easy: 'Friendly',
       normal: 'Balanced',
       hard: 'Tactical',
       expert: 'Sharp',
-      master: 'Maximum',
+      master: 'Model only',
     },
   },
   en: {
@@ -74,6 +77,7 @@ const COPY = {
     mode: 'MODE',
     side: 'SIDE',
     level: 'LEVEL',
+    thinkBudget: 'ENGINE MODE',
     modeAi: 'VS AI',
     modeHuman: 'VS HUMAN',
     selected: 'SELECTED',
@@ -86,19 +90,21 @@ const COPY = {
     hint: 'Hint',
     undo: 'Undo',
     account: 'ACCOUNT',
+    thinkLimited: 'FAST',
+    thinkUnlimited: 'STRENGTH',
     levelLabels: {
-      easy: 'EASY',
-      normal: 'NORMAL',
-      hard: 'HARD',
-      expert: 'EXPERT',
-      master: 'MASTER',
+      easy: 'MM5',
+      normal: 'MM7',
+      hard: 'MM9',
+      expert: 'MM11',
+      master: 'AZ',
     },
     levelHints: {
       easy: 'Friendly',
       normal: 'Balanced',
       hard: 'Tactical',
       expert: 'Sharp',
-      master: 'Maximum',
+      master: 'Model only',
     },
   },
 } as const;
@@ -125,6 +131,7 @@ export default function SetupScreen({ language, initialConfig, monetization, onB
   const [mode, setMode] = useState<GameMode>(initialConfig.mode);
   const [difficulty, setDifficulty] = useState<Difficulty>(initialConfig.difficulty);
   const [humanSide, setHumanSide] = useState<1 | -1>(initialConfig.humanSide);
+  const [unlimitedThink, setUnlimitedThink] = useState<boolean>(initialConfig.unlimitedThink ?? false);
   const t = COPY[language];
 
   const levelHint = useMemo(
@@ -168,6 +175,16 @@ export default function SetupScreen({ language, initialConfig, monetization, onB
           </View>
         </View>
 
+        {mode === 'vs-ai' ? (
+          <View style={styles.panel}>
+            <Text style={styles.sectionLabel}>{t.thinkBudget}</Text>
+            <View style={styles.row}>
+              <Chip title={t.thinkLimited} active={!unlimitedThink} tint={CYAN} onPress={() => setUnlimitedThink(false)} />
+              <Chip title={t.thinkUnlimited} active={unlimitedThink} tint={GOLD} onPress={() => setUnlimitedThink(true)} />
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.panel}>
           <Text style={styles.sectionLabel}>{t.level}</Text>
           <View style={styles.levelGrid}>
@@ -194,7 +211,10 @@ export default function SetupScreen({ language, initialConfig, monetization, onB
           </Text>
         </View>
 
-        <Pressable style={[styles.playButton, { borderColor: levelTint }]} onPress={() => onPlay({ mode, difficulty, humanSide })}>
+        <Pressable
+          style={[styles.playButton, { borderColor: levelTint }]}
+          onPress={() => onPlay({ mode, difficulty, humanSide, unlimitedThink: mode === 'vs-ai' ? unlimitedThink : false })}
+        >
           <Text style={styles.playText}>{t.start}</Text>
         </Pressable>
 

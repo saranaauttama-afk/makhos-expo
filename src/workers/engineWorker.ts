@@ -4,7 +4,7 @@
 // with New Architecture).  No React, no UI — pure computation only.
 //
 // Protocol (main → worker):
-//   { type: 'search', gen, pos, timeMs, historyHashes }
+//   { type: 'search', gen, pos, timeMs, historyHashes, maxDepth? }
 //   { type: 'cancel' }
 //
 // Protocol (worker → main):
@@ -24,7 +24,7 @@ let currentToken: CancelToken = { cancelled: false };
 addEventListener('message', async (e: MessageEvent) => {
   const msg = e.data as
     | { type: 'cancel' }
-    | { type: 'search'; gen: number; pos: Position; timeMs: number; historyHashes: number[] };
+    | { type: 'search'; gen: number; pos: Position; timeMs: number; historyHashes: number[]; maxDepth?: number };
 
   if (msg.type === 'cancel') {
     // Cancel the in-flight search; result handler will see token.cancelled = true
@@ -38,7 +38,7 @@ addEventListener('message', async (e: MessageEvent) => {
     const token: CancelToken = { cancelled: false };
     currentToken = token;
 
-    const { gen, pos, timeMs, historyHashes } = msg;
+    const { gen, pos, timeMs, historyHashes, maxDepth } = msg;
 
     const result = await iterativeDeepening(
       pos,
@@ -51,6 +51,7 @@ addEventListener('message', async (e: MessageEvent) => {
       },
       historyHashes,
       token,
+      maxDepth,
     );
 
     // Always send a result — main thread ignores stale generations via gen check

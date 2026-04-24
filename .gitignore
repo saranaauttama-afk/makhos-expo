@@ -47,6 +47,7 @@ makhos/
 # local temp / generated files
 .tmp/
 tmp_battle/
+tmp_battle_newaz/
 tmp_review/
 __pycache__/
 *.pyc
