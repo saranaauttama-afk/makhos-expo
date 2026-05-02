@@ -71,22 +71,24 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 12,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.7,
   },
   subtitle: {
     color: SOFT,
     fontSize: 10,
+    fontFamily: 'Kanit_500Medium',
   },
   price: {
     color: WHITE,
     fontSize: 13,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
   },
   copy: {
     color: SOFT,
     fontSize: 11,
     lineHeight: 16,
+    fontFamily: 'Kanit_500Medium',
   },
   button: {
     minHeight: 36,
@@ -101,7 +103,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.7,
   },
 });
+

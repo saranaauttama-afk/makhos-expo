@@ -28,6 +28,10 @@ function sanitizeAdConsent(value: unknown, fallback: AdConsentStatus): AdConsent
   return fallback;
 }
 
+function sanitizeBoolean(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
 function coercePersistedWallet(input: unknown): PersistedWallet | null {
   if (!input || typeof input !== 'object') return null;
   const raw = input as Partial<PersistedWallet>;
@@ -38,6 +42,8 @@ function coercePersistedWallet(input: unknown): PersistedWallet | null {
     undoCredits: sanitizeNumber(raw.undoCredits, 0),
     noAdsUnlocked: Boolean(raw.noAdsUnlocked),
     adConsent: sanitizeAdConsent(raw.adConsent, 'unknown'),
+    soundEnabled: sanitizeBoolean(raw.soundEnabled, true),
+    vibrationEnabled: sanitizeBoolean(raw.vibrationEnabled, true),
     interstitialCounter: sanitizeNumber(raw.interstitialCounter, 0),
     interstitialSeen: sanitizeNumber(raw.interstitialSeen, 0),
     rewardedSeen: sanitizeNumber(raw.rewardedSeen, 0),
@@ -113,6 +119,8 @@ export async function savePersistedMonetization(state: MonetizationState): Promi
     undoCredits: state.undoCredits,
     noAdsUnlocked: state.noAdsUnlocked,
     adConsent: state.adConsent,
+    soundEnabled: state.soundEnabled,
+    vibrationEnabled: state.vibrationEnabled,
     interstitialCounter: state.interstitialCounter,
     interstitialSeen: state.interstitialSeen,
     rewardedSeen: state.rewardedSeen,

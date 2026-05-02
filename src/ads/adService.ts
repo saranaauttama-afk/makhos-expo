@@ -91,9 +91,6 @@ export async function prepareInterstitialAfterMatch(input: MatchEndInterstitialI
   if (input.noAdsUnlocked) {
     return { shown: false, reason: 'no_ads', nextCompletedMatches: input.completedMatches };
   }
-  if (input.adConsent !== 'granted') {
-    return { shown: false, reason: 'consent_denied', nextCompletedMatches: input.completedMatches };
-  }
 
   const every = Math.max(2, input.interstitialEveryMatches);
   const nextCompletedMatches = input.completedMatches + 1;
@@ -113,9 +110,6 @@ export async function prepareInterstitialAfterMatch(input: MatchEndInterstitialI
 }
 
 export async function showRewardedAd(input: RewardedAdInput): Promise<RewardedAdResult> {
-  if (input.adConsent !== 'granted') {
-    return { granted: false, placement: input.placement, reason: 'consent_denied' };
-  }
   try {
     // TODO(ad-sdk): map rewarded unit ids by placement:
     // hint | undo | coins. Must remain user-triggered only.

@@ -11,9 +11,9 @@
 // When done, paste the printed BOOK constant into openingBook.ts.
 
 import { initialPosition } from '../src/coreClaude/position';
-import { generateMoves, applyMove } from '../src/coreClaude/movegen';
+import { generateMoves, applyMove, Move } from '../src/coreClaude/movegen';
 import { hashPosition } from '../src/coreClaude/search/zobrist';
-import { iterativeDeepening } from '../src/coreClaude/search/alphabeta';
+import { iterativeDeepening, SearchResult } from '../src/coreClaude/search/alphabeta';
 import { TT } from '../src/coreClaude/search/tt';
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -21,10 +21,14 @@ import { TT } from '../src/coreClaude/search/tt';
 const AI_SIDE      = -1 as const;
 const MAX_PLY      = 14;   // plies from start (7 rounds each)
 const TOP_N        = 3;    // opponent's top-N responses to cover (captures + first quiet)
+const BOOK_TOP_K   = 4;    // candidate moves stored per AI position
+const BOOK_MARGIN  = 55;   // centipawn-ish margin from best move to keep in book
 const AI_THINK_MS  = 1000; // ms for AI's book move — use high value for quality
 
 // ── BFS ──────────────────────────────────────────────────────────────────────
 interface QueueItem { pos: ReturnType<typeof initialPosition>; ply: number; }
+interface BookCandidate { move: Move; score: number; weight: number; }
+interface BookRow { from: number; to: number; score: number; weight: number; }
 
 function topNMoves(pos: ReturnType<typeof initialPosition>, n: number) {
   const moves = generateMoves(pos);
@@ -35,9 +39,35 @@ function topNMoves(pos: ReturnType<typeof initialPosition>, n: number) {
   return [...caps, ...quiet].slice(0, n);
 }
 
+function candidateWeight(score: number, bestScore: number, index: number): number {
+  const gap = Math.max(0, bestScore - score);
+  const rankDampener = 1 + index * 0.15;
+  return Math.max(1, Math.round((100 * Math.exp(-gap / 32)) / rankDampener));
+}
+
+function bookCandidatesFromSearch(result: SearchResult): BookCandidate[] {
+  const raw = result.rootCandidates?.length
+    ? result.rootCandidates
+    : result.best
+      ? [{ move: result.best, score: result.score }]
+      : [];
+  const sorted = [...raw].sort((a, b) => b.score - a.score);
+  const bestScore = sorted[0]?.score;
+  if (bestScore == null) return [];
+
+  return sorted
+    .filter(candidate => candidate.score >= bestScore - BOOK_MARGIN)
+    .slice(0, BOOK_TOP_K)
+    .map((candidate, index) => ({
+      move: candidate.move,
+      score: candidate.score,
+      weight: candidateWeight(candidate.score, bestScore, index),
+    }));
+}
+
 async function buildBook() {
   const tt       = new TT();
-  const book     = new Map<number, { from: number; to: number }>();
+  const book     = new Map<number, BookRow[]>();
   const visited  = new Set<number>();
   const queue: QueueItem[] = [{ pos: initialPosition(), ply: 0 }];
 
@@ -61,16 +91,22 @@ async function buildBook() {
       const result = await iterativeDeepening(
         pos, AI_THINK_MS, tt, () => {}, [], { cancelled: false },
       );
-      if (!result.best) continue;
+      const candidates = bookCandidatesFromSearch(result);
+      if (!candidates.length) continue;
 
-      book.set(hash, { from: result.best.from, to: result.best.to });
+      book.set(hash, candidates.map(candidate => ({
+        from: candidate.move.from,
+        to: candidate.move.to,
+        score: candidate.score,
+        weight: candidate.weight,
+      })));
       processed++;
       process.stdout.write(
-        `\r  ply ${ply} | entries ${processed} | queue ${queue.length}   `,
+        `\r  ply ${ply} | entries ${processed} | queue ${queue.length} | candidates ${candidates.length}   `,
       );
 
       // After AI's move, opponent faces a position — expand it
-      queue.push({ pos: applyMove(pos, result.best), ply: ply + 1 });
+      queue.push({ pos: applyMove(pos, candidates[0].move), ply: ply + 1 });
 
     } else {
       // ── Opponent's turn: branch into top-N likely responses ───────────────
@@ -85,10 +121,12 @@ async function buildBook() {
 
   // ── Output TypeScript ─────────────────────────────────────────────────────
   console.log('// Paste this into src/coreClaude/search/openingBook.ts');
-  console.log('// [hash, from, to]');
-  console.log('const BOOK: [number, number, number][] = [');
-  for (const [hash, move] of book) {
-    console.log(`  [${hash}, ${move.from}, ${move.to}],`);
+  console.log('// [hash, from, to, weight, score]');
+  console.log('const BOOK: BookRow[] = [');
+  for (const [hash, candidates] of book) {
+    for (const move of candidates) {
+      console.log(`  [${hash}, ${move.from}, ${move.to}, ${move.weight}, ${move.score}],`);
+    }
   }
   console.log('];');
 }

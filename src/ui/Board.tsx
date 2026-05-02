@@ -23,6 +23,8 @@ interface Props {
   selectedFrom: number | null;
   destSquares: Dest[];
   lastMove?: LastMoveHint | null;
+  rotateNumbers180?: boolean;
+  rotatePieces180?: boolean;
 }
 
 const HILITE_FROM = '#8ecbc2';
@@ -37,7 +39,16 @@ const PIECE_P1_BASE = '#4c515e';
 const PIECE_P2_BASE = '#d9dde4';
 const KING_FILL = '#f6e5b8';
 
-export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selectedFrom, destSquares, lastMove = null }) => {
+export const Board: React.FC<Props> = ({
+  pos,
+  onTapSquare,
+  fromSquares,
+  selectedFrom,
+  destSquares,
+  lastMove = null,
+  rotateNumbers180 = false,
+  rotatePieces180 = false,
+}) => {
   const N = 8;
   const S = SIZE.board / N;
   const [animFrame, setAnimFrame] = useState(0);
@@ -171,7 +182,7 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
     const innerFill = side === 1 ? '#646a78' : '#eceff5';
     const kingStroke = side === 1 ? '#2b2f38' : '#8d939d';
     return (
-      <G key={key}>
+      <G key={key} transform={rotatePieces180 ? `rotate(180 ${cx} ${cy})` : undefined}>
         <Circle cx={cx + 1.6} cy={cy + 3.8} r={outerR} fill={shadowFill} />
         <Circle cx={cx} cy={cy} r={outerR} fill={baseFill} />
         <Circle cx={cx} cy={cy - S * 0.02} r={innerR} fill={innerFill} />
@@ -208,6 +219,27 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
               return (
                 <G key={k}>
                   <Rect x={x} y={y} width={S} height={S} fill={dark ? COLORS.dark : COLORS.light} />
+                  {dark && idx >= 0 && (
+                    <G
+                      transform={
+                        rotateNumbers180
+                          ? `rotate(180 ${x + S * 0.15} ${y + S * 0.18})`
+                          : undefined
+                      }
+                    >
+                      <SvgText
+                        x={x + S * 0.08}
+                        y={y + S * 0.24}
+                        fontSize={S * 0.18}
+                        fontFamily="Kanit_700Bold"
+                        fill="rgba(245,248,252,0.55)"
+                        fontWeight="700"
+                        textAnchor="start"
+                      >
+                        {idx + 1}
+                      </SvgText>
+                    </G>
+                  )}
 
                   {isLastFrom && (
                     <Circle
@@ -319,6 +351,7 @@ export const Board: React.FC<Props> = ({ pos, onTapSquare, fromSquares, selected
                             x={x + S * 0.78}
                             y={y + S * 0.26}
                             fontSize={S * 0.18}
+                            fontFamily="Kanit_700Bold"
                             fill="#5a4a29"
                             fontWeight="bold"
                             textAnchor="middle"

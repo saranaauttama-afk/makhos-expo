@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   title: {
     color: WHITE,
     fontSize: 15,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.5,
   },
   helper: {
@@ -111,7 +111,8 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.5,
   },
 });
+

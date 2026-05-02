@@ -6,21 +6,20 @@ import PurchaseCard from './components/PurchaseCard';
 import RewardActionRow from './components/RewardActionRow';
 import WalletStatCard from './components/WalletStatCard';
 import { ACCOUNT_TEXT } from './i18n/accountText';
-import { AdConsentStatus, MonetizationState } from './types';
+import { MonetizationState } from './types';
 import { RewardKind } from './walletStore';
 
 interface Props {
   language: AppLanguage;
   onLanguageChange: (language: AppLanguage) => void;
   monetization: MonetizationState;
-  onAdConsentChange: (consent: AdConsentStatus) => void;
-  aiModels: Array<{ id: string; label: string }>;
-  aiModelId: string;
-  onAiModelChange: (modelId: string) => void;
+  appVersion: string;
+  companyName: string;
+  onSoundEnabledChange: (enabled: boolean) => void;
+  onVibrationEnabledChange: (enabled: boolean) => void;
   onClaimFreeReward: (kind: RewardKind) => Promise<boolean>;
   onBuyNoAds: () => void;
   onBuyStarterPack: () => void;
-  onRestorePurchase: () => void;
   onBack: () => void;
 }
 
@@ -37,16 +36,21 @@ const SOFT = '#d7efe8';
 
 function ToggleRow({
   title,
+  subtitle,
   active,
   onToggle,
 }: {
   title: string;
+  subtitle: string;
   active: boolean;
   onToggle: () => void;
 }) {
   return (
     <Pressable onPress={onToggle} style={styles.rowCard}>
-      <Text style={styles.rowTitle}>{title}</Text>
+      <View style={styles.rowTextBlock}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowSub}>{subtitle}</Text>
+      </View>
       <View style={[styles.togglePill, active && styles.togglePillActive]}>
         <View style={[styles.toggleKnob, active && styles.toggleKnobActive]} />
       </View>
@@ -58,19 +62,15 @@ export default function AccountScreen({
   language,
   onLanguageChange,
   monetization,
-  onAdConsentChange,
-  aiModels,
-  aiModelId,
-  onAiModelChange,
+  appVersion,
+  companyName,
+  onSoundEnabledChange,
+  onVibrationEnabledChange,
   onClaimFreeReward,
   onBuyNoAds,
   onBuyStarterPack,
-  onRestorePurchase,
   onBack,
 }: Props) {
-  const [soundOn, setSoundOn] = useState(true);
-  const [vibrationOn, setVibrationOn] = useState(true);
-  const [retroFx, setRetroFx] = useState(true);
   const [busyReward, setBusyReward] = useState<RewardKind | null>(null);
   const t = ACCOUNT_TEXT[language];
 
@@ -120,28 +120,18 @@ export default function AccountScreen({
             </View>
           </View>
 
-          <View style={styles.rowCardColumn}>
-            <Text style={styles.rowTitle}>{t.model}</Text>
-            <Text style={styles.rowSub}>{t.modelSub}</Text>
-            <View style={styles.modelButtons}>
-              {aiModels.map(model => {
-                const active = model.id === aiModelId;
-                return (
-                  <Pressable
-                    key={model.id}
-                    style={[styles.modelButton, active && styles.modelButtonActive]}
-                    onPress={() => onAiModelChange(model.id)}
-                  >
-                    <Text style={[styles.modelButtonText, active && styles.modelButtonTextActive]}>{model.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <ToggleRow title={t.sound} active={soundOn} onToggle={() => setSoundOn(v => !v)} />
-          <ToggleRow title={t.vibration} active={vibrationOn} onToggle={() => setVibrationOn(v => !v)} />
-          <ToggleRow title={t.retroFx} active={retroFx} onToggle={() => setRetroFx(v => !v)} />
+          <ToggleRow
+            title={t.sound}
+            subtitle={t.soundSub}
+            active={monetization.soundEnabled}
+            onToggle={() => onSoundEnabledChange(!monetization.soundEnabled)}
+          />
+          <ToggleRow
+            title={t.vibration}
+            subtitle={t.vibrationSub}
+            active={monetization.vibrationEnabled}
+            onToggle={() => onVibrationEnabledChange(!monetization.vibrationEnabled)}
+          />
         </View>
 
         <View style={styles.panel}>
@@ -181,25 +171,6 @@ export default function AccountScreen({
         <View style={styles.panel}>
           <Text style={styles.sectionTitle}>{t.purchases}</Text>
 
-          <View style={styles.rowCardColumn}>
-            <Text style={styles.rowTitle}>{t.consent}</Text>
-            <Text style={styles.rowSub}>{t.consentSub}</Text>
-            <View style={styles.modelButtons}>
-              <Pressable
-                style={[styles.modelButton, monetization.adConsent === 'granted' && styles.modelButtonActive]}
-                onPress={() => onAdConsentChange('granted')}
-              >
-                <Text style={[styles.modelButtonText, monetization.adConsent === 'granted' && styles.modelButtonTextActive]}>{t.allow}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modelButton, monetization.adConsent === 'denied' && styles.modelButtonActive]}
-                onPress={() => onAdConsentChange('denied')}
-              >
-                <Text style={[styles.modelButtonText, monetization.adConsent === 'denied' && styles.modelButtonTextActive]}>{t.deny}</Text>
-              </Pressable>
-            </View>
-          </View>
-
           <View style={styles.rowCard}>
             <Text style={styles.rowTitle}>{t.noAds}</Text>
             <Text style={[styles.statusPill, monetization.noAdsUnlocked ? styles.statusActive : styles.statusFree]}>
@@ -229,14 +200,11 @@ export default function AccountScreen({
             onPress={onBuyStarterPack}
           />
 
-          <PurchaseCard
-            title={t.restoreTitle}
-            price={t.restorePrice}
-            copy={t.restoreCopy}
-            cta={t.restoreCta}
-            tint={GOLD}
-            onPress={onRestorePurchase}
-          />
+        </View>
+
+        <View style={styles.metaBlock}>
+          <Text style={styles.metaText}>{companyName}</Text>
+          <Text style={styles.metaText}>Version {appVersion}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -266,12 +234,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 24, gap: 12 },
   headerPanel: { backgroundColor: PANEL, borderWidth: 1, borderColor: LINE, borderRadius: 14, padding: 12, gap: 6 },
   backButton: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: LINE, borderRadius: 999, backgroundColor: PANEL_DARK },
-  backButtonText: { color: WHITE, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  title: { color: WHITE, fontSize: 24, fontWeight: '900', letterSpacing: 1 },
-  subtitle: { color: SOFT, fontSize: 12, lineHeight: 17 },
+  backButtonText: { color: WHITE, fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 1 },
+  title: { color: WHITE, fontSize: 24, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 1 },
+  subtitle: { color: SOFT, fontSize: 12, lineHeight: 17, fontFamily: 'Kanit_500Medium' },
 
   panel: { backgroundColor: PANEL, borderWidth: 1, borderColor: LINE, borderRadius: 14, padding: 12, gap: 8 },
-  sectionTitle: { color: WHITE, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
+  sectionTitle: { color: WHITE, fontSize: 13, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.8 },
   walletRow: { flexDirection: 'row', gap: 8 },
   rowCard: {
     minHeight: 52,
@@ -296,8 +264,8 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   rowTextBlock: { flex: 1, gap: 3 },
-  rowTitle: { color: WHITE, fontSize: 12, fontWeight: '800' },
-  rowSub: { color: SOFT, fontSize: 10, lineHeight: 14 },
+  rowTitle: { color: WHITE, fontSize: 12, fontFamily: 'Kanit_800ExtraBold' },
+  rowSub: { color: SOFT, fontSize: 10, lineHeight: 14, fontFamily: 'Kanit_500Medium' },
 
   langButtons: { flexDirection: 'row', gap: 6 },
   langButton: {
@@ -311,7 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   langButtonActive: { borderColor: MINT, backgroundColor: '#2f6b62' },
-  langButtonText: { color: SOFT, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  langButtonText: { color: SOFT, fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.8 },
   langButtonTextActive: { color: WHITE },
 
   modelButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -325,7 +293,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   modelButtonActive: { borderColor: GOLD, backgroundColor: '#376d64' },
-  modelButtonText: { color: SOFT, fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  modelButtonText: { color: SOFT, fontSize: 10, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.7 },
   modelButtonTextActive: { color: WHITE },
 
   togglePill: { width: 52, height: 28, borderWidth: 1, borderColor: LINE, borderRadius: 999, backgroundColor: PANEL, padding: 3, justifyContent: 'center' },
@@ -341,9 +309,22 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     lineHeight: 28,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     overflow: 'hidden',
   },
   statusActive: { color: MINT, backgroundColor: '#2f6b62' },
   statusFree: { color: SOFT, backgroundColor: PANEL },
+  metaBlock: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 6,
+  },
+  metaText: {
+    color: SOFT,
+    fontSize: 10,
+    opacity: 0.88,
+    fontFamily: 'Kanit_500Medium',
+  },
 });
+

@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: WHITE,
     fontSize: 11,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1,
   },
   headerTextBlock: {
@@ -184,13 +184,13 @@ const styles = StyleSheet.create({
   kicker: {
     color: GOLD,
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1.3,
   },
   title: {
     color: WHITE,
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1.2,
   },
   subtitle: {
@@ -213,13 +213,13 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1.2,
   },
   statTitle: {
     color: SOFT,
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.8,
   },
   block: {
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   },
   blockTitle: {
     fontSize: 13,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1,
   },
   blockCopy: {
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   roadmapTitle: {
     color: CYAN,
     fontSize: 13,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1,
   },
   roadmapList: {
@@ -272,3 +272,4 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
+

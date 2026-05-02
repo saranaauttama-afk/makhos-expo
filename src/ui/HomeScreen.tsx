@@ -7,6 +7,9 @@ import { GameConfig, MonetizationState } from './types';
 interface Props {
   language: AppLanguage;
   monetization: MonetizationState;
+  companyName: string;
+  appVersion: string;
+  defaultSetupConfig: GameConfig;
   onQuickPlay: (config: GameConfig) => void;
   onStart: (config: GameConfig) => void;
   onAccount: () => void;
@@ -18,29 +21,18 @@ const PANEL_DARK = '#214b46';
 const LINE = 'rgba(223, 247, 240, 0.34)';
 const GOLD = '#f6e2aa';
 const CYAN = '#9be7da';
-const MINT = '#b8f3df';
 const WHITE = '#f5f2e8';
 const SOFT = '#d7efe8';
 
 const COPY = {
   th: {
-    title: 'MAKHOS',
-    subtitle: 'พร้อมเล่น พร้อมลุย',
-    statusPrefix: 'กระเป๋า',
-    coins: 'เหรียญ',
-    noAdsActive: 'เปิด No Ads แล้ว',
-    freeMode: 'โหมดฟรี',
-    play: 'PLAY NOW',
-    setup: 'CUSTOM MATCH',
-    account: 'ACCOUNT',
+    title: 'หมากฮอสไทย',
+    play: 'เล่นทันที',
+    setup: 'ตั้งค่าการเล่น',
+    account: 'บัญชี',
   },
   en: {
-    title: 'MAKHOS',
-    subtitle: 'Quiet board. Sharp moves.',
-    statusPrefix: 'Wallet',
-    coins: 'coins',
-    noAdsActive: 'No Ads active',
-    freeMode: 'Free mode',
+    title: 'MAKHOS (Thai Checker)',
     play: 'PLAY NOW',
     setup: 'CUSTOM MATCH',
     account: 'ACCOUNT',
@@ -75,29 +67,40 @@ function MenuButton({
 export default function HomeScreen({
   language,
   monetization,
+  companyName,
+  appVersion,
+  defaultSetupConfig,
   onQuickPlay,
   onStart,
   onAccount,
 }: Props) {
   const t = COPY[language];
-  const openSetup = () => onStart({ mode: 'vs-ai', difficulty: 'normal', humanSide: 1, unlimitedThink: false });
+  const openSetup = () => onStart(defaultSetupConfig);
   const quickPlay = () => onQuickPlay({ mode: 'vs-ai', difficulty: 'easy', humanSide: 1, unlimitedThink: false });
-  const statusLine = `${t.statusPrefix}: ${monetization.coins} ${t.coins} · ${monetization.noAdsUnlocked ? t.noAdsActive : t.freeMode}`;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View pointerEvents="none" style={styles.bgAuraLarge} />
       <View pointerEvents="none" style={styles.bgAuraSmall} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.edgeSpacer} />
+
         <View style={styles.headerPanel}>
           <Text style={styles.title}>{t.title}</Text>
-          <Text style={styles.subtitle}>{t.subtitle}</Text>
-          <Text style={styles.statusLine}>{statusLine}</Text>
         </View>
 
-        <MenuButton title={t.play} onPress={quickPlay} tint={BG} primary />
-        <MenuButton title={t.setup} onPress={openSetup} tint={CYAN} />
-        <MenuButton title={t.account} onPress={onAccount} />
+        <View style={styles.menuGroup}>
+          <MenuButton title={t.play} onPress={quickPlay} tint={BG} primary />
+          <MenuButton title={t.setup} onPress={openSetup} tint={CYAN} />
+          <MenuButton title={t.account} onPress={onAccount} />
+        </View>
+
+        <View style={styles.edgeSpacer} />
+
+        <View style={styles.metaBlock}>
+          <Text style={styles.metaText}>{companyName}</Text>
+          <Text style={styles.metaText}>Version {appVersion}</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -123,7 +126,17 @@ const styles = StyleSheet.create({
     bottom: -140,
     right: -100,
   },
-  scrollContent: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 24, gap: 10 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 24,
+    gap: 10,
+  },
+  edgeSpacer: {
+    flexGrow: 1,
+    minHeight: 0,
+  },
   headerPanel: {
     backgroundColor: PANEL,
     borderWidth: 1,
@@ -136,17 +149,11 @@ const styles = StyleSheet.create({
   title: {
     color: WHITE,
     fontSize: 26,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 1.2,
   },
-  subtitle: {
-    color: SOFT,
-    fontSize: 12,
-  },
-  statusLine: {
-    color: SOFT,
-    fontSize: 11,
-    opacity: 0.9,
+  menuGroup: {
+    gap: 10,
   },
   menuButton: {
     minHeight: 46,
@@ -154,6 +161,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 12,
     shadowColor: '#000',
     shadowOpacity: 0.16,
@@ -171,7 +179,7 @@ const styles = StyleSheet.create({
   },
   menuButtonText: {
     fontSize: 13,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.8,
   },
   menuButtonTextPrimary: {
@@ -179,4 +187,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 1,
   },
+  metaBlock: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 4,
+  },
+  metaText: {
+    color: SOFT,
+    fontSize: 10,
+    opacity: 0.86,
+    fontFamily: 'Kanit_500Medium',
+  },
 });
+

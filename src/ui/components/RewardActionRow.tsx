@@ -61,12 +61,13 @@ const styles = StyleSheet.create({
   title: {
     color: WHITE,
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: 'Kanit_800ExtraBold',
   },
   subtitle: {
     color: SOFT,
     fontSize: 10,
     lineHeight: 14,
+    fontFamily: 'Kanit_500Medium',
   },
   button: {
     minHeight: 30,
@@ -82,7 +83,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.6,
   },
 });
+

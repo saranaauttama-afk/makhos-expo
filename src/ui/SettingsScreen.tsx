@@ -325,12 +325,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 22, gap: 12 },
   headerPanel: { backgroundColor: PANEL, borderWidth: 1, borderRadius: 14, borderColor: LINE, padding: 12, gap: 8 },
   backButton: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderRadius: 999, borderColor: LINE, backgroundColor: PANEL_DARK },
-  backButtonText: { color: WHITE, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  kicker: { color: GOLD, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: WHITE, fontSize: 24, fontWeight: '900', letterSpacing: 1 },
+  backButtonText: { color: WHITE, fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 1 },
+  kicker: { color: GOLD, fontSize: 10, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 1.1 },
+  title: { color: WHITE, fontSize: 24, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 1 },
   subtitle: { color: SOFT, fontSize: 12, lineHeight: 17 },
   panel: { backgroundColor: PANEL, borderWidth: 1, borderRadius: 14, borderColor: LINE, padding: 12, gap: 8 },
-  sectionTitle: { color: WHITE, fontSize: 13, fontWeight: '900', letterSpacing: 0.9 },
+  sectionTitle: { color: WHITE, fontSize: 13, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.9 },
   languageRow: {
     backgroundColor: PANEL_DARK,
     borderWidth: 1,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   modelButtonText: {
     color: SOFT,
     fontSize: 10,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.7,
   },
   modelButtonTextActive: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   langButtonText: {
     color: SOFT,
     fontSize: 11,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.9,
   },
   langButtonTextActive: {
@@ -420,13 +420,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   toggleTextBlock: { flex: 1, gap: 4 },
-  toggleTitle: { color: WHITE, fontSize: 12, fontWeight: '800' },
+  toggleTitle: { color: WHITE, fontSize: 12, fontFamily: 'Kanit_800ExtraBold' },
   toggleSubtitle: { color: SOFT, fontSize: 11, lineHeight: 15 },
   togglePill: { width: 52, height: 28, borderWidth: 1, borderColor: LINE, borderRadius: 999, backgroundColor: PANEL, padding: 3, justifyContent: 'center' },
   togglePillActive: { borderColor: MINT, backgroundColor: '#18302d' },
   toggleKnob: { width: 16, height: 16, backgroundColor: SOFT },
   toggleKnobActive: { backgroundColor: MINT, alignSelf: 'flex-end' },
   actionRow: { backgroundColor: PANEL_DARK, borderWidth: 1, borderRadius: 12, borderColor: LINE, minHeight: 46, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  actionTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.7 },
-  actionArrow: { color: SOFT, fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  actionTitle: { fontSize: 12, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.7 },
+  actionArrow: { color: SOFT, fontSize: 10, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.7 },
 });
+

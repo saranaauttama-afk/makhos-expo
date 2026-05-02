@@ -136,14 +136,15 @@ FORCE_IGNORE_OLD_DECISIONS = True
 FORCE_DECISION_MTIME_SLACK_S = 2.0
 
 # Run-policy
-RUN_BLOCK_ITERS = 20     # stop after each 20-iter block so we can review and adjust
+RUN_BLOCK_ITERS = 10     # stop after each 10-iter block so we can review and adjust
 MAX_TOTAL_ITERS = 200
 
 # Force-resume controls (set FORCE_BASELINE_ITER=None to disable).
-FORCE_BASELINE_ITER = 79
-FORCE_RESET_TRAIN_STATE = True
-FORCE_CLEAR_REPLAY_BUFFER = True
-FORCE_RESET_LOG_CURSOR = True
+FORCE_BASELINE_ITER = None
+FORCE_RESET_TRAIN_STATE = False
+FORCE_CLEAR_REPLAY_BUFFER = False
+FORCE_RESET_LOG_CURSOR = False
+SAVE_BLOCK_END_CHECKPOINT = True
 
 # Learning-rate control
 LR_PLATEAU_PATIENCE = 2
@@ -167,6 +168,7 @@ if QUICK_GATE_FOR_EXTERNAL_EVAL:
     print(f'  q-gate   : external eval requires mm3>={QUICK_GATE_MIN_MM3:.0%} and mm5>={QUICK_GATE_MIN_MM5:.0%}')
 print(f'  run      : blocks of {RUN_BLOCK_ITERS} iterations (cap {MAX_TOTAL_ITERS})')
 print(f'  force    : baseline={FORCE_BASELINE_ITER} reset_state={FORCE_RESET_TRAIN_STATE} clear_buf={FORCE_CLEAR_REPLAY_BUFFER}')
+print(f'  save-end : block_end_checkpoint={SAVE_BLOCK_END_CHECKPOINT}')
 print(f'  guard    : ignore_old_decisions={FORCE_IGNORE_OLD_DECISIONS}')
 print(f'  lr floor : global={MIN_LR:.1e}, frontier={MIN_FRONTIER_LR:.1e}')
 print(f'  stability: reg={STABILITY_REG_WEIGHT:.2f}, value_w={STABILITY_VALUE_WEIGHT:.2f}, mined_w={LOSS_MINING_SAMPLE_WEIGHT:.2f}')
@@ -986,12 +988,21 @@ elif os.path.exists(LATEST_NET_PATH):
         replay_buffer = [tuple(x) for x in np.load(BUFFER_PATH, allow_pickle=True)]
         print(f'  Loaded replay buffer: {len(replay_buffer)} samples')
 
-    # Find start iteration from log
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE) as f:
+    # Prefer explicit resume cursor from train_state, fallback to training_log.
+    if os.path.exists(TRAIN_STATE_PATH):
+        state = torch.load(TRAIN_STATE_PATH, map_location=DEVICE)
+        if 'last_iter' in state:
+            start_iter = int(state['last_iter']) + 1
+        elif os.path.exists(LOG_FILE):
+            with open(LOG_FILE, encoding='utf-8-sig') as f:
+                lines = f.readlines()
+            if lines:
+                start_iter = json.loads(lines[-1].strip()).get('iter', 0) + 1
+    elif os.path.exists(LOG_FILE):
+        with open(LOG_FILE, encoding='utf-8-sig') as f:
             lines = f.readlines()
         if lines:
-            start_iter = json.loads(lines[-1]).get('iter', 0) + 1
+            start_iter = json.loads(lines[-1].strip()).get('iter', 0) + 1
 
     print(f'✅ Resumed from iteration {start_iter}  (LR={get_current_lr(optimizer):.2e})')
 else:
@@ -1259,6 +1270,7 @@ for it in range(start_iter, N_ITER):
     # Save curr_net + optimizer + scheduler + buffer every iteration (for resume)
     curr_net.save(LATEST_NET_PATH)
     torch.save({
+        'last_iter': it,
         'optimizer': optimizer.state_dict(),
         'scheduler': scheduler.state_dict(),
         'target_best_wr': target_best_wr,
@@ -1275,6 +1287,14 @@ for it in range(start_iter, N_ITER):
     np.save(BUFFER_PATH, np.array(replay_buffer, dtype=object))
 
 print('\nTraining complete!')
+
+# Save an end-of-block checkpoint even when block end is not aligned with EVAL_INTERVAL.
+if SAVE_BLOCK_END_CHECKPOINT and N_ITER > start_iter:
+    last_iter = N_ITER - 1
+    end_ckpt_path = checkpoint_path_for_iter(last_iter)
+    if not os.path.exists(end_ckpt_path):
+        curr_net.save(end_ckpt_path)
+        print(f'Block-end checkpoint saved -> {end_ckpt_path}')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CELL 6 — Show training progress (run anytime)

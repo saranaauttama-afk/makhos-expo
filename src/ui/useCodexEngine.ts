@@ -7,11 +7,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TT } from '../coreClaude/search/tt';
-import { CancelToken, iterativeDeepening, SearchInfo } from '../coreClaude/search/alphabeta';
+import { CancelToken, iterativeDeepening, moveKey, RootMoveScores, SearchInfo } from '../coreClaude/search/alphabeta';
+import { getAZRootMoveScores } from '../coreClaude/search/azGuide';
+import { lookupOpeningBookCandidates } from '../coreClaude/search/openingBook';
+import { precomputeEndgameTablebase } from '../coreClaude/search/endgameTablebase';
 import { Position } from '../coreClaude/position';
 import { Move } from '../coreClaude/movegen';
 import { preloadAZModel } from '../coreClaude/azNet';
-import { azBestMove } from '../coreClaude/azMcts';
 import { HybridDifficulty, HybridPlan, hybridBestMove } from '../coreClaude/search/hybrid';
 import { Difficulty } from './types';
 
@@ -20,7 +22,7 @@ import { Difficulty } from './types';
 //
 // NOTE:
 // - easy/normal/hard/expert use strict minimax from the screen layer.
-// - master uses AZ-only route below (no hybrid).
+// - master uses guided alpha-beta through the hybrid route.
 const HYBRID_PROFILE: Record<Difficulty, { hybridDifficulty: HybridDifficulty; budgetMs: number }> = {
   easy: { hybridDifficulty: 'medium', budgetMs: 700 },
   normal: { hybridDifficulty: 'medium', budgetMs: 1200 },
@@ -28,17 +30,8 @@ const HYBRID_PROFILE: Record<Difficulty, { hybridDifficulty: HybridDifficulty; b
   expert: { hybridDifficulty: 'hard', budgetMs: 3000 },
   master: { hybridDifficulty: 'hard', budgetMs: 4000 },
 };
-const STRICT_NO_LIMIT_BUDGET_MS = 24 * 60 * 60 * 1000;
-const AZ_ONLY_SIMS_MIN = 140;
-const AZ_ONLY_SIMS_MAX = 900;
-const AZ_ONLY_SIMS_PER_SECOND = 120;
+const STRICT_NO_LIMIT_BUDGET_MS = 12_000;
 const USE_ENGINE_WORKER = false;
-
-function simsFromBudgetMs(ms: number, noTimeLimit: boolean): number {
-  if (noTimeLimit) return AZ_ONLY_SIMS_MAX;
-  const sims = Math.round((Math.max(400, ms) / 1000) * AZ_ONLY_SIMS_PER_SECOND);
-  return Math.max(AZ_ONLY_SIMS_MIN, Math.min(AZ_ONLY_SIMS_MAX, sims));
-}
 
 type EngineWorkerLike = {
   postMessage: (message: unknown) => void;
@@ -94,6 +87,9 @@ export function useCodexEngine() {
   if (!preloaded.current) {
     preloaded.current = true;
     preloadAZModel();
+    setTimeout(() => {
+      precomputeEndgameTablebase().catch(() => {});
+    }, 0);
   }
 
   const handleStrictResult = useCallback((
@@ -104,15 +100,18 @@ export function useCodexEngine() {
     token: CancelToken,
     noTimeLimit: boolean,
     maxDepth: number,
+    guideLabel: string | undefined,
     onInfo?: (info: SearchInfo) => void,
   ) => {
     setThinking(false);
     if (token.cancelled) return undefined;
     setLastPlan({
       mode: 'alphabeta',
-      reason: noTimeLimit
-        ? `strict mm depth ${maxDepth} (no time limit)`
-        : `strict mm depth ${maxDepth}`,
+      reason: [
+        `strict mm depth ${maxDepth}`,
+        guideLabel ?? '',
+        noTimeLimit ? `capped ${Math.round(STRICT_NO_LIMIT_BUDGET_MS / 1000)}s think` : '',
+      ].filter(Boolean).join(', '),
     });
     const info: SearchInfo | null = depth > 0
       ? { depth, score, nodes, pv: best ? [best] : [] }
@@ -131,24 +130,62 @@ export function useCodexEngine() {
     onInfo?: (info: SearchInfo) => void,
     noTimeLimit = false,
   ): Promise<Move | undefined> => {
-    return iterativeDeepening(
-      pos,
-      budgetMs,
-      ttRef.current,
-      onInfo,
-      historyHashes,
-      token,
-      maxDepth,
-    ).then(res => handleStrictResult(
-      res.best,
-      res.depth,
-      res.score,
-      res.nodes,
-      token,
-      noTimeLimit,
-      maxDepth,
-      onInfo,
-    )).catch(() => {
+    return (async () => {
+      const openingPly = historyHashes.length > 0 && historyHashes.length <= 14;
+      const guideLabels: string[] = [];
+      const blendedScores = new Map<number, number>();
+
+      if (openingPly) {
+        const book = lookupOpeningBookCandidates(pos);
+        if (book) {
+          const bestWeight = Math.max(0.001, book.candidates[0]?.weight ?? 1);
+          for (const candidate of book.candidates) {
+            const key = moveKey(candidate.move);
+            const hint = Math.max(0.05, candidate.weight / bestWeight);
+            blendedScores.set(key, Math.max(blendedScores.get(key) ?? 0, hint));
+          }
+          guideLabels.push(book.candidates.length > 1 ? 'top-k opening book' : 'book-guided opening');
+        }
+      }
+
+      if (maxDepth >= 9 && !token.cancelled) {
+        try {
+          const azScores = await getAZRootMoveScores(pos);
+          if (azScores) {
+            for (const [key, value] of azScores) {
+              blendedScores.set(key, Math.max(blendedScores.get(key) ?? 0, value * 0.8));
+            }
+            guideLabels.push('AZ-guided ordering');
+          }
+        } catch {
+        }
+      }
+
+      const rootMoveScores: RootMoveScores | undefined = blendedScores.size ? blendedScores : undefined;
+      const diversifyRoot = openingPly && maxDepth >= 5;
+      const res = await iterativeDeepening(
+        pos,
+        budgetMs,
+        ttRef.current,
+        onInfo,
+        historyHashes,
+        token,
+        maxDepth,
+        rootMoveScores,
+        diversifyRoot,
+      );
+      return handleStrictResult(
+        res.best,
+        res.depth,
+        res.score,
+        res.nodes,
+        token,
+        noTimeLimit,
+        maxDepth,
+        guideLabels.length ? guideLabels.join(', ') : undefined,
+        onInfo,
+      );
+    })().catch(() => {
       setThinking(false);
       return undefined;
     });
@@ -180,6 +217,7 @@ export function useCodexEngine() {
       pending.token,
       pending.noTimeLimit,
       pending.maxDepth,
+      undefined,
       pending.onInfo,
     );
     pending.resolve(best);
@@ -227,30 +265,6 @@ export function useCodexEngine() {
     setThinking(true);
 
     const noTimeLimit = !Number.isFinite(ms) || ms <= 0;
-    if (difficulty === 'master') {
-      const budgetMs = noTimeLimit ? 0 : Math.max(450, ms);
-      const sims = simsFromBudgetMs(budgetMs, noTimeLimit);
-      return azBestMove(pos, sims).then(move => {
-        setThinking(false);
-        if (token.cancelled) return undefined;
-        setLastPlan({
-          mode: 'az',
-          reason: noTimeLimit
-            ? `az-only ${sims} sims (no time limit)`
-            : `az-only ${sims} sims`,
-        });
-        const info = move
-          ? ({ depth: 0, score: 0, nodes: sims, pv: [move] } as SearchInfo)
-          : null;
-        setLastInfo(info);
-        if (info) onInfo?.(info);
-        return move;
-      }).catch(() => {
-        setThinking(false);
-        return undefined;
-      });
-    }
-
     const profile = HYBRID_PROFILE[difficulty];
     const budgetMs = noTimeLimit ? 0 : Math.max(350, Math.min(ms, profile.budgetMs));
 
@@ -261,6 +275,7 @@ export function useCodexEngine() {
       historyHashes,
       token,
       profile.hybridDifficulty,
+      difficulty === 'master',
     ).then(res => {
       setThinking(false);
       if (token.cancelled) return undefined;

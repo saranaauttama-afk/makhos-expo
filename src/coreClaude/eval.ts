@@ -82,6 +82,21 @@ function mobilityScore(p: Position): number {
   const opp  = side === 1 ? -1 : 1 as 1 | -1;
   let my = 0, op = 0;
 
+  const kingRayMobility = (sq: number) => {
+    let total = 0;
+    for (const first of STEPS[sq]) {
+      let cur = first.to;
+      while (cur >= 0) {
+        if (occ & B1(cur)) break;
+        total++;
+        const next = STEPS[cur].find(st => st.dir === first.dir);
+        if (!next) break;
+        cur = next.to;
+      }
+    }
+    return total;
+  };
+
   for (const sq of bits(side === 1 ? p.p1Men : p.p2Men))
     for (const st of STEPS[sq]) {
       if (side === 1  && (st.dir === 'DL' || st.dir === 'DR')) continue;
@@ -89,8 +104,7 @@ function mobilityScore(p: Position): number {
       if (!(occ & B1(st.to))) my++;
     }
   for (const sq of bits(side === 1 ? p.p1Kings : p.p2Kings))
-    for (const st of STEPS[sq])
-      if (!(occ & B1(st.to))) my++;
+    my += kingRayMobility(sq);
 
   for (const sq of bits(side === 1 ? p.p2Men : p.p1Men))
     for (const st of STEPS[sq]) {
@@ -99,8 +113,7 @@ function mobilityScore(p: Position): number {
       if (!(occ & B1(st.to))) op++;
     }
   for (const sq of bits(side === 1 ? p.p2Kings : p.p1Kings))
-    for (const st of STEPS[sq])
-      if (!(occ & B1(st.to))) op++;
+    op += kingRayMobility(sq);
 
   return 1 * (my - op); // Texel-tuned: 5→1
 }
@@ -122,7 +135,38 @@ function backRankGuard(p: Position): number {
   return score;
 }
 
-// ── King endgame proximity ────────────────────────────────────────────────────
+// ── Promotion threats ─────────────────────────────────────────────────────────
+// Reward men close to promotion when at least one forward lane is still open.
+// Cheap enough for leaf eval: adjacency only, no full move generation.
+function promotionThreatScore(p: Position): number {
+  const occ = (p.p1Men | p.p1Kings | p.p2Men | p.p2Kings) >>> 0;
+  const side = p.side;
+
+  const scoreMen = (men: BB, menSide: 1 | -1) => {
+    let score = 0;
+    for (const sq of bits(men)) {
+      const { r } = toRC(sq);
+      const dist = menSide === 1 ? r : 7 - r;
+      if (dist > 2) continue;
+
+      let hasLane = false;
+      for (const st of STEPS[sq]) {
+        if (menSide === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue;
+        if (menSide === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
+        if (!(occ & B1(st.to))) { hasLane = true; break; }
+      }
+      if (!hasLane) continue;
+      score += dist <= 1 ? 28 : 10;
+    }
+    return score;
+  };
+
+  const myMen = side === 1 ? p.p1Men : p.p2Men;
+  const opMen = side === 1 ? p.p2Men : p.p1Men;
+  const opSide = (side === 1 ? -1 : 1) as 1 | -1;
+  return scoreMen(myMen, side) - scoreMen(opMen, opSide);
+}
+
 // When ahead in piece count and we have kings vs enemy men:
 // reward our kings for being close to enemy men (guides the king to hunt them).
 function kingEndgameScore(p: Position): number {
@@ -200,10 +244,11 @@ export function handEvaluate(p: Position): number {
   score += materialScore(p, kingVal);
   score += psqtScore(p);
   score += mobilityScore(p);
+  score += promotionThreatScore(p);
   // protectedMenBonus: Texel tuning found weight 0 — omitted
   score += backRankGuard(p) * (1 - eg); // less critical in endgame
   score += simplificationBonus(p);
-  // kingEndgameScore: Texel tuning found kegDistW=0 — omitted
+  score += Math.round(kingEndgameScore(p) * eg * 0.35);
 
   return score | 0;
 }

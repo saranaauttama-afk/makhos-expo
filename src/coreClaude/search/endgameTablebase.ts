@@ -32,6 +32,7 @@ const sharedMemo = new Map<string, SolveResult>();
 
 // Precompute status — true once background precomputation finishes
 let _tablebaseReady = false;
+let _tablebasePrecompute: Promise<void> | undefined;
 export function isEndgameTablebaseReady(): boolean { return _tablebaseReady; }
 
 function keyMove(move: Move) {
@@ -266,10 +267,21 @@ function combinations(n: number, k: number): number[][] {
   return result;
 }
 
-export async function precomputeEndgameTablebase(
+export function precomputeEndgameTablebase(
   onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
-  if (_tablebaseReady) return;
+  if (_tablebaseReady) return Promise.resolve();
+  if (!_tablebasePrecompute) {
+    _tablebasePrecompute = precomputeEndgameTablebaseImpl(onProgress).finally(() => {
+      if (!_tablebaseReady) _tablebasePrecompute = undefined;
+    });
+  }
+  return _tablebasePrecompute;
+}
+
+async function precomputeEndgameTablebaseImpl(
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
 
   // Piece configurations satisfying canProbe():
   //   (a) totalPieces ≤ 3, both sides have ≥ 1 piece

@@ -15,6 +15,8 @@ export interface WalletModel {
   undoCredits: number;
   noAdsUnlocked: boolean;
   adConsent: AdConsentStatus;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
 }
 
 export interface MonetizationState {
@@ -23,6 +25,8 @@ export interface MonetizationState {
   undoCredits: number;
   noAdsUnlocked: boolean;
   adConsent: AdConsentStatus;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
   interstitialCounter: number;
   interstitialSeen: number;
   rewardedSeen: number;

@@ -12,6 +12,7 @@ export interface Move {
   to: number;
   captured: number[]; // indices of captured squares (dark-square indices)
   promote: boolean;   // men only; kings never promote
+  path?: number[];    // landing squares for multi-capture display/input
 }
 
 // P1 เดินขึ้น (ไปด้านบน) → โปรโมตเมื่อถึงแถวบนสุด (dark 4 ช่องแรก: 0..3)
@@ -230,7 +231,7 @@ function genMenCapturesFrom(p: Position, from: number, out: Move[]) {
     if (!extended && caps.length > 0) {
       const lastTo = path.length ? path[path.length - 1] : cur;
       const promote = willPromote(p.side, lastTo);
-      out.push({ from, to: lastTo, captured: [...caps], promote });
+      out.push({ from, to: lastTo, captured: [...caps], promote, path: [...path] });
     }
   }
 
@@ -312,7 +313,7 @@ function genKingCapturesFrom(p: Position, from: number, out: Move[]) {
     if (!extended && caps.length > 0) {
       const lastTo = path.length ? path[path.length - 1] : cur;
       // king never promotes
-      out.push({ from, to: lastTo, captured: [...caps], promote: false });
+      out.push({ from, to: lastTo, captured: [...caps], promote: false, path: [...path] });
     }
   }
 

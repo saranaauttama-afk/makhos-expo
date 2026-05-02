@@ -13,11 +13,11 @@ import { Difficulty } from './types';
 
 type ArenaLevel = Difficulty;
 const ARENA_LEVELS: { id: ArenaLevel; label: string }[] = [
-  { id: 'easy', label: 'MM5' },
-  { id: 'normal', label: 'MM7' },
-  { id: 'hard', label: 'MM9' },
-  { id: 'expert', label: 'MM11' },
-  { id: 'master', label: 'AZ' },
+  { id: 'easy', label: 'Level 1' },
+  { id: 'normal', label: 'Level 2' },
+  { id: 'hard', label: 'Level 3' },
+  { id: 'expert', label: 'Level 4' },
+  { id: 'master', label: 'Level 5' },
 ];
 const THINK_MS: Record<ArenaLevel, number> = {
   easy: 0,
@@ -27,11 +27,11 @@ const THINK_MS: Record<ArenaLevel, number> = {
   master: 4500,
 };
 const LEVEL_LABEL: Record<ArenaLevel, string> = {
-  easy: 'MM5',
-  normal: 'MM7',
-  hard: 'MM9',
-  expert: 'MM11',
-  master: 'AZ',
+  easy: 'Level 1',
+  normal: 'Level 2',
+  hard: 'Level 3',
+  expert: 'Level 4',
+  master: 'Level 5',
 };
 const STRICT_MM_DEPTH: Record<Exclude<ArenaLevel, 'master'>, number> = {
   easy: 5,
@@ -44,7 +44,7 @@ const LEVEL_MODE_TAG: Record<ArenaLevel, string> = {
   normal: 'STRICT',
   hard: 'STRICT',
   expert: 'STRICT',
-  master: 'AZ',
+  master: 'GUIDED',
 };
 
 interface LogEntry {
@@ -57,7 +57,7 @@ interface LogEntry {
 function fmtMove(m: Move): string {
   const cap = m.captured.length > 0 ? `x${m.captured.length}` : '';
   const promo = m.promote ? 'K' : '';
-  return `${m.from}->${m.to}${cap}${promo}`;
+  return `${m.from + 1}->${m.to + 1}${cap}${promo}`;
 }
 
 function LevelBtn({ level, active, onPress }: { level: ArenaLevel; active: boolean; onPress: () => void }) {
@@ -439,44 +439,45 @@ const styles = StyleSheet.create({
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: PANEL },
   backBtn: { minHeight: 30, borderWidth: 1, borderColor: LINE, borderRadius: 999, backgroundColor: PANEL_DARK, justifyContent: 'center', paddingHorizontal: 10 },
-  backText: { fontSize: 11, color: WHITE, fontWeight: '800', letterSpacing: 0.6 },
+  backText: { fontSize: 11, color: WHITE, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.6 },
   resetBtn: { minHeight: 30, borderWidth: 1, borderColor: LINE, borderRadius: 999, backgroundColor: PANEL_DARK, justifyContent: 'center', paddingHorizontal: 10 },
-  resetText: { fontSize: 11, color: SOFT, fontWeight: '800', letterSpacing: 0.6 },
-  title: { fontSize: 17, fontWeight: '900', color: WHITE, letterSpacing: 0.6 },
+  resetText: { fontSize: 11, color: SOFT, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.6 },
+  title: { fontSize: 17, fontFamily: 'Kanit_800ExtraBold', color: WHITE, letterSpacing: 0.6 },
 
   agentRow: { flexDirection: 'row', gap: 10, width: '100%' },
   agentCol: { flex: 1, gap: 5, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: PANEL, padding: 8 },
-  sideLabel: { fontSize: 10, fontWeight: '800', color: GOLD, textTransform: 'uppercase', letterSpacing: 0.8 },
+  sideLabel: { fontSize: 10, fontFamily: 'Kanit_800ExtraBold', color: GOLD, textTransform: 'uppercase', letterSpacing: 0.8 },
   agentBtn: { minHeight: 30, borderRadius: 999, borderWidth: 1, borderColor: LINE, backgroundColor: PANEL_DARK, alignItems: 'center', justifyContent: 'center' },
   agentBtnActive: { borderColor: MINT, backgroundColor: '#2f6b62' },
-  agentText: { fontSize: 11, fontWeight: '700', color: SOFT, letterSpacing: 0.4 },
+  agentText: { fontSize: 11, fontFamily: 'Kanit_700Bold', color: SOFT, letterSpacing: 0.4 },
   agentTextActive: { color: WHITE },
 
   mainRow: { flexDirection: 'row', gap: 10, width: '100%', flex: 1 },
   boardStage: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8, borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: PANEL },
   comboBadge: { position: 'absolute', top: 8, zIndex: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#2f6b62', borderWidth: 1, borderColor: GOLD },
-  comboBadgeText: { fontSize: 11, fontWeight: '900', color: GOLD, letterSpacing: 0.7 },
+  comboBadgeText: { fontSize: 11, fontFamily: 'Kanit_800ExtraBold', color: GOLD, letterSpacing: 0.7 },
 
   logPanel: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: LINE, backgroundColor: PANEL, padding: 8 },
-  logTitle: { fontSize: 11, fontWeight: '800', color: GOLD, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  logTitle: { fontSize: 11, fontFamily: 'Kanit_800ExtraBold', color: GOLD, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
   logScroll: { flex: 1 },
   logEntry: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
-  logPly: { fontSize: 10, fontWeight: '700', width: 20 },
+  logPly: { fontSize: 10, fontFamily: 'Kanit_700Bold', width: 20 },
   logP1: { color: P1_CLR },
   logP2: { color: P2_CLR },
-  logAgent: { fontSize: 10, fontWeight: '700', color: SOFT, width: 18 },
-  logMove: { fontSize: 11, fontWeight: '600', color: WHITE },
+  logAgent: { fontSize: 10, fontFamily: 'Kanit_700Bold', color: SOFT, width: 18 },
+  logMove: { fontSize: 11, fontFamily: 'Kanit_500Medium', color: WHITE },
 
   statusRow: { width: '100%', minHeight: 28, justifyContent: 'center', borderWidth: 1, borderColor: LINE, borderRadius: 12, backgroundColor: PANEL, paddingHorizontal: 10 },
-  thinkText: { fontSize: 12, fontWeight: '700', color: GOLD },
-  turnText: { fontSize: 12, color: SOFT, fontWeight: '600' },
-  resultText: { fontSize: 13, fontWeight: '800', color: MINT },
+  thinkText: { fontSize: 12, fontFamily: 'Kanit_700Bold', color: GOLD },
+  turnText: { fontSize: 12, color: SOFT, fontFamily: 'Kanit_500Medium' },
+  resultText: { fontSize: 13, fontFamily: 'Kanit_800ExtraBold', color: MINT },
 
   controls: { width: '100%', flexDirection: 'row', gap: 10, paddingBottom: 4 },
   playBtn: { flex: 1, minHeight: 42, backgroundColor: '#2f6b62', borderWidth: 1, borderColor: MINT, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   stopBtn: { backgroundColor: '#7d4a56', borderColor: '#f2c5c5' },
   stepBtn: { minWidth: 92, minHeight: 42, backgroundColor: PANEL_DARK, borderWidth: 1, borderColor: LINE, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   btnDisabled: { opacity: 0.45 },
-  playText: { fontSize: 12, fontWeight: '800', color: WHITE, letterSpacing: 0.5 },
-  stepText: { fontSize: 12, fontWeight: '800', color: WHITE, letterSpacing: 0.5 },
+  playText: { fontSize: 12, fontFamily: 'Kanit_800ExtraBold', color: WHITE, letterSpacing: 0.5 },
+  stepText: { fontSize: 12, fontFamily: 'Kanit_800ExtraBold', color: WHITE, letterSpacing: 0.5 },
 });
+

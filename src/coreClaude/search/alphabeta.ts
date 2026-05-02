@@ -19,9 +19,12 @@ import {
 import { hashPosition } from './zobrist';
 
 export interface SearchInfo  { depth: number; score: number; nodes: number; pv: Move[]; }
-export interface SearchResult { best?: Move; score: number; nodes: number; depth: number; }
+export interface RootSearchCandidate { move: Move; score: number; }
+export interface SearchResult { best?: Move; score: number; nodes: number; depth: number; rootCandidates?: RootSearchCandidate[]; }
 export interface CancelToken  { cancelled: boolean; }
+export type RootMoveScores = ReadonlyMap<number, number>;
 type OnInfo = (info: SearchInfo) => void;
+type RootCandidate = RootSearchCandidate;
 
 // Eval override — allows A/B testing without changing all call sites
 let _eval: (p: Position) => number = evaluate;
@@ -51,15 +54,139 @@ const LMR: Uint8Array[] = Array.from({ length: 32 }, (_, i) =>
   )
 );
 
-function key(m: Move) { return (m.from << 5) | m.to; }
+export function moveKey(m: Move) { return (m.from << 5) | m.to; }
+
+function rootHint(rootMoveScores: RootMoveScores | undefined, k: number): number {
+  return rootMoveScores?.get(k) ?? 0;
+}
+
+function pickDiversifiedRoot(candidates: RootCandidate[], bestScore: number): RootCandidate | undefined {
+  if (candidates.length < 2) return undefined;
+  if (Math.abs(bestScore) > INF - MAX_PLY) return undefined;
+
+  const sorted = [...candidates]
+    .filter(c => c.move.captured.length === 0 && c.score >= bestScore - 35)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+  if (sorted.length < 2) return undefined;
+
+  let total = 0;
+  const weights = sorted.map((c, i) => {
+    const scoreWeight = Math.exp((c.score - sorted[0].score) / 28);
+    const rankWeight = 1 / (1 + i * 0.7);
+    const weight = scoreWeight * rankWeight;
+    total += weight;
+    return weight;
+  });
+
+  let roll = Math.random() * total;
+  for (let i = 0; i < sorted.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return sorted[i];
+  }
+  return sorted[0];
+}
+
+function extendTacticalDepth(depth: number, d: number, move: Move, opHasCaptures: boolean, ply: number): number {
+  if (ply > 18 || depth < 2) return d;
+  let ext = 0;
+  if (move.captured.length > 0 || opHasCaptures) ext++;
+  if (move.captured.length >= 2 && depth <= 6) ext++;
+  // Common tactical blind spot on low depths: quiet move that allows immediate
+  // capture, or a shallow single-capture that gets recaptured right away.
+  if (depth <= 6 && opHasCaptures) {
+    if (move.captured.length === 0) ext++;
+    if (move.captured.length === 1) ext++;
+  }
+  if (ext <= 0) return d;
+  const cap = move.captured.length >= 2 ? depth + 2 : depth + 1;
+  return Math.min(cap, d + ext);
+}
+
+function candidateWindow(candidates: RootCandidate[], bestScore: number, margin = 80): RootCandidate[] {
+  return [...candidates]
+    .filter(c => c.score >= bestScore - margin)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+}
+
+function immediateCaptureRiskAfter(root: Position, move: Move): number {
+  const child = applyMove(root, move);
+  const oppMoves = generateMoves(child);
+  if (!oppMoves.length) return -5_000; // immediate win: opponent has no legal move
+  if (oppMoves[0].captured.length === 0) return 0; // opponent cannot capture right away
+
+  let maxCap = 0;
+  let maxCapLines = 0;
+  let hangingMovedPieceMax = 0;
+  for (const reply of oppMoves) {
+    const cap = reply.captured.length;
+    if (cap > maxCap) {
+      maxCap = cap;
+      maxCapLines = 1;
+    } else if (cap === maxCap) {
+      maxCapLines++;
+    }
+    if (reply.captured.includes(move.to)) {
+      if (cap > hangingMovedPieceMax) hangingMovedPieceMax = cap;
+    }
+  }
+
+  // Penalize immediate tactical shots heavily, especially multi-captures.
+  let risk = maxCap * 140;
+  if (maxCap >= 2) risk += 180;
+  if (maxCap >= 3) risk += 220;
+  // Strongly punish moves that hang the moved piece to immediate capture.
+  if (hangingMovedPieceMax > 0) {
+    risk += 260 + hangingMovedPieceMax * 210;
+    if (hangingMovedPieceMax >= 2) risk += 240;
+  }
+  if (move.captured.length === 0) risk += 50; // quiet self-pin blunders are common
+  if (maxCapLines >= 2) risk += 40;
+  return risk;
+}
+
+function pickSaferRootCandidate(
+  root: Position,
+  candidates: RootCandidate[],
+  bestScore: number,
+): RootCandidate | undefined {
+  if (candidates.length < 2) return undefined;
+
+  // Keep only near-best options so we don't throw away substantial eval value.
+  const shortlist = candidates.filter(c => c.score >= bestScore - 140);
+  if (shortlist.length < 2) return undefined;
+
+  const analyzed = shortlist.map(c => ({
+    ...c,
+    risk: immediateCaptureRiskAfter(root, c.move),
+  }));
+  const byScore = [...analyzed].sort((a, b) => b.score - a.score);
+  const currentBest = byScore[0];
+  const safest = [...analyzed].sort((a, b) => (a.risk - b.risk) || (b.score - a.score))[0];
+
+  // Only override when the tactical risk difference is meaningful.
+  if (currentBest.risk < 200) return undefined;
+  if (safest.risk + 90 > currentBest.risk) return undefined;
+  if (safest.score < bestScore - 115) return undefined;
+  return safest;
+}
 
 // prevKey = key of the move that led to this position (-1 at root)
-function orderMoves(pos: Position, moves: Move[], ttMove: number, ply: number, prevKey = -1): Move[] {
+function orderMoves(
+  pos: Position,
+  moves: Move[],
+  ttMove: number,
+  ply: number,
+  prevKey = -1,
+  rootMoveScores?: RootMoveScores,
+): Move[] {
   const cm = prevKey >= 0 ? counterMove[prevKey] : -1; // look up countermove
   return moves.map(m => {
-    const k = key(m);
+    const k = moveKey(m);
     let s = 0;
     if (k === ttMove)        s += 2_000_000;
+    s += Math.round(rootHint(rootMoveScores, k) * 120_000);
     if (m.captured.length)   s += 100_000 + m.captured.length * 10_000;
     if (k === killers0[ply]) s += 8_000;
     if (k === killers1[ply]) s += 7_000;
@@ -78,7 +205,7 @@ function orderMoves(pos: Position, moves: Move[], ttMove: number, ply: number, p
 }
 
 function updateKillers(m: Move, ply: number) {
-  const k = key(m);
+  const k = moveKey(m);
   if (killers0[ply] !== k) { killers1[ply] = killers0[ply]; killers0[ply] = k; }
 }
 
@@ -86,7 +213,7 @@ function getPV(pos: Position, tt: TT, max = 10): Move[] {
   const pv: Move[] = []; let cur = pos;
   for (let i = 0; i < max; i++) {
     const hit = tt.get(hashPosition(cur)); if (!hit || hit.move == null) break;
-    const mv = generateMoves(cur).find(m => key(m) === hit.move!); if (!mv) break;
+    const mv = generateMoves(cur).find(m => moveKey(m) === hit.move!); if (!mv) break;
     pv.push(mv); cur = applyMove(cur, mv);
   }
   return pv;
@@ -217,7 +344,7 @@ function negamax(
         pushRepetition(rep, ch);
         acc.n++;
         tried++;
-        const s = -negamax(child, pcDepth, -pcBeta, -(pcBeta - 1), tt, deadline, acc, ply + 1, rep, true, key(m));
+        const s = -negamax(child, pcDepth, -pcBeta, -(pcBeta - 1), tt, deadline, acc, ply + 1, rep, true, moveKey(m));
         popRepetition(rep, ch);
         if (s >= pcBeta) return beta; // Probcut — fail high
       }
@@ -260,6 +387,8 @@ function negamax(
     // LMR — skip if opponent will have forced captures (sacrifice/tactic position).
     // hasCapturesAvailable is O(pieces) vs full generateMoves, avoiding double movegen.
     const opHasCaptures = isQ && hasCapturesAvailable(child);
+    d = extendTacticalDepth(depth, d, m, opHasCaptures, ply);
+    const fullD = d;
     if (i >= 3 && d >= 2 && isQ && !single && !opHasCaptures) {
       d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
     }
@@ -269,14 +398,14 @@ function negamax(
     if (isQ && !single && depth <= 2 && i >= (depth === 1 ? 6 : 10) && alpha > -INF + MAX_PLY) break;
 
     pushRepetition(rep, ch);
-    const mk = key(m); // move key — passed as prevMoveKey to child nodes
+    const mk = moveKey(m); // move key — passed as prevMoveKey to child nodes
     let score: number;
     if (i === 0) {
       score = -negamax(child, d, -beta, -alpha, tt, deadline, acc, ply+1, rep, true, mk);
     } else {
       score = -negamax(child, d, -(alpha+1), -alpha, tt, deadline, acc, ply+1, rep, true, mk);
       if (score > alpha && score < beta) {
-        score = -negamax(child, depth-1, -beta, -alpha, tt, deadline, acc, ply+1, rep, true, mk);
+        score = -negamax(child, fullD, -beta, -alpha, tt, deadline, acc, ply+1, rep, true, mk);
       }
     }
     popRepetition(rep, ch);
@@ -306,6 +435,8 @@ export async function iterativeDeepening(
   root: Position, timeMs: number, tt = new TT(), onInfo?: OnInfo,
   historyHashes: number[] = [], cancel?: CancelToken,
   maxDepth = 24,
+  rootMoveScores?: RootMoveScores,
+  diversifyRoot = false,
 ): Promise<SearchResult> {
   const deadline  = Date.now() + timeMs;
   const rootHash  = hashPosition(root);
@@ -333,6 +464,8 @@ export async function iterativeDeepening(
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, reached = 0;
+  let lastRootCandidates: RootCandidate[] | undefined;
+  let lastRootScore = 0;
   let lastScore = 0, haveLast = false;
   const acc = { n: 0 };
   // Adaptive time: track how many consecutive depths produced the same best move
@@ -348,7 +481,7 @@ export async function iterativeDeepening(
     let winSize = haveLast ? 150 : INF;
     let alpha   = haveLast ? lastScore - winSize : -INF;
     let beta    = haveLast ? lastScore + winSize : INF;
-    let result: { move?: Move; score: number } = { score: 0 };
+    let result: { move?: Move; score: number; candidates?: RootCandidate[] } = { score: 0 };
 
     while (true) {
       // Cooperative yield between aspiration retries.
@@ -356,9 +489,10 @@ export async function iterativeDeepening(
       // Run root search (first move full window, rest PVS)
       const moves = generateMoves(root);
       if (!moves.length) break;
-      const ordered = orderMoves(root, moves, tt.get(rootHash)?.move ?? -1, 0);
+      const ordered = orderMoves(root, moves, tt.get(rootHash)?.move ?? -1, 0, -1, rootMoveScores);
 
       let rootBest = -INF, rootMove: Move | undefined;
+      const rootCandidates: RootCandidate[] = [];
       acc.n = 0;
 
       for (let i = 0; i < ordered.length; i++) {
@@ -370,7 +504,7 @@ export async function iterativeDeepening(
         const m      = ordered[i];
         const child  = applyMove(root, m);
         const ch     = hashPosition(child);
-        const mk     = key(m);
+        const mk     = moveKey(m);
         const single = ordered.length === 1;
         const total  = bitCount(child.p1Men|child.p1Kings|child.p2Men|child.p2Kings);
         const isQ    = m.captured.length === 0;
@@ -380,6 +514,8 @@ export async function iterativeDeepening(
         if (total <= 5) d = Math.min(depth, d+1);
         // LMR at root — skip on tactical positions (opponent has forced captures)
         const opCapRoot = isQ && hasCapturesAvailable(child);
+        d = extendTacticalDepth(depth, d, m, opCapRoot, 0);
+        const fullD = d;
         if (i >= 3 && d >= 2 && isQ && !single && !opCapRoot) {
           d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
         }
@@ -391,18 +527,19 @@ export async function iterativeDeepening(
         } else {
           score = -negamax(child, d, -(alpha+1), -alpha, tt, deadline, acc, 1, rep, true, mk);
           if (score > alpha && score < beta)
-            score = -negamax(child, depth-1, -beta, -alpha, tt, deadline, acc, 1, rep, true, mk);
+            score = -negamax(child, fullD, -beta, -alpha, tt, deadline, acc, 1, rep, true, mk);
         }
         popRepetition(rep, ch);
         acc.n++;
 
+        rootCandidates.push({ move: m, score });
         if (score > rootBest) { rootBest = score; rootMove = m; }
         if (score > alpha) alpha = score;
         if (alpha >= beta) break;
       }
 
       nodes += acc.n;
-      result = { move: rootMove, score: rootBest };
+      result = { move: rootMove, score: rootBest, candidates: rootCandidates };
 
       if (cancel?.cancelled || Date.now() > deadline) break;
       if (rootBest <= (haveLast ? lastScore - winSize : -INF)) {
@@ -416,14 +553,71 @@ export async function iterativeDeepening(
 
     if (cancel?.cancelled || Date.now() > deadline) break;
     if (result.move) { best = result.move; bestScore = result.score; reached = depth; }
+    if (result.candidates?.length) {
+      lastRootCandidates = result.candidates;
+      lastRootScore = result.score;
+    }
     lastScore = result.score; haveLast = true;
     onInfo?.({ depth, score: bestScore, nodes, pv: getPV(root, tt) });
 
     // Adaptive time: if the best move hasn't changed for 3+ depths and we've
     // used ≥50% of the time budget, the search has converged — stop early.
-    const newBestKey = result.move ? key(result.move) : -1;
+    const newBestKey = result.move ? moveKey(result.move) : -1;
     if (newBestKey === lastBestKey) { stableDepths++; } else { stableDepths = 0; lastBestKey = newBestKey; }
     if (stableDepths >= 3 && Date.now() > startTime + timeMs * 0.5) break;
+  }
+
+  if (lastRootCandidates?.length) {
+    // Before adding opening variety, re-check the top root alternatives with a
+    // wide window. This catches occasional aspiration / ordering artifacts at
+    // the root without paying the cost for every legal move.
+    if (reached >= 5 && Date.now() + 50 < deadline && !cancel?.cancelled) {
+      const verifyAcc = { n: 0 };
+      const updated = [...lastRootCandidates];
+      for (const candidate of candidateWindow(lastRootCandidates, bestScore, 95)) {
+        if (Date.now() > deadline || cancel?.cancelled || stop.flag) break;
+        const child = applyMove(root, candidate.move);
+        const ch = hashPosition(child);
+        const isQ = candidate.move.captured.length === 0;
+        let d = Math.max(1, reached - 1);
+        const total = bitCount(child.p1Men | child.p1Kings | child.p2Men | child.p2Kings);
+        if (total <= 5) d = Math.min(reached, d + 1);
+        d = extendTacticalDepth(reached, d, candidate.move, isQ && hasCapturesAvailable(child), 0);
+        if (candidate.move.captured.length >= 2) d = Math.min(reached + 1, d + 1);
+
+        pushRepetition(rep, ch);
+        const score = -negamax(child, d, -INF, INF, tt, deadline, verifyAcc, 1, rep, true, moveKey(candidate.move));
+        popRepetition(rep, ch);
+        verifyAcc.n++;
+
+        const idx = updated.findIndex(c => moveKey(c.move) === moveKey(candidate.move));
+        if (idx >= 0) updated[idx] = { move: candidate.move, score };
+        if (score > bestScore) {
+          best = candidate.move;
+          bestScore = score;
+        }
+      }
+      nodes += verifyAcc.n;
+      lastRootCandidates = updated;
+      lastRootScore = bestScore;
+    }
+
+    if (diversifyRoot) {
+      const selected = pickDiversifiedRoot(lastRootCandidates, lastRootScore);
+      if (selected) {
+        best = selected.move;
+        bestScore = selected.score;
+      }
+    }
+
+    // Tactical blunder guard at root:
+    // if the top-eval move hangs an immediate multi-capture and there is a
+    // near-equal safer move, prefer the safer move.
+    const safer = pickSaferRootCandidate(root, lastRootCandidates, bestScore);
+    if (safer) {
+      best = safer.move;
+      bestScore = safer.score;
+    }
   }
 
   // Safety fallback: if the search somehow produced no best move (e.g. time
@@ -434,5 +628,5 @@ export async function iterativeDeepening(
     if (fallback.length) best = fallback[0];
   }
 
-  return { best, score: bestScore, nodes, depth: reached };
+  return { best, score: bestScore, nodes, depth: reached, rootCandidates: lastRootCandidates };
 }

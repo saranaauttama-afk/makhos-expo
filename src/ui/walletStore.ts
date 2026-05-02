@@ -4,7 +4,7 @@ import { loadPersistedMonetization, savePersistedMonetization } from './walletPe
 
 export type SpendKind = 'hint' | 'undo';
 export type RewardKind = 'coins' | 'hint' | 'undo';
-export type MatchOutcome = 'win' | 'loss' | 'draw';
+export type MatchOutcome = 'win' | 'loss' | 'draw' | 'surrender';
 export type SpendSource = 'credit' | 'coins' | 'none';
 
 export const HINT_COST = 10;
@@ -19,6 +19,8 @@ export const DEFAULT_MONETIZATION_STATE: MonetizationState = {
   undoCredits: 0,
   noAdsUnlocked: false,
   adConsent: 'unknown',
+  soundEnabled: true,
+  vibrationEnabled: true,
   interstitialCounter: 0,
   interstitialSeen: 0,
   rewardedSeen: 0,
@@ -147,6 +149,14 @@ export function useWalletStore(initial?: Partial<MonetizationState>) {
     setMonetization(prev => ({ ...prev, adConsent }));
   }, []);
 
+  const setSoundEnabled = useCallback((soundEnabled: boolean) => {
+    setMonetization(prev => ({ ...prev, soundEnabled }));
+  }, []);
+
+  const setVibrationEnabled = useCallback((vibrationEnabled: boolean) => {
+    setMonetization(prev => ({ ...prev, vibrationEnabled }));
+  }, []);
+
   const consumeSpend = useCallback((kind: SpendKind): SpendSource => {
     const result = resolveSpend(stateRef.current, kind);
     if (result.source !== 'none') {
@@ -224,6 +234,8 @@ export function useWalletStore(initial?: Partial<MonetizationState>) {
       walletHydrated,
       setMonetization,
       setAdConsent,
+      setSoundEnabled,
+      setVibrationEnabled,
       consumeSpend,
       claimReward,
       applyMatchOutcome,
@@ -237,6 +249,8 @@ export function useWalletStore(initial?: Partial<MonetizationState>) {
       monetization,
       walletHydrated,
       setAdConsent,
+      setSoundEnabled,
+      setVibrationEnabled,
       consumeSpend,
       claimReward,
       applyMatchOutcome,

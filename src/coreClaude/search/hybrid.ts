@@ -2,13 +2,14 @@ import { bitCount } from '../bitboards';
 import { azBestMove } from '../azMcts';
 import { Move, generateMoves } from '../movegen';
 import { Position } from '../position';
-import { CancelToken, iterativeDeepening, SearchInfo } from './alphabeta';
+import { CancelToken, iterativeDeepening, RootMoveScores, SearchInfo } from './alphabeta';
+import { getAZRootMoveScores } from './azGuide';
 import { lookupOpeningBook } from './openingBook';
 import { TT } from './tt';
 import { isAZRuntimeAvailable } from '../azNet';
 
 export type HybridDifficulty = 'easy' | 'medium' | 'hard';
-export type HybridMode = 'book' | 'az' | 'alphabeta' | 'forced';
+export type HybridMode = 'book' | 'az' | 'az-guided' | 'alphabeta' | 'forced';
 
 export interface HybridPlan {
   mode: HybridMode;
@@ -38,7 +39,7 @@ const AB_BUDGET_MS: Record<HybridDifficulty, { tactical: number; endgame: number
   medium: { tactical: 1200, endgame: 1600 },
   hard: { tactical: 2200, endgame: 3200 },
 };
-const NO_LIMIT_BUDGET_MS = 24 * 60 * 60 * 1000;
+const NO_LIMIT_BUDGET_MS = 12_000;
 
 function pieceCounts(pos: Position) {
   const men = bitCount(pos.p1Men | pos.p2Men);
@@ -91,6 +92,7 @@ export async function hybridBestMove(
   historyHashes: number[] = [],
   cancel?: CancelToken,
   difficulty: HybridDifficulty = 'medium',
+  guidedSearch = false,
 ): Promise<HybridResult> {
   const noTimeLimit = !Number.isFinite(ms) || ms <= 0;
   const plan = classifyPosition(pos, difficulty, historyHashes);
@@ -124,11 +126,42 @@ export async function hybridBestMove(
     const searchMs = noTimeLimit
       ? NO_LIMIT_BUDGET_MS
       : Math.max(250, Math.min(ms, budget));
-    const result = await iterativeDeepening(pos, searchMs, tt, undefined, historyHashes, cancel);
+    let rootMoveScores: RootMoveScores | undefined;
+    if (guidedSearch) {
+      try {
+        rootMoveScores = await getAZRootMoveScores(pos, moves);
+      } catch {
+        rootMoveScores = undefined;
+      }
+    }
+    const result = await iterativeDeepening(pos, searchMs, tt, undefined, historyHashes, cancel, 24, rootMoveScores);
     return {
       move: result.best,
       info: result.depth > 0 ? { depth: result.depth, score: result.score, nodes: result.nodes, pv: result.best ? [result.best] : [] } : null,
-      plan,
+      plan: rootMoveScores
+        ? { mode: 'az-guided', reason: `${plan.reason}, AZ-guided ordering` }
+        : plan,
+    };
+  }
+
+  if (guidedSearch) {
+    let rootMoveScores: RootMoveScores | undefined;
+    try {
+      rootMoveScores = await getAZRootMoveScores(pos, moves);
+    } catch {
+      rootMoveScores = undefined;
+    }
+    const searchMs = noTimeLimit
+      ? NO_LIMIT_BUDGET_MS
+      : Math.max(700, Math.min(ms, AB_BUDGET_MS[difficulty].endgame));
+    const result = await iterativeDeepening(pos, searchMs, tt, undefined, historyHashes, cancel, 24, rootMoveScores);
+    return {
+      move: result.best,
+      info: result.depth > 0 ? { depth: result.depth, score: result.score, nodes: result.nodes, pv: result.best ? [result.best] : [] } : null,
+      plan: {
+        mode: rootMoveScores ? 'az-guided' : 'alphabeta',
+        reason: rootMoveScores ? 'AZ-guided verification search' : 'AZ guide unavailable, fallback search',
+      },
     };
   }
 

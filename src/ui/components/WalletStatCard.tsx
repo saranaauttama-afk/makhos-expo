@@ -35,11 +35,13 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 17,
-    fontWeight: '900',
+    fontFamily: 'Kanit_800ExtraBold',
     letterSpacing: 0.6,
   },
   label: {
     color: SOFT,
     fontSize: 10,
+    fontFamily: 'Kanit_500Medium',
   },
 });
+

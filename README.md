@@ -313,5 +313,47 @@ cd "d:\My App\makhos-v2"
 $env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.10"
 npx expo start --lan -c
 
+cd "D:\My App\PhiKinHuaV6"
+$env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.10"
+npx expo start --lan -c
+
 cd /d "d:\My App\makhos-v2"
-python newAz\eval_local.py --drive-dir "G:\My Drive\makhos_az_v5" --checkpoint iter_0079
+python newAz\eval_local.py --drive-dir "G:\My Drive\makhos_az_v5" --checkpoint iter_0094
+
+cd /d "d:\My App\makhos-v2"
+python newAz\eval_local.py --drive-dir "G:\My Drive\makhos_az_v5" --checkpoint iter_0099
+
+---
+
+## Release Checklist
+
+Use this list before shipping a preview or production build.
+
+### Product / UX
+
+- [ ] Home screen text is correct in both TH/EN
+- [ ] Language switch persists after app restart
+- [ ] Last setup config (mode / side / level) persists after app restart
+- [ ] Sound toggle works (OFF = no sound)
+- [ ] Vibration toggle works (OFF = no vibration)
+- [ ] Hint / Undo / Surrender flows work end-to-end
+
+### Ads / Monetization
+
+- [ ] Interstitial cadence is correct (`every 5 matches`)
+- [ ] No Ads purchase hides forced interstitial ads
+- [ ] Rewarded actions (coins / hint / undo) are user-triggered only
+- [ ] Account footer shows company + app version
+
+### Technical
+
+- [ ] `npx tsc --noEmit` passes
+- [ ] Android/iOS open without runtime crash on real device
+- [ ] Settings and wallet values persist on mobile (`AsyncStorage` working)
+
+### Store Readiness
+
+- [ ] Privacy Policy URL ready
+- [ ] App metadata (title, short/full description, screenshots, icon) ready
+- [ ] Build `preview` passed on device
+- [ ] Build `production` generated successfully

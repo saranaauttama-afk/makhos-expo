@@ -24,50 +24,53 @@ const PINK = '#f2c5c5';
 const WHITE = '#f5f2e8';
 const SOFT = '#d7efe8';
 
-const LEVELS: Array<{ id: Difficulty; tint: string }> = [
+type SelectableDifficulty = Exclude<Difficulty, 'master'>;
+const LEVELS: Array<{ id: SelectableDifficulty; tint: string }> = [
   { id: 'easy', tint: MINT },
   { id: 'normal', tint: CYAN },
   { id: 'hard', tint: GOLD },
   { id: 'expert', tint: PINK },
-  { id: 'master', tint: '#ff8a5e' },
 ];
+
+function clampSelectableDifficulty(value: Difficulty): SelectableDifficulty {
+  return value === 'master' ? 'expert' : value;
+}
 
 const COPY = {
   th: {
-    back: 'BACK',
-    title: 'SETUP',
-    subtitle: 'โหมด ฝั่ง และระดับ',
-    mode: 'MODE',
-    side: 'SIDE',
-    level: 'LEVEL',
-    thinkBudget: 'ENGINE MODE',
-    modeAi: 'VS AI',
-    modeHuman: 'VS HUMAN',
+    back: 'กลับ',
+    title: 'ตั้งค่าเกม',
+    subtitle: 'เลือกโหมด ฝั่งเล่น และระดับ',
+    mode: 'โหมด',
+    side: 'ฝั่งเล่น',
+    sideP1: 'ผู้เล่น 1',
+    sideP2: 'ผู้เล่น 2',
+    level: 'ระดับ',
+    modeAi: 'เล่นกับ AI',
+    modeHuman: 'เล่น 2 คน',
     selected: 'เลือกแล้ว',
     selectedLabel: 'ระดับที่เลือก',
-    start: 'START MATCH',
-    adPlan: 'AD PLAN',
-    noAdsActive: 'เปิด No Ads แล้ว - มีเฉพาะโฆษณาแบบสมัครใจ',
-    freeMode: 'โหมดฟรี - มี interstitial หลังจบบางแมตช์',
+    start: 'เริ่มเกม',
+    adPlan: 'โหมดโฆษณา',
+    noAdsActive: 'เปิด No Ads แล้ว - จะมีเฉพาะโฆษณาแบบสมัครใจ',
+    freeMode: 'โหมดฟรี - มีโฆษณาคั่นหลังจบบางแมตช์',
     rewardCredits: 'เครดิตรางวัล',
-    hint: 'Hint',
-    undo: 'Undo',
-    account: 'ACCOUNT',
-    thinkLimited: 'FAST',
-    thinkUnlimited: 'STRENGTH',
+    hint: 'แนะนำ',
+    undo: 'ย้อนตา',
+    account: 'บัญชี',
     levelLabels: {
-      easy: 'MM5',
-      normal: 'MM7',
-      hard: 'MM9',
-      expert: 'MM11',
-      master: 'AZ',
+      easy: 'ระดับ 1',
+      normal: 'ระดับ 2',
+      hard: 'ระดับ 3',
+      expert: 'ระดับ 4',
+      master: 'ระดับ 5',
     },
     levelHints: {
-      easy: 'Friendly',
-      normal: 'Balanced',
-      hard: 'Tactical',
-      expert: 'Sharp',
-      master: 'Model only',
+      easy: 'สบายๆ',
+      normal: 'สมดุล',
+      hard: 'วางแผน',
+      expert: 'เข้มข้น',
+      master: 'ค้นหานำทาง',
     },
   },
   en: {
@@ -76,8 +79,9 @@ const COPY = {
     subtitle: 'mode, side, level',
     mode: 'MODE',
     side: 'SIDE',
+    sideP1: 'PLAYER 1',
+    sideP2: 'PLAYER 2',
     level: 'LEVEL',
-    thinkBudget: 'ENGINE MODE',
     modeAi: 'VS AI',
     modeHuman: 'VS HUMAN',
     selected: 'SELECTED',
@@ -90,21 +94,19 @@ const COPY = {
     hint: 'Hint',
     undo: 'Undo',
     account: 'ACCOUNT',
-    thinkLimited: 'FAST',
-    thinkUnlimited: 'STRENGTH',
     levelLabels: {
-      easy: 'MM5',
-      normal: 'MM7',
-      hard: 'MM9',
-      expert: 'MM11',
-      master: 'AZ',
+      easy: 'Level 1',
+      normal: 'Level 2',
+      hard: 'Level 3',
+      expert: 'Level 4',
+      master: 'Level 5',
     },
     levelHints: {
       easy: 'Friendly',
       normal: 'Balanced',
       hard: 'Tactical',
       expert: 'Sharp',
-      master: 'Model only',
+      master: 'Guided search',
     },
   },
 } as const;
@@ -129,9 +131,8 @@ function Chip({
 
 export default function SetupScreen({ language, initialConfig, monetization, onBack, onPlay, onOpenAccount }: Props) {
   const [mode, setMode] = useState<GameMode>(initialConfig.mode);
-  const [difficulty, setDifficulty] = useState<Difficulty>(initialConfig.difficulty);
+  const [difficulty, setDifficulty] = useState<SelectableDifficulty>(clampSelectableDifficulty(initialConfig.difficulty));
   const [humanSide, setHumanSide] = useState<1 | -1>(initialConfig.humanSide);
-  const [unlimitedThink, setUnlimitedThink] = useState<boolean>(initialConfig.unlimitedThink ?? false);
   const t = COPY[language];
 
   const levelHint = useMemo(
@@ -170,20 +171,10 @@ export default function SetupScreen({ language, initialConfig, monetization, onB
         <View style={styles.panel}>
           <Text style={styles.sectionLabel}>{t.side}</Text>
           <View style={styles.row}>
-            <Chip title="P1" active={humanSide === 1} tint={CYAN} onPress={() => setHumanSide(1)} />
-            <Chip title="P2" active={humanSide === -1} tint={PINK} onPress={() => setHumanSide(-1)} />
+            <Chip title={t.sideP1} active={humanSide === 1} tint={CYAN} onPress={() => setHumanSide(1)} />
+            <Chip title={t.sideP2} active={humanSide === -1} tint={PINK} onPress={() => setHumanSide(-1)} />
           </View>
         </View>
-
-        {mode === 'vs-ai' ? (
-          <View style={styles.panel}>
-            <Text style={styles.sectionLabel}>{t.thinkBudget}</Text>
-            <View style={styles.row}>
-              <Chip title={t.thinkLimited} active={!unlimitedThink} tint={CYAN} onPress={() => setUnlimitedThink(false)} />
-              <Chip title={t.thinkUnlimited} active={unlimitedThink} tint={GOLD} onPress={() => setUnlimitedThink(true)} />
-            </View>
-          </View>
-        ) : null}
 
         <View style={styles.panel}>
           <Text style={styles.sectionLabel}>{t.level}</Text>
@@ -213,7 +204,7 @@ export default function SetupScreen({ language, initialConfig, monetization, onB
 
         <Pressable
           style={[styles.playButton, { borderColor: levelTint }]}
-          onPress={() => onPlay({ mode, difficulty, humanSide, unlimitedThink: mode === 'vs-ai' ? unlimitedThink : false })}
+          onPress={() => onPlay({ mode, difficulty, humanSide, unlimitedThink: false })}
         >
           <Text style={styles.playText}>{t.start}</Text>
         </Pressable>
@@ -273,9 +264,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
-  backText: { color: WHITE, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  title: { color: WHITE, fontSize: 22, fontWeight: '900', letterSpacing: 1 },
-  subtitle: { color: SOFT, fontSize: 11 },
+  backText: { color: WHITE, fontSize: 10, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.8 },
+  title: { color: WHITE, fontSize: 22, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 1 },
+  subtitle: { color: SOFT, fontSize: 11, fontFamily: 'Kanit_500Medium' },
   panel: {
     backgroundColor: PANEL,
     borderWidth: 1,
@@ -284,7 +275,7 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 8,
   },
-  sectionLabel: { color: WHITE, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  sectionLabel: { color: WHITE, fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.8 },
   row: { flexDirection: 'row', gap: 8 },
   chip: {
     flex: 1,
@@ -296,7 +287,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  chipText: { color: WHITE, fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  chipText: { color: WHITE, fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.7 },
   levelGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   levelCard: {
     width: '48%',
@@ -317,10 +308,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  levelTitle: { color: WHITE, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
-  levelHint: { color: SOFT, fontSize: 10 },
-  levelSelectedTag: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  levelCurrent: { fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
+  levelTitle: { color: WHITE, fontSize: 13, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.8 },
+  levelHint: { color: SOFT, fontSize: 10, fontFamily: 'Kanit_500Medium' },
+  levelSelectedTag: { fontSize: 9, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.7 },
+  levelCurrent: { fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.4 },
   playButton: {
     minHeight: 48,
     borderWidth: 1,
@@ -329,7 +320,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playText: { color: WHITE, fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
+  playText: { color: WHITE, fontSize: 13, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.8 },
   secondaryButton: {
     flex: 1,
     minHeight: 40,
@@ -340,6 +331,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  secondaryText: { color: SOFT, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
-  helperText: { color: SOFT, fontSize: 11, lineHeight: 16 },
+  secondaryText: { color: SOFT, fontSize: 11, fontFamily: 'Kanit_800ExtraBold', letterSpacing: 0.6 },
+  helperText: { color: SOFT, fontSize: 11, lineHeight: 16, fontFamily: 'Kanit_500Medium' },
 });
+
