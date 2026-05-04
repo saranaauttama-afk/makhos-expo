@@ -16,10 +16,12 @@ export interface StrictLevelPolicy {
 export const STRICT_LEVELS: StrictDifficulty[] = ['easy', 'normal', 'hard', 'expert'];
 
 export const STRICT_LEVEL_POLICY: Record<StrictDifficulty, StrictLevelPolicy> = {
-  easy: { baseDepth: 3, depthCap: 6, baseBudgetMs: 500, budgetCapMs: 1400 },
-  normal: { baseDepth: 6, depthCap: 9, baseBudgetMs: 1200, budgetCapMs: 3200 },
-  hard: { baseDepth: 9, depthCap: 11, baseBudgetMs: 2800, budgetCapMs: 4500 },
-  expert: { baseDepth: 12, depthCap: 14, baseBudgetMs: 5600, budgetCapMs: 7600 },
+  // Rebalanced for better monotonicity: easy is weaker, expert is stronger
+  // This ensures clear strength ladder: easy < normal < hard < expert
+  easy: { baseDepth: 2, depthCap: 5, baseBudgetMs: 400, budgetCapMs: 1200 },
+  normal: { baseDepth: 5, depthCap: 8, baseBudgetMs: 1100, budgetCapMs: 3000 },
+  hard: { baseDepth: 8, depthCap: 11, baseBudgetMs: 2600, budgetCapMs: 4500 },
+  expert: { baseDepth: 11, depthCap: 14, baseBudgetMs: 6000, budgetCapMs: 8500 },
 };
 
 export function isStrictDifficulty(difficulty: EngineDifficulty): difficulty is StrictDifficulty {
@@ -126,9 +128,10 @@ export function selectStrictLevelMove(
   const bestScore = candidates.find(candidate => moveKey(candidate.move) === bestKey)?.score
     ?? Math.max(...candidates.map(candidate => candidate.score));
 
-  const margin = difficulty === 'easy' ? 260 : difficulty === 'normal' ? 45 : 45;
-  const maxRisk = difficulty === 'easy' ? 110 : difficulty === 'normal' ? 70 : 60;
-  const poolSize = difficulty === 'easy' ? 5 : difficulty === 'normal' ? 2 : 2;
+  // Tightened margins for better play quality: easy won't pick moves that are too far from best
+  const margin = difficulty === 'easy' ? 180 : difficulty === 'normal' ? 40 : 35;
+  const maxRisk = difficulty === 'easy' ? 100 : difficulty === 'normal' ? 65 : 55;
+  const poolSize = difficulty === 'easy' ? 4 : difficulty === 'normal' ? 2 : 2;
   const rankBias = difficulty === 'easy' ? 1 : 0;
 
   const pool = [...candidates]

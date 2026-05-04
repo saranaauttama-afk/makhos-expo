@@ -254,6 +254,80 @@ function protectedMenBonus(p: Position): number {
   return score;
 }
 
+// ── Hanging pieces penalty ────────────────────────────────────────────────────
+// Detect pieces that are threatened by opponent but not defended.
+// This is the inverse of protection: a piece is "hanging" when an enemy piece
+// can capture it and either (a) we have no piece that can recapture, or
+// (b) the attacker is protected but our piece is not.
+// This addresses roadmap requirement: "Add cheap tactical features" & "hanging-piece signals"
+function hangingPiecesPenalty(p: Position): number {
+  const side  = p.side;
+  const opp   = (side === 1 ? -1 : 1) as 1 | -1;
+  const myMen = side === 1 ? p.p1Men   : p.p2Men;
+  const myKings = side === 1 ? p.p1Kings : p.p2Kings;
+  const opMen = side === 1 ? p.p2Men   : p.p1Men;
+  const opKings = side === 1 ? p.p2Kings : p.p1Kings;
+  const myAll = (myMen | myKings) >>> 0;
+  const opAll = (opMen | opKings) >>> 0;
+  let penalty = 0;
+
+  // Check if a square is threatened by opponent
+  const isThreatened = (sq: number): boolean => {
+    for (const st of STEPS[sq]) {
+      const attackerSq = st.to;
+      if (!(opAll & B1(attackerSq))) continue;
+
+      // Check if this opponent piece can capture toward our square
+      const isOpMen = !!(opMen & B1(attackerSq));
+      if (isOpMen) {
+        // Men can only capture in their forward directions
+        if (opp === 1  && (st.dir === 'DL' || st.dir === 'DR')) return true;
+        if (opp === -1 && (st.dir === 'UL' || st.dir === 'UR')) return true;
+      } else {
+        // Kings can capture from any diagonal
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check if a square is defended by our pieces
+  const isDefended = (sq: number): boolean => {
+    for (const st of STEPS[sq]) {
+      const defenderSq = st.to;
+      if (!(myAll & B1(defenderSq))) continue;
+
+      // Check if this friendly piece can recapture
+      const isMyMen = !!(myMen & B1(defenderSq));
+      if (isMyMen) {
+        // Men defend from their "behind" diagonals
+        if (side === 1  && (st.dir === 'DL' || st.dir === 'DR')) return true;
+        if (side === -1 && (st.dir === 'UL' || st.dir === 'UR')) return true;
+      } else {
+        // Kings defend from any diagonal
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check our men for hanging
+  for (const sq of bits(myMen)) {
+    if (isThreatened(sq) && !isDefended(sq)) {
+      penalty += 80; // hanging man
+    }
+  }
+
+  // Check our kings for hanging (more valuable, bigger penalty)
+  for (const sq of bits(myKings)) {
+    if (isThreatened(sq) && !isDefended(sq)) {
+      penalty += 150; // hanging king
+    }
+  }
+
+  return -penalty;
+}
+
 // ── Simplification bonus ──────────────────────────────────────────────────────
 // When ahead in pieces, reward trading (fewer pieces = easier technical win).
 function simplificationBonus(p: Position): number {
@@ -277,6 +351,7 @@ export function handEvaluate(p: Position): number {
   score += psqtScore(p);
   score += mobilityScore(p);
   score += promotionThreatScore(p);
+  score += hangingPiecesPenalty(p); // NEW: detect undefended pieces
   // protectedMenBonus: Texel tuning found weight 0 — omitted
   score += backRankGuard(p) * (1 - eg); // less critical in endgame
   score += simplificationBonus(p);

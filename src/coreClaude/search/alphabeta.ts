@@ -373,6 +373,11 @@ function pickAbsoluteAntiHangMove(root: Position, current: Move | undefined): Mo
   const legal = generateMoves(root);
   if (legal.length < 2) return undefined;
 
+  // In low-mobility positions (<=3 legal moves), only override if the risk is VERY high.
+  // The hanging piece detection in eval should handle moderate cases.
+  const isLowMobility = legal.length <= 3;
+  if (isLowMobility && currentRisk < 1100) return undefined;
+
   const safest = legal
     .map(move => ({ move, risk: immediateCaptureRiskAfter(root, move) }))
     .sort((a, b) =>
@@ -437,7 +442,8 @@ function getPV(pos: Position, tt: TT, max = 10): Move[] {
 // ── Quiescence ───────────────────────────────────────────────────────────────
 function quiesce(
   pos: Position, alpha: number, beta: number,
-  deadline: number, acc: {n:number; q:number}, ply: number
+  deadline: number, acc: {n:number; q:number}, ply: number,
+  lastCapSquare = -1
 ): number {
   acc.q++;
   if (stop.flag) return _eval(pos);
@@ -453,18 +459,44 @@ function quiesce(
   if (!caps.length) {
     const stand = _eval(pos);
     if (stand >= beta) return beta;
-    if (stand + 300 < alpha) return alpha; // delta pruning only in quiet qnodes
+
+    // Delta pruning: skip moves that can't possibly improve alpha.
+    // EXCEPT: don't prune if we have men close to promotion (rows 1 or 6).
+    // This fixes promotion race blind spots.
+    if (stand + 300 < alpha) {
+      const side = pos.side;
+      const myMen = side === 1 ? pos.p1Men : pos.p2Men;
+      let hasPromotionThreat = false;
+      for (let sq = 0; sq < 32 && !hasPromotionThreat; sq++) {
+        if (!(myMen & (1 << sq))) continue;
+        const r = Math.floor(sq / 4);
+        if ((side === 1 && r === 1) || (side === -1 && r === 6)) {
+          hasPromotionThreat = true;
+        }
+      }
+      if (!hasPromotionThreat) return alpha;
+    }
+
     if (stand > alpha) alpha = stand;
     return alpha;
   }
 
-  caps.sort((a, b) => b.captured.length - a.captured.length);
+  // Sort captures by length, but prioritize recaptures (same square as last capture)
+  caps.sort((a, b) => {
+    const aIsRecap = lastCapSquare >= 0 && a.to === lastCapSquare ? 1 : 0;
+    const bIsRecap = lastCapSquare >= 0 && b.to === lastCapSquare ? 1 : 0;
+    if (aIsRecap !== bIsRecap) return bIsRecap - aIsRecap;
+    return b.captured.length - a.captured.length;
+  });
 
   for (const m of caps) {
     if (stop.flag) break;
     if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) { stop.flag = true; break; }
     acc.n++;
-    const score = -quiesce(applyMove(pos, m), -beta, -alpha, deadline, acc, ply+1);
+
+    // Pass the captured square to detect recaptures in the next level
+    const nextLastCapSquare = m.captured.length > 0 ? m.from : -1;
+    const score = -quiesce(applyMove(pos, m), -beta, -alpha, deadline, acc, ply+1, nextLastCapSquare);
     if (score >= beta) return beta;
     if (score > alpha) alpha = score;
   }
