@@ -18,9 +18,17 @@ const rng = R(0xC0FFEE);
 export const Z_PIECE: number[][] = Array.from({ length: 4 }, () => Array(32).fill(0));
 export const Z_SIDE: number = rand32(rng);
 
+// Verify hash with separate seed to detect collisions
+const rngVerify = R(0xDEADBEEF);
+export const Z_PIECE_VERIFY: number[][] = Array.from({ length: 4 }, () => Array(32).fill(0));
+export const Z_SIDE_VERIFY: number = rand32(rngVerify);
+
 (function init() {
   for (let t = 0; t < 4; t++) {
-    for (let s = 0; s < 32; s++) Z_PIECE[t][s] = rand32(rng);
+    for (let s = 0; s < 32; s++) {
+      Z_PIECE[t][s] = rand32(rng);
+      Z_PIECE_VERIFY[t][s] = rand32(rngVerify);
+    }
   }
 })();
 
@@ -31,5 +39,15 @@ export function hashPosition(p: Position): number {
   for (const i of bits(p.p2Men))   h ^= Z_PIECE[2][i];
   for (const i of bits(p.p2Kings)) h ^= Z_PIECE[3][i];
   if (p.side === 1) h ^= Z_SIDE;
+  return h >>> 0;
+}
+
+export function verifyHashPosition(p: Position): number {
+  let h = 0 >>> 0;
+  for (const i of bits(p.p1Men))   h ^= Z_PIECE_VERIFY[0][i];
+  for (const i of bits(p.p1Kings)) h ^= Z_PIECE_VERIFY[1][i];
+  for (const i of bits(p.p2Men))   h ^= Z_PIECE_VERIFY[2][i];
+  for (const i of bits(p.p2Kings)) h ^= Z_PIECE_VERIFY[3][i];
+  if (p.side === 1) h ^= Z_SIDE_VERIFY;
   return h >>> 0;
 }

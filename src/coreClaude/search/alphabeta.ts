@@ -16,7 +16,7 @@ import {
   buildRepetitionCounts, getRepetitionCount, isThreefoldRepetition,
   popRepetition, pushRepetition, RepetitionCounts,
 } from './repetition';
-import { hashPosition } from './zobrist';
+import { hashPosition, verifyHashPosition } from './zobrist';
 
 export interface SearchInfo  { depth: number; score: number; nodes: number; pv: Move[]; }
 export interface RootSearchCandidate { move: Move; score: number; }
@@ -432,7 +432,7 @@ function updateKillers(m: Move, ply: number) {
 function getPV(pos: Position, tt: TT, max = 10): Move[] {
   const pv: Move[] = []; let cur = pos;
   for (let i = 0; i < max; i++) {
-    const hit = tt.get(hashPosition(cur)); if (!hit || hit.move == null) break;
+    const hit = tt.get(hashPosition(cur), verifyHashPosition(cur)); if (!hit || hit.move == null) break;
     const mv = generateMoves(cur).find(m => moveKey(m) === hit.move!); if (!mv) break;
     pv.push(mv); cur = applyMove(cur, mv);
   }
@@ -510,6 +510,7 @@ function negamax(
   nullOk = true, prevMoveKey = -1, iidOk = true,
 ): number {
   const h = hashPosition(pos);
+  const hv = verifyHashPosition(pos);
   if (isDrawByInactivity(pos) || isThreefoldRepetition(rep, h)) return 0;
 
   // NOTE: endgame tablebase probe intentionally removed from hot path —
@@ -523,7 +524,7 @@ function negamax(
   if (depth <= 0) return quiesce(pos, alpha, beta, deadline, acc, ply);
 
   // TT probe
-  const hit = tt.get(h);
+  const hit = tt.get(h, hv);
   let ttMove = hit?.move ?? -1; // let — may be updated by IID below
   if (hit && hit.depth >= depth && getRepetitionCount(rep, h) <= 1) {
     if (hit.bound === Bound.EXACT) return hit.score;
@@ -617,7 +618,7 @@ function negamax(
   const isPV = beta > alpha + 1;
   if (ttMove === -1 && depth >= 5 && ply > 0 && isPV && iidOk && Date.now() <= deadline) {
     negamax(pos, Math.min(depth - 2, 4), alpha, beta, tt, deadline, acc, ply, rep, false, prevMoveKey, false);
-    const iidHit = tt.get(h);
+    const iidHit = tt.get(h, hv);
     if (iidHit?.move != null) ttMove = iidHit.move;
   }
 
@@ -682,7 +683,7 @@ function negamax(
 
   const bound: Bound = best <= a0 ? Bound.UPPER : best >= b0 ? Bound.LOWER : Bound.EXACT;
   if (getRepetitionCount(rep, h) <= 1)
-    tt.put({ key: h, depth, score: best, move: bestKey >= 0 ? bestKey : undefined, bound });
+    tt.put({ key: h, verifyKey: hv, depth, score: best, move: bestKey >= 0 ? bestKey : undefined, bound });
   return best;
 }
 
@@ -752,7 +753,8 @@ export async function iterativeDeepening(
       // Run root search (first move full window, rest PVS)
       const moves = generateMoves(root);
       if (!moves.length) break;
-      const ordered = orderMoves(root, moves, tt.get(rootHash)?.move ?? -1, 0, -1, rootMoveScores);
+      const rootHashVerify = verifyHashPosition(root);
+      const ordered = orderMoves(root, moves, tt.get(rootHash, rootHashVerify)?.move ?? -1, 0, -1, rootMoveScores);
       const rootLowMobility = ordered.length <= 3 && totalRootPieces <= 8 && moves[0].captured.length === 0;
       const rootLowMobilityExtension = rootLowMobility && depth >= 4
         ? (totalRootPieces <= 6 ? 4 : 2)
