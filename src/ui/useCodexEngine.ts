@@ -8,29 +8,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TT } from '../coreClaude/search/tt';
 import { CancelToken, iterativeDeepening, moveKey, RootMoveScores, SearchInfo } from '../coreClaude/search/alphabeta';
-import { getAZRootMoveScores } from '../coreClaude/search/azGuide';
 import { lookupOpeningBookCandidates } from '../coreClaude/search/openingBook';
 import { precomputeEndgameTablebase } from '../coreClaude/search/endgameTablebase';
 import { selectStrictLevelMove, StrictDifficulty } from '../coreClaude/search/levelPolicy';
 import { Position } from '../coreClaude/position';
 import { Move } from '../coreClaude/movegen';
-import { preloadAZModel } from '../coreClaude/azNet';
-import { HybridDifficulty, HybridPlan, hybridBestMove } from '../coreClaude/search/hybrid';
 import { Difficulty } from './types';
 
 // Production profile: keep turns responsive on mobile while giving higher
 // levels enough budget to avoid shallow tactical blunders.
-//
-// NOTE:
-// - easy/normal/hard/expert use strict minimax from the screen layer.
-// - master uses guided alpha-beta through the hybrid route.
-const HYBRID_PROFILE: Record<Difficulty, { hybridDifficulty: HybridDifficulty; budgetMs: number }> = {
-  easy: { hybridDifficulty: 'medium', budgetMs: 700 },
-  normal: { hybridDifficulty: 'medium', budgetMs: 1200 },
-  hard: { hybridDifficulty: 'hard', budgetMs: 2000 },
-  expert: { hybridDifficulty: 'hard', budgetMs: 3000 },
-  master: { hybridDifficulty: 'hard', budgetMs: 4000 },
-};
 const STRICT_NO_LIMIT_BUDGET_MS = 12_000;
 const USE_ENGINE_WORKER = false;
 
@@ -74,7 +60,6 @@ type PendingWorkerSearch = {
 export function useCodexEngine() {
   const [thinking, setThinking] = useState(false);
   const [lastInfo, setLastInfo] = useState<SearchInfo | null>(null);
-  const [lastPlan, setLastPlan] = useState<HybridPlan | null>(null);
 
   const ttRef = useRef(new TT());
   const cancelRef = useRef<CancelToken | null>(null);
@@ -87,7 +72,6 @@ export function useCodexEngine() {
 
   if (!preloaded.current) {
     preloaded.current = true;
-    preloadAZModel();
     setTimeout(() => {
       precomputeEndgameTablebase().catch(() => {});
     }, 0);
@@ -106,14 +90,6 @@ export function useCodexEngine() {
   ) => {
     setThinking(false);
     if (token.cancelled) return undefined;
-    setLastPlan({
-      mode: 'alphabeta',
-      reason: [
-        `strict mm depth ${maxDepth}`,
-        guideLabel ?? '',
-        noTimeLimit ? `capped ${Math.round(STRICT_NO_LIMIT_BUDGET_MS / 1000)}s think` : '',
-      ].filter(Boolean).join(', '),
-    });
     const info: SearchInfo | null = depth > 0
       ? { depth, score, nodes, pv: best ? [best] : [] }
       : null;
@@ -150,18 +126,7 @@ export function useCodexEngine() {
         }
       }
 
-      if (maxDepth >= 9 && !token.cancelled) {
-        try {
-          const azScores = await getAZRootMoveScores(pos);
-          if (azScores) {
-            for (const [key, value] of azScores) {
-              blendedScores.set(key, Math.max(blendedScores.get(key) ?? 0, value * 0.8));
-            }
-            guideLabels.push('AZ-guided ordering');
-          }
-        } catch {
-        }
-      }
+      // AZ guidance removed (Phase 0 cleanup)
 
       const rootMoveScores: RootMoveScores | undefined = blendedScores.size ? blendedScores : undefined;
       const diversifyRoot = openingPly && maxDepth >= 5;
@@ -268,28 +233,20 @@ export function useCodexEngine() {
     setThinking(true);
 
     const noTimeLimit = !Number.isFinite(ms) || ms <= 0;
-    const profile = HYBRID_PROFILE[difficulty];
-    const budgetMs = noTimeLimit ? 0 : Math.max(350, Math.min(ms, profile.budgetMs));
+    // Hybrid mode removed - fall back to strict mode
+    const maxDepth = difficulty === 'easy' ? 4 : difficulty === 'normal' ? 6 : difficulty === 'hard' ? 9 : 12;
+    const budgetMs = noTimeLimit ? 0 : Math.max(350, ms);
 
-    return hybridBestMove(
+    return runStrictOnMainThread(
       pos,
       budgetMs,
-      ttRef.current,
       historyHashes,
+      maxDepth,
       token,
-      profile.hybridDifficulty,
-      difficulty === 'master',
-    ).then(res => {
-      setThinking(false);
-      if (token.cancelled) return undefined;
-      setLastPlan(res.plan);
-      setLastInfo(res.info);
-      if (res.info) onInfo?.(res.info);
-      return res.move;
-    }).catch(() => {
-      setThinking(false);
-      return undefined;
-    });
+      onInfo,
+      noTimeLimit,
+      difficulty as StrictDifficulty,
+    );
   }, [cancel]);
 
   const thinkStrict = useCallback((
@@ -379,5 +336,5 @@ export function useCodexEngine() {
     try { worker.terminate?.(); } catch {}
   }, []);
 
-  return { think, thinkStrict, thinking, lastInfo, lastPlan, cancel };
+  return { think, thinkStrict, thinking, lastInfo, cancel };
 }
