@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "test:tactical": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/tactical scripts/tacticalSuite.ts && node .tmp/tactical/scripts/tacticalSuite.js",
     "test:rules": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/rules scripts/ruleInvariantSuite.ts && node .tmp/rules/scripts/ruleInvariantSuite.js",
+    "test:perft": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/perft scripts/perftThaiCheckers.ts && node .tmp/perft/scripts/perftThaiCheckers.js",
     "bench:ai": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/ai-benchmark scripts/aiBenchmark.ts && node .tmp/ai-benchmark/scripts/aiBenchmark.js",
     "bench:ai:fresh": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/ai-benchmark scripts/aiBenchmark.ts && node .tmp/ai-benchmark/scripts/aiBenchmark.js --fresh",
     "bench:ai:full": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/ai-benchmark scripts/aiBenchmark.ts && node .tmp/ai-benchmark/scripts/aiBenchmark.js --full",
@@ -17,6 +18,7 @@
     "bench:ai:teacher": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/ai-benchmark scripts/aiBenchmark.ts && node .tmp/ai-benchmark/scripts/aiBenchmark.js --teacher",
     "bench:ai:teacher:fresh": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/ai-benchmark scripts/aiBenchmark.ts && node .tmp/ai-benchmark/scripts/aiBenchmark.js --teacher --fresh",
     "bench:ai:analyze": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/ai-benchmark-analysis scripts/analyzeAiBenchmark.ts && node .tmp/ai-benchmark-analysis/analyzeAiBenchmark.js",
+    "profile:ai": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/profile-ai scripts/profileAiHotspots.ts && node .tmp/profile-ai/scripts/profileAiHotspots.js",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:prod": "eas build --platform android --profile production",
     "submit:android:prod": "eas submit --platform android --profile production"
