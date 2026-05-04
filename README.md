@@ -153,9 +153,36 @@ Archived experiment exports stay in `data_old/` and should not be referenced by 
 
 | Script | Purpose |
 |---|---|
+| `ruleInvariantSuite.ts` | Rule correctness checks for movegen/apply/max-capture/capture detection |
+| `aiBenchmark.ts` | L1-L4 tactical benchmark, blunder/timing metrics, and full release gate |
 | `battleTest.ts` | AZ (with flip) vs Minimax-N |
 | `battleTestOld.ts` | OLD AZ (no flip) vs Minimax-5 |
 | `battleAZvsAZ.ts` | NEW AZ (flip) vs OLD AZ (no flip) |
+
+```bash
+npm run test:rules
+npm run test:tactical
+npm run bench:ai
+npm run bench:ai:fresh
+npm run bench:ai:full
+npm run bench:ai:full:fresh
+npm run bench:ai:teacher
+npm run bench:ai:teacher:fresh
+npm run bench:ai:analyze
+```
+
+`bench:ai` writes JSON reports to `.tmp/benchmarks/`, including
+`ai-benchmark-quick-latest.json` for the most recent quick run. The `.tmp`
+folder is ignored by git, so benchmark artifacts can be regenerated without
+polluting source control. Full benchmark runs also write a checkpoint file,
+`ai-benchmark-full-checkpoint.json`, so rerunning `npm run bench:ai:full`
+continues from the last completed tactical sample or head-to-head game.
+Use `npm run bench:ai:full:fresh` to reset that checkpoint and start over.
+`bench:ai:teacher` uses a slower tactical-only oracle (`20s`, depth `19`) and
+separate checkpoint/report files. It is meant to validate teacher-quality labels,
+not gameplay timing.
+`bench:ai:analyze` reads the latest full report and prints tactical plus
+head-to-head ladder diagnostics.
 
 ```bash
 # Compile and run

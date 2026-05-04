@@ -7,6 +7,14 @@ import { applyMove, generateMoves, Move } from '../coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position } from '../coreClaude/position';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../coreClaude/search/repetition';
 import { hashPosition } from '../coreClaude/search/zobrist';
+import {
+  isStrictDifficulty,
+  pickAdaptiveStrictBudgetMs,
+  pickAdaptiveStrictDepth,
+  pickStrictHintBudgetMs,
+  pickStrictHintDepth,
+  STRICT_LEVEL_POLICY,
+} from '../coreClaude/search/levelPolicy';
 import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
 import { Difficulty, GameConfig, MonetizationState } from './types';
@@ -14,31 +22,6 @@ import { usePixelGameFx } from './usePixelGameFx';
 import SpendOrWatchAdModal from './components/SpendOrWatchAdModal';
 import { HINT_COST, LOSE_REWARD, makeSpendPreview, MatchOutcome, SpendKind, SpendSource, UNDO_COST, WIN_REWARD } from './walletStore';
 
-type StrictDifficulty = Exclude<Difficulty, 'master'>;
-const STRICT_MM_DEPTH: Record<StrictDifficulty, number> = {
-  easy: 5,
-  normal: 7,
-  hard: 9,
-  expert: 11,
-};
-const STRICT_FAST_MS: Record<StrictDifficulty, number> = {
-  easy: 900,
-  normal: 1400,
-  hard: 2800,
-  expert: 5000,
-};
-const STRICT_DEPTH_CAP: Record<StrictDifficulty, number> = {
-  easy: 7,
-  normal: 9,
-  hard: 11,
-  expert: 13,
-};
-const STRICT_BUDGET_CAP_MS: Record<StrictDifficulty, number> = {
-  easy: 1700,
-  normal: 2500,
-  hard: 4200,
-  expert: 6500,
-};
 const AZ_ONLY_FAST_MS = 2800;
 const MOVE_ANIM_GUARD_MS = 560;
 const INITIAL_PIECES_PER_SIDE = 8;
@@ -365,54 +348,6 @@ function avatarKindByDifficulty(difficulty: Difficulty): AvatarKind {
   return 'bot-easy';
 }
 
-function isStrictDifficulty(difficulty: Difficulty): difficulty is StrictDifficulty {
-  return difficulty !== 'master';
-}
-
-function countTotalPieces(pos: Position): number {
-  return bitCount(pos.p1Men | pos.p1Kings | pos.p2Men | pos.p2Kings);
-}
-
-function pickAdaptiveStrictDepth(difficulty: StrictDifficulty, pos: Position): number {
-  const base = STRICT_MM_DEPTH[difficulty];
-  const cap = STRICT_DEPTH_CAP[difficulty];
-  const moves = generateMoves(pos);
-  if (moves.length <= 1) return Math.min(cap, base + 1);
-
-  const forcedCapture = moves[0].captured.length > 0;
-  const hasMultiCapture = forcedCapture && moves.some(m => m.captured.length >= 2);
-  const total = countTotalPieces(pos);
-
-  let bonus = 0;
-  if (forcedCapture) bonus += 1;
-  if (hasMultiCapture) bonus += 1;
-  if (total <= 10) bonus += 1;
-  if (total <= 7) bonus += 1;
-
-  return Math.min(cap, base + bonus);
-}
-
-function pickAdaptiveStrictBudgetMs(difficulty: StrictDifficulty, pos: Position): number {
-  const base = STRICT_FAST_MS[difficulty];
-  const cap = STRICT_BUDGET_CAP_MS[difficulty];
-  const moves = generateMoves(pos);
-  if (moves.length <= 1) return Math.min(cap, base + 100);
-
-  const forcedCapture = moves[0].captured.length > 0;
-  const hasMultiCapture = forcedCapture && moves.some(m => m.captured.length >= 2);
-  const total = countTotalPieces(pos);
-  const lowMobility = moves.length <= 3;
-
-  let extra = 0;
-  if (forcedCapture) extra += 220;
-  if (hasMultiCapture) extra += 280;
-  if (lowMobility) extra += 180;
-  if (total <= 10) extra += 220;
-  if (total <= 7) extra += 280;
-
-  return Math.min(cap, base + extra);
-}
-
 function immediateCaptureRiskForMove(pos: Position, move: Move): number {
   const child = applyMove(pos, move);
   const oppMoves = generateMoves(child);
@@ -644,7 +579,7 @@ export default function HumanVsCodexArenaScreen({
   const aiSide = (-humanSide) as 1 | -1;
   const aiThinkMs = !isStrictDifficulty(difficulty)
     ? AZ_ONLY_FAST_MS
-    : STRICT_FAST_MS[difficulty];
+    : STRICT_LEVEL_POLICY[difficulty].baseBudgetMs;
 
   const [pos, setPos] = useState<Position>(() => initialPosition());
   const [posHistory, setPosHistory] = useState<Position[]>(() => [initialPosition()]);
@@ -810,7 +745,8 @@ export default function HumanVsCodexArenaScreen({
         histSnapshot,
         adaptiveDepth,
         undefined,
-      ).then(best => pickSaferFallbackMove(posSnapshot, best));
+        difficulty,
+      );
     }
     return think(posSnapshot, aiThinkMs, histSnapshot, undefined, difficulty)
       .then(best => pickSaferFallbackMove(posSnapshot, best));
@@ -818,8 +754,8 @@ export default function HumanVsCodexArenaScreen({
 
   function computeHintMove(posSnapshot: Position, histSnapshot: number[]) {
     if (isStrictDifficulty(difficulty)) {
-      const hintBudget = Math.min(HINT_PRO_STRICT_MAX_MS, Math.max(HINT_PRO_STRICT_MIN_MS, STRICT_FAST_MS[difficulty] + 1000));
-      const hintDepth = Math.min(13, STRICT_MM_DEPTH[difficulty] + 2);
+      const hintBudget = pickStrictHintBudgetMs(difficulty, HINT_PRO_STRICT_MIN_MS, HINT_PRO_STRICT_MAX_MS);
+      const hintDepth = pickStrictHintDepth(difficulty);
       return thinkStrict(posSnapshot, hintBudget, histSnapshot, hintDepth, undefined);
     }
     return thinkStrict(posSnapshot, HINT_PRO_AZ_MS, histSnapshot, 11, undefined);

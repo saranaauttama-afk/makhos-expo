@@ -11,6 +11,7 @@ import { CancelToken, iterativeDeepening, moveKey, RootMoveScores, SearchInfo } 
 import { getAZRootMoveScores } from '../coreClaude/search/azGuide';
 import { lookupOpeningBookCandidates } from '../coreClaude/search/openingBook';
 import { precomputeEndgameTablebase } from '../coreClaude/search/endgameTablebase';
+import { selectStrictLevelMove, StrictDifficulty } from '../coreClaude/search/levelPolicy';
 import { Position } from '../coreClaude/position';
 import { Move } from '../coreClaude/movegen';
 import { preloadAZModel } from '../coreClaude/azNet';
@@ -129,6 +130,7 @@ export function useCodexEngine() {
     token: CancelToken,
     onInfo?: (info: SearchInfo) => void,
     noTimeLimit = false,
+    strictDifficulty?: StrictDifficulty,
   ): Promise<Move | undefined> => {
     return (async () => {
       const openingPly = historyHashes.length > 0 && historyHashes.length <= 14;
@@ -174,8 +176,9 @@ export function useCodexEngine() {
         rootMoveScores,
         diversifyRoot,
       );
+      const selected = strictDifficulty ? selectStrictLevelMove(strictDifficulty, pos, res) : res.best;
       return handleStrictResult(
-        res.best,
+        selected,
         res.depth,
         res.score,
         res.nodes,
@@ -295,6 +298,7 @@ export function useCodexEngine() {
     historyHashes: number[] = [],
     maxDepth = 7,
     onInfo?: (info: SearchInfo) => void,
+    strictDifficulty?: StrictDifficulty,
   ): Promise<Move | undefined> => {
     cancel();
 
@@ -314,6 +318,7 @@ export function useCodexEngine() {
         token,
         onInfo,
         noTimeLimit,
+        strictDifficulty,
       );
     }
 
@@ -350,6 +355,7 @@ export function useCodexEngine() {
         token,
         onInfo,
         noTimeLimit,
+        strictDifficulty,
       );
     });
   }, [cancel, ensureWorker, runStrictOnMainThread]);

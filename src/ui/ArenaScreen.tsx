@@ -6,6 +6,7 @@ import { applyMove, generateMoves, Move } from '../coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position } from '../coreClaude/position';
 import { hashPosition } from '../coreClaude/search/zobrist';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../coreClaude/search/repetition';
+import { STRICT_LEVEL_POLICY } from '../coreClaude/search/levelPolicy';
 import { Board } from './Board';
 import { useCodexEngine } from './useCodexEngine';
 import { usePixelGameFx } from './usePixelGameFx';
@@ -32,12 +33,6 @@ const LEVEL_LABEL: Record<ArenaLevel, string> = {
   hard: 'Level 3',
   expert: 'Level 4',
   master: 'Level 5',
-};
-const STRICT_MM_DEPTH: Record<Exclude<ArenaLevel, 'master'>, number> = {
-  easy: 5,
-  normal: 7,
-  hard: 9,
-  expert: 11,
 };
 const LEVEL_MODE_TAG: Record<ArenaLevel, string> = {
   easy: 'STRICT',
@@ -171,7 +166,7 @@ export default function ArenaScreen({ language, onBack }: Props) {
 
     const move = agent === 'master'
       ? await think(curPos, THINK_MS[agent], curHistory, undefined, 'master')
-      : await thinkStrict(curPos, THINK_MS[agent], curHistory, STRICT_MM_DEPTH[agent], undefined);
+      : await thinkStrict(curPos, THINK_MS[agent], curHistory, STRICT_LEVEL_POLICY[agent].baseDepth, undefined, agent);
     steppingRef.current = false;
 
     if (!move) return;

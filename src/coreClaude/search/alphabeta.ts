@@ -20,7 +20,17 @@ import { hashPosition } from './zobrist';
 
 export interface SearchInfo  { depth: number; score: number; nodes: number; pv: Move[]; }
 export interface RootSearchCandidate { move: Move; score: number; }
-export interface SearchResult { best?: Move; score: number; nodes: number; depth: number; rootCandidates?: RootSearchCandidate[]; }
+export interface SearchResult {
+  best?: Move;
+  score: number;
+  nodes: number;
+  qnodes: number;
+  depth: number;
+  elapsedMs: number;
+  timedOut: boolean;
+  overrideReason?: string;
+  rootCandidates?: RootSearchCandidate[];
+}
 export interface CancelToken  { cancelled: boolean; }
 export type RootMoveScores = ReadonlyMap<number, number>;
 type OnInfo = (info: SearchInfo) => void;
@@ -146,30 +156,235 @@ function immediateCaptureRiskAfter(root: Position, move: Move): number {
   return risk;
 }
 
+function safeOverrideMargin(currentRisk: number, saferRisk: number): number {
+  const riskDrop = currentRisk - saferRisk;
+  if (currentRisk >= 900) return Math.min(520, 220 + riskDrop);
+  if (currentRisk >= 650) return Math.min(420, 180 + riskDrop);
+  if (currentRisk >= 420) return Math.min(300, 140 + riskDrop);
+  return 115;
+}
+
+function materialForSide(pos: Position, side: 1 | -1): number {
+  const myMen = side === 1 ? pos.p1Men : pos.p2Men;
+  const myKings = side === 1 ? pos.p1Kings : pos.p2Kings;
+  const opMen = side === 1 ? pos.p2Men : pos.p1Men;
+  const opKings = side === 1 ? pos.p2Kings : pos.p1Kings;
+  return bitCount(myMen) * 100 + bitCount(myKings) * 300 - bitCount(opMen) * 100 - bitCount(opKings) * 300;
+}
+
+function piecesForSide(pos: Position, side: 1 | -1): number {
+  return bitCount(side === 1 ? (pos.p1Men | pos.p1Kings) : (pos.p2Men | pos.p2Kings));
+}
+
+function scoreRootMaterialDelta(root: Position, pos: Position): { terminalWin: boolean; netGain: number; pieceGain: number } {
+  const rootSide = root.side;
+  const opponentSide = (rootSide === 1 ? -1 : 1) as 1 | -1;
+  const beforeNet = materialForSide(root, rootSide);
+  const beforeMyPieces = piecesForSide(root, rootSide);
+  const beforeOppPieces = piecesForSide(root, opponentSide);
+  const terminalWin = generateMoves(pos).length === 0;
+  const netGain = terminalWin ? INF : materialForSide(pos, rootSide) - beforeNet;
+  const myPiecesNow = piecesForSide(pos, rootSide);
+  const oppPiecesNow = piecesForSide(pos, opponentSide);
+  const pieceGain = terminalWin ? INF : (beforeOppPieces - oppPiecesNow) - (beforeMyPieces - myPiecesNow);
+  return { terminalWin, netGain, pieceGain };
+}
+
+function scoreAfterImmediateCounter(root: Position, afterOurMove: Position): { terminalWin: boolean; netGain: number; pieceGain: number } {
+  const opponentReplies = generateMoves(afterOurMove);
+  if (!opponentReplies.length) return { terminalWin: true, netGain: INF, pieceGain: INF };
+  if (opponentReplies[0].captured.length === 0) return scoreRootMaterialDelta(root, afterOurMove);
+
+  let worst: { terminalWin: boolean; netGain: number; pieceGain: number } | undefined;
+  for (const reply of opponentReplies) {
+    const afterCounter = applyMove(afterOurMove, reply);
+    const current = scoreRootMaterialDelta(root, afterCounter);
+    if (!worst || current.netGain < worst.netGain || (current.netGain === worst.netGain && current.pieceGain < worst.pieceGain)) {
+      worst = current;
+    }
+  }
+
+  return worst ?? scoreRootMaterialDelta(root, afterOurMove);
+}
+
+function trapReplyScore(root: Position, afterReply: Position): { terminalWin: boolean; netGain: number; pieceGain: number } | undefined {
+  const ourReplies = generateMoves(afterReply);
+  if (!ourReplies.length) return undefined;
+  if (ourReplies[0].captured.length === 0) return undefined;
+
+  let best: { terminalWin: boolean; netGain: number; pieceGain: number } | undefined;
+  for (const recapture of ourReplies) {
+    const afterRecapture = applyMove(afterReply, recapture);
+    const current = scoreAfterImmediateCounter(root, afterRecapture);
+
+    if (!best || current.netGain > best.netGain || (current.netGain === best.netGain && current.pieceGain > best.pieceGain)) {
+      best = current;
+    }
+  }
+
+  return best;
+}
+
+function isSoundForcedTrap(root: Position, move: Move): boolean {
+  if (move.captured.length > 0) return false;
+
+  const total = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
+  const child = applyMove(root, move);
+  const opponentReplies = generateMoves(child);
+  if (!opponentReplies.length) return true;
+  if (opponentReplies[0].captured.length === 0) return false;
+
+  const minGain = total > 10 ? 160 : 120;
+  let hasTerminalWin = false;
+  let worstNetGainAfterTrap = INF;
+  let worstPieceGain = INF;
+
+  for (const reply of opponentReplies) {
+    const afterReply = applyMove(child, reply);
+    const replyScore = trapReplyScore(root, afterReply);
+    if (!replyScore) return false;
+
+    hasTerminalWin = hasTerminalWin || replyScore.terminalWin;
+    worstNetGainAfterTrap = Math.min(worstNetGainAfterTrap, replyScore.netGain);
+    worstPieceGain = Math.min(worstPieceGain, replyScore.pieceGain);
+  }
+
+  return hasTerminalWin || worstNetGainAfterTrap >= minGain || (worstPieceGain >= 1 && worstNetGainAfterTrap >= 0);
+}
+
+function pickSoundForcedTrap(
+  root: Position,
+  candidates: RootCandidate[] | undefined,
+  bestScore: number,
+): RootCandidate | undefined {
+  const source = candidates?.length
+    ? candidates
+    : generateMoves(root).map(move => ({ move, score: bestScore - 180 }));
+  const traps = source
+    .filter(candidate => isSoundForcedTrap(root, candidate.move))
+    .sort((a, b) => b.score - a.score);
+  if (!traps.length) return undefined;
+
+  const bestTrap = traps[0];
+  const total = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
+  const lowMobility = generateMoves(root).length <= 3;
+  const maxConcession = lowMobility && total <= 8
+    ? 900
+    : bestTrap.move.promote
+      ? 80
+      : 260;
+  if (bestTrap.score < bestScore - maxConcession) return undefined;
+  return bestTrap;
+}
+
+function hasForcedRecaptureReply(root: Position, move: Move): boolean {
+  if (move.captured.length > 0) return false;
+
+  const child = applyMove(root, move);
+  const opponentReplies = generateMoves(child);
+  if (!opponentReplies.length || opponentReplies[0].captured.length === 0) return false;
+
+  for (const reply of opponentReplies) {
+    const afterReply = applyMove(child, reply);
+    const ourReplies = generateMoves(afterReply);
+    if (!ourReplies.length || ourReplies[0].captured.length === 0) return false;
+
+    const bestRecaptureLen = Math.max(...ourReplies.map(recapture => recapture.captured.length));
+    if (bestRecaptureLen <= reply.captured.length) return false;
+  }
+
+  return true;
+}
+
+function pickLowMobilityRecaptureCandidate(
+  root: Position,
+  candidates: RootCandidate[] | undefined,
+  bestScore: number,
+): RootCandidate | undefined {
+  const legal = generateMoves(root);
+  const total = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
+  if (total > 8 || legal.length > 3 || legal[0]?.captured.length > 0) return undefined;
+
+  const source = candidates?.length
+    ? candidates
+    : legal.map(move => ({ move, score: bestScore - 180 }));
+  return source
+    .filter(candidate => candidate.score >= bestScore - 220)
+    .filter(candidate => hasForcedRecaptureReply(root, candidate.move))
+    .sort((a, b) => b.score - a.score)[0];
+}
+
+function pickEndgamePromotionCandidate(
+  root: Position,
+  candidates: RootCandidate[] | undefined,
+  bestScore: number,
+): RootCandidate | undefined {
+  const total = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
+  if (total > 6) return undefined;
+
+  const source = candidates?.length
+    ? candidates
+    : generateMoves(root).map(move => ({ move, score: bestScore - 120 }));
+  const promotion = source
+    .filter(candidate => candidate.move.promote && candidate.score >= bestScore - 180)
+    .sort((a, b) => b.score - a.score)[0];
+  return promotion;
+}
+
 function pickSaferRootCandidate(
   root: Position,
   candidates: RootCandidate[],
   bestScore: number,
+  currentMove?: Move,
 ): RootCandidate | undefined {
   if (candidates.length < 2) return undefined;
 
-  // Keep only near-best options so we don't throw away substantial eval value.
-  const shortlist = candidates.filter(c => c.score >= bestScore - 140);
-  if (shortlist.length < 2) return undefined;
-
-  const analyzed = shortlist.map(c => ({
+  const analyzed = candidates.map(c => ({
     ...c,
     risk: immediateCaptureRiskAfter(root, c.move),
   }));
-  const byScore = [...analyzed].sort((a, b) => b.score - a.score);
-  const currentBest = byScore[0];
-  const safest = [...analyzed].sort((a, b) => (a.risk - b.risk) || (b.score - a.score))[0];
 
-  // Only override when the tactical risk difference is meaningful.
-  if (currentBest.risk < 200) return undefined;
+  const byScore = [...analyzed].sort((a, b) => b.score - a.score);
+  const currentKey = currentMove ? moveKey(currentMove) : -1;
+  const currentBest = analyzed.find(c => moveKey(c.move) === currentKey) ?? byScore[0];
+  if (!currentBest) return undefined;
+  if (isSoundForcedTrap(root, currentBest.move)) return undefined;
+
+  const safest = [...analyzed].sort((a, b) => (a.risk - b.risk) || (b.score - a.score))[0];
+  if (!safest) return undefined;
+
+  // Only override when the tactical risk difference is meaningful. For severe
+  // immediate hangs, trust the one-ply safety signal more than a shallow eval.
+  if (currentBest.risk < 220) return undefined;
   if (safest.risk + 90 > currentBest.risk) return undefined;
-  if (safest.score < bestScore - 115) return undefined;
+
+  const margin = safeOverrideMargin(currentBest.risk, safest.risk);
+  const scoreFloor = Math.max(bestScore, currentBest.score) - margin;
+  if (safest.score < scoreFloor) return undefined;
   return safest;
+}
+
+function pickAbsoluteAntiHangMove(root: Position, current: Move | undefined): Move | undefined {
+  if (!current) return undefined;
+  if (isSoundForcedTrap(root, current)) return undefined;
+  const currentRisk = immediateCaptureRiskAfter(root, current);
+  if (currentRisk < 820) return undefined;
+
+  const legal = generateMoves(root);
+  if (legal.length < 2) return undefined;
+
+  const safest = legal
+    .map(move => ({ move, risk: immediateCaptureRiskAfter(root, move) }))
+    .sort((a, b) =>
+      (a.risk - b.risk) ||
+      (b.move.captured.length - a.move.captured.length) ||
+      (Number(b.move.promote) - Number(a.move.promote))
+    )[0];
+  if (!safest) return undefined;
+  if (isSoundForcedTrap(root, current)) return undefined;
+  if (safest.risk + 300 > currentRisk) return undefined;
+  if (safest.risk > 180) return undefined;
+  return safest.move;
 }
 
 // prevKey = key of the move that led to this position (-1 at root)
@@ -222,18 +437,27 @@ function getPV(pos: Position, tt: TT, max = 10): Move[] {
 // ── Quiescence ───────────────────────────────────────────────────────────────
 function quiesce(
   pos: Position, alpha: number, beta: number,
-  deadline: number, acc: {n:number}, ply: number
+  deadline: number, acc: {n:number; q:number}, ply: number
 ): number {
+  acc.q++;
   if (stop.flag) return _eval(pos);
   if (isDrawByInactivity(pos)) return 0;
   if (ply >= MAX_PLY) return _eval(pos);
 
-  const stand = _eval(pos);
-  if (stand >= beta) return beta;
-  if (stand + 300 < alpha) return alpha; // delta pruning
-  if (stand > alpha) alpha = stand;
+  const moves = generateMoves(pos);
+  if (!moves.length) return -INF + ply;
 
-  const caps = generateMoves(pos).filter(m => m.captured.length > 0);
+  // If a capture is forced, stand-pat is not a legal continuation in Thai
+  // Checkers. Search the capture chain instead of allowing static eval cutoffs.
+  const caps = moves[0].captured.length > 0 ? moves : [];
+  if (!caps.length) {
+    const stand = _eval(pos);
+    if (stand >= beta) return beta;
+    if (stand + 300 < alpha) return alpha; // delta pruning only in quiet qnodes
+    if (stand > alpha) alpha = stand;
+    return alpha;
+  }
+
   caps.sort((a, b) => b.captured.length - a.captured.length);
 
   for (const m of caps) {
@@ -250,7 +474,7 @@ function quiesce(
 // ── Negamax ──────────────────────────────────────────────────────────────────
 function negamax(
   pos: Position, depth: number, alpha: number, beta: number, tt: TT,
-  deadline: number, acc: {n:number}, ply: number, rep: RepetitionCounts,
+  deadline: number, acc: {n:number; q:number}, ply: number, rep: RepetitionCounts,
   nullOk = true, prevMoveKey = -1, iidOk = true,
 ): number {
   const h = hashPosition(pos);
@@ -439,6 +663,7 @@ export async function iterativeDeepening(
   diversifyRoot = false,
 ): Promise<SearchResult> {
   const deadline  = Date.now() + timeMs;
+  const startTime = Date.now();
   const rootHash  = hashPosition(root);
   const normHist  = historyHashes.length ? historyHashes : [rootHash];
   const rep       = buildRepetitionCounts(normHist);
@@ -449,27 +674,33 @@ export async function iterativeDeepening(
   stop.flag = false;                                          // clear stop flag
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, depth: 0 };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
-  const probeMs = Math.min(500, Math.floor(timeMs * 0.3));
+  const totalRootPieces = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
+  const allRootKings = root.p1Men === 0 && root.p2Men === 0;
+  const probeMs = totalRootPieces <= 3
+    ? Math.min(1200, Math.max(500, Math.floor(timeMs * 0.65)))
+    : allRootKings && totalRootPieces <= 4
+      ? Math.min(900, Math.max(350, Math.floor(timeMs * 0.45)))
+      : Math.min(500, Math.floor(timeMs * 0.3));
   const eg = probeSmallEndgame(root, normHist, probeMs);
   // Only shortcut when we have an actual move — draw positions at the depth
   // limit store bestMoveKey = NO_MOVE_KEY so eg.best would be undefined.
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, depth: eg.dtm };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false };
   }
 
-  let best: Move | undefined, bestScore = 0, nodes = 0, reached = 0;
+  let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
+  let overrideReason: string | undefined;
   let lastRootCandidates: RootCandidate[] | undefined;
   let lastRootScore = 0;
   let lastScore = 0, haveLast = false;
-  const acc = { n: 0 };
+  const acc = { n: 0, q: 0 };
   // Adaptive time: track how many consecutive depths produced the same best move
-  const startTime = Date.now();
   let stableDepths = 0, lastBestKey = -1;
 
   for (let depth = 1; depth <= maxDepth; depth++) {
@@ -490,10 +721,15 @@ export async function iterativeDeepening(
       const moves = generateMoves(root);
       if (!moves.length) break;
       const ordered = orderMoves(root, moves, tt.get(rootHash)?.move ?? -1, 0, -1, rootMoveScores);
+      const rootLowMobility = ordered.length <= 3 && totalRootPieces <= 8 && moves[0].captured.length === 0;
+      const rootLowMobilityExtension = rootLowMobility && depth >= 4
+        ? (totalRootPieces <= 6 ? 4 : 2)
+        : 0;
 
       let rootBest = -INF, rootMove: Move | undefined;
       const rootCandidates: RootCandidate[] = [];
       acc.n = 0;
+      acc.q = 0;
 
       for (let i = 0; i < ordered.length; i++) {
         if ((i & 1) === 1) {
@@ -515,6 +751,8 @@ export async function iterativeDeepening(
         // LMR at root — skip on tactical positions (opponent has forced captures)
         const opCapRoot = isQ && hasCapturesAvailable(child);
         d = extendTacticalDepth(depth, d, m, opCapRoot, 0);
+        if (rootLowMobilityExtension > 0) d = Math.min(depth + rootLowMobilityExtension, d + rootLowMobilityExtension);
+        if (isSoundForcedTrap(root, m)) d = Math.min(depth + 2, d + 2);
         const fullD = d;
         if (i >= 3 && d >= 2 && isQ && !single && !opCapRoot) {
           d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
@@ -539,6 +777,7 @@ export async function iterativeDeepening(
       }
 
       nodes += acc.n;
+      qnodes += acc.q;
       result = { move: rootMove, score: rootBest, candidates: rootCandidates };
 
       if (cancel?.cancelled || Date.now() > deadline) break;
@@ -572,7 +811,7 @@ export async function iterativeDeepening(
     // wide window. This catches occasional aspiration / ordering artifacts at
     // the root without paying the cost for every legal move.
     if (reached >= 5 && Date.now() + 50 < deadline && !cancel?.cancelled) {
-      const verifyAcc = { n: 0 };
+      const verifyAcc = { n: 0, q: 0 };
       const updated = [...lastRootCandidates];
       for (const candidate of candidateWindow(lastRootCandidates, bestScore, 95)) {
         if (Date.now() > deadline || cancel?.cancelled || stop.flag) break;
@@ -583,6 +822,7 @@ export async function iterativeDeepening(
         const total = bitCount(child.p1Men | child.p1Kings | child.p2Men | child.p2Kings);
         if (total <= 5) d = Math.min(reached, d + 1);
         d = extendTacticalDepth(reached, d, candidate.move, isQ && hasCapturesAvailable(child), 0);
+        if (isSoundForcedTrap(root, candidate.move)) d = Math.min(reached + 2, d + 2);
         if (candidate.move.captured.length >= 2) d = Math.min(reached + 1, d + 1);
 
         pushRepetition(rep, ch);
@@ -598,6 +838,7 @@ export async function iterativeDeepening(
         }
       }
       nodes += verifyAcc.n;
+      qnodes += verifyAcc.q;
       lastRootCandidates = updated;
       lastRootScore = bestScore;
     }
@@ -607,16 +848,41 @@ export async function iterativeDeepening(
       if (selected) {
         best = selected.move;
         bestScore = selected.score;
+        overrideReason = 'opening diversification';
       }
+    }
+
+    const trap = pickSoundForcedTrap(root, lastRootCandidates, bestScore);
+    if (trap) {
+      best = trap.move;
+      bestScore = trap.score;
+      overrideReason = 'forced recapture trap';
+    }
+
+    const lowMobilityRecapture = pickLowMobilityRecaptureCandidate(root, lastRootCandidates, bestScore);
+    if (lowMobilityRecapture) {
+      best = lowMobilityRecapture.move;
+      bestScore = lowMobilityRecapture.score;
+      overrideReason = 'low-mobility recapture';
+    }
+
+    const promotion = pickEndgamePromotionCandidate(root, lastRootCandidates, bestScore);
+    if (promotion) {
+      best = promotion.move;
+      bestScore = promotion.score;
+      overrideReason = 'endgame promotion race';
     }
 
     // Tactical blunder guard at root:
     // if the top-eval move hangs an immediate multi-capture and there is a
     // near-equal safer move, prefer the safer move.
-    const safer = pickSaferRootCandidate(root, lastRootCandidates, bestScore);
+    const safer = reached >= 2
+      ? pickSaferRootCandidate(root, lastRootCandidates, bestScore, best)
+      : undefined;
     if (safer) {
       best = safer.move;
       bestScore = safer.score;
+      overrideReason = 'root tactical safety';
     }
   }
 
@@ -628,5 +894,21 @@ export async function iterativeDeepening(
     if (fallback.length) best = fallback[0];
   }
 
-  return { best, score: bestScore, nodes, depth: reached, rootCandidates: lastRootCandidates };
+  const antiHang = pickAbsoluteAntiHangMove(root, best);
+  if (antiHang) {
+    best = antiHang;
+    overrideReason = 'absolute anti-hang safety';
+  }
+
+  return {
+    best,
+    score: bestScore,
+    nodes,
+    qnodes,
+    depth: reached,
+    elapsedMs: Date.now() - startTime,
+    timedOut: stop.flag || Date.now() > deadline,
+    overrideReason,
+    rootCandidates: lastRootCandidates,
+  };
 }

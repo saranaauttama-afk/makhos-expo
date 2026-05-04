@@ -9,7 +9,7 @@
 //
 // Protocol (worker → main):
 //   { type: 'info',   gen, depth, score, nodes, pv }
-//   { type: 'result', gen, best, score, nodes, depth }
+//   { type: 'result', gen, best, score, nodes, qnodes, depth, elapsedMs, timedOut }
 
 import { iterativeDeepening, CancelToken } from '../coreClaude/search/alphabeta';
 import { TT } from '../coreClaude/search/tt';
@@ -61,7 +61,11 @@ addEventListener('message', async (e: MessageEvent) => {
       best:  result.best   as Move | undefined,
       score: result.score,
       nodes: result.nodes,
+      qnodes: result.qnodes,
       depth: result.depth,
+      elapsedMs: result.elapsedMs,
+      timedOut: result.timedOut,
+      overrideReason: result.overrideReason,
     });
   }
 });

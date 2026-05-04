@@ -191,6 +191,38 @@ function kingEndgameScore(p: Position): number {
   return score;
 }
 
+function allKingsEndgameScore(p: Position): number {
+  if (p.p1Men !== 0 || p.p2Men !== 0) return 0;
+
+  const side = p.side;
+  const myKings = side === 1 ? p.p1Kings : p.p2Kings;
+  const opKings = side === 1 ? p.p2Kings : p.p1Kings;
+  const myCount = bitCount(myKings);
+  const opCount = bitCount(opKings);
+  if (!myKings || !opKings || myCount <= opCount) return 0;
+
+  const opSquares = [...bits(opKings)];
+  let score = 0;
+
+  for (const opSq of opSquares) {
+    const { r: or, c: oc } = toRC(opSq);
+    const edgePressure = Math.max(
+      Math.abs(or - 3.5),
+      Math.abs(oc - 3.5),
+    );
+    score += Math.round(edgePressure * 12);
+
+    let nearest = 99;
+    for (const mySq of bits(myKings)) {
+      const { r: mr, c: mc } = toRC(mySq);
+      nearest = Math.min(nearest, Math.abs(mr - or) + Math.abs(mc - oc));
+    }
+    score += Math.max(0, 14 - nearest) * 5;
+  }
+
+  return score;
+}
+
 // ── Protected men ─────────────────────────────────────────────────────────────
 // A man is "protected" when a friendly piece sits in the direction it came from
 // (its "behind" diagonal).  Protected men are harder to capture safely because
@@ -249,6 +281,7 @@ export function handEvaluate(p: Position): number {
   score += backRankGuard(p) * (1 - eg); // less critical in endgame
   score += simplificationBonus(p);
   score += Math.round(kingEndgameScore(p) * eg * 0.35);
+  score += Math.round(allKingsEndgameScore(p) * eg * 0.5);
 
   return score | 0;
 }
