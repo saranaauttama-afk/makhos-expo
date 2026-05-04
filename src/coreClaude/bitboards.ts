@@ -81,3 +81,59 @@ export function *bits(bb: BB): Iterable<number> {
     x = (x ^ lsb) >>> 0;
   }
 }
+
+// ── Fast directional tables for movegen optimization (Phase 3) ──────────────
+export const DIRS = ['UL', 'UR', 'DL', 'DR'] as const;
+export type DirIndex = typeof DIRS[number];
+
+export const DIR_INDEX: Record<Dir, number> = {
+  UL: 0,
+  UR: 1,
+  DL: 2,
+  DR: 3,
+};
+
+// NEXT[sq][dirIndex] = next square in that direction, or -1 if off-board
+export const NEXT: Int8Array[] = Array.from({ length: 32 }, () => new Int8Array([-1, -1, -1, -1]));
+
+// RAYS[sq][dirIndex] = list of all squares outward in that direction (for king fly)
+export const RAYS: number[][][] = Array.from({ length: 32 }, () =>
+  Array.from({ length: 4 }, () => [] as number[])
+);
+
+(function buildFastDirectionalTables() {
+  const dirs: [number, number][] = [
+    [-1, -1], // UL
+    [-1, +1], // UR
+    [+1, -1], // DL
+    [+1, +1], // DR
+  ];
+
+  for (let sq = 0; sq < 32; sq++) {
+    const { r, c } = toRC(sq);
+
+    for (let d = 0; d < 4; d++) {
+      const [dr, dc] = dirs[d];
+
+      // NEXT: just one step
+      let nr = r + dr;
+      let nc = c + dc;
+      if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+        const nextIdx = toIndex(nr, nc);
+        if (nextIdx >= 0) {
+          NEXT[sq][d] = nextIdx;
+        }
+      }
+
+      // RAYS: all steps outward until edge
+      nr = r + dr;
+      nc = c + dc;
+      while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+        const idx = toIndex(nr, nc);
+        if (idx >= 0) RAYS[sq][d].push(idx);
+        nr += dr;
+        nc += dc;
+      }
+    }
+  }
+})();

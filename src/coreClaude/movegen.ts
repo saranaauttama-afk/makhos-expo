@@ -1,123 +1,256 @@
-﻿// src/core/movegen.ts
-// Thai Checkers movegen:
-// - Men: step 1 forward diag; capture forward; forced capture; multi-capture chains
-// - Kings (Hos): fly any distance onto captures but must land immediately behind the captured piece;
-//   forced capture; multi-capture chains.
+// src/coreClaude/movegen.ts
+// Optimized Thai Checkers move generator (Phase 3).
+// Keeps old API, adds generateMovesInto / generateCapturesInto.
 
-import { BB, B1, bits, STEPS } from './bitboards';
-import { Position, occupied, sideMen, sideKings } from './position';
+import { BB, B1, bits, NEXT, RAYS } from './bitboards';
+import { Position, occupied, sideKings, sideMen } from './position';
 
 export interface Move {
   from: number;
   to: number;
-  captured: number[]; // indices of captured squares (dark-square indices)
-  promote: boolean;   // men only; kings never promote
-  path?: number[];    // landing squares for multi-capture display/input
+  captured: number[];
+  promote: boolean;
+  path?: number[];
 }
 
-// P1 เดินขึ้น (ไปด้านบน) → โปรโมตเมื่อถึงแถวบนสุด (dark 4 ช่องแรก: 0..3)
-// P2 เดินลง (ไปด้านล่าง) → โปรโมตเมื่อถึงแถวล่างสุด (dark 4 ช่องท้าย: 28..31)
-const LAST_RANK_P1 = new Set([0, 1, 2, 3]);
-const LAST_RANK_P2 = new Set([28, 29, 30, 31]);
+const UL = 0;
+const UR = 1;
+const DL = 2;
+const DR = 3;
 
-type Dir = 'UL' | 'UR' | 'DL' | 'DR';
+const P1_DIR_A = UL;
+const P1_DIR_B = UR;
+const P2_DIR_A = DL;
+const P2_DIR_B = DR;
 
-// ---- helpers ---------------------------------------------------------------
+const LAST_RANK_P1 = 0b00000000000000000000000000001111 >>> 0; // 0..3
+const LAST_RANK_P2 = 0b11110000000000000000000000000000 >>> 0; // 28..31
+
+const EMPTY_CAPTURED: number[] = Object.freeze([]) as unknown as number[];
+const MAX_CHAIN = 16;
 
 function willPromote(side: 1 | -1, to: number): boolean {
-  return side === 1 ? LAST_RANK_P1.has(to) : LAST_RANK_P2.has(to);
+  const bit = B1(to);
+  return side === 1 ? (LAST_RANK_P1 & bit) !== 0 : (LAST_RANK_P2 & bit) !== 0;
 }
 
-function nextInDir(from: number, dir: Dir): number {
-  const st = STEPS[from].find(s => s.dir === dir);
-  return st ? st.to : -1;
+function pushQuiet(out: Move[], from: number, to: number, promote: boolean): void {
+  out.push({ from, to, captured: EMPTY_CAPTURED, promote });
 }
 
-function *ray(from: number, dir: Dir): Iterable<number> {
-  let cur = from;
-  // walk outward until out of board
-  while (true) {
-    const nxt = nextInDir(cur, dir);
-    if (nxt < 0) return;
-    yield nxt;
-    cur = nxt;
+function pushCapture(
+  out: Move[],
+  from: number,
+  to: number,
+  promote: boolean,
+  caps: Int8Array,
+  path: Int8Array,
+  depth: number,
+): void {
+  const captured = new Array<number>(depth);
+  const movePath = new Array<number>(depth);
+
+  for (let i = 0; i < depth; i++) {
+    captured[i] = caps[i];
+    movePath[i] = path[i];
   }
-}
 
-// ---- public API ------------------------------------------------------------
+  out.push({
+    from,
+    to,
+    captured,
+    promote,
+    path: movePath,
+  });
+}
 
 export function applyMove(p: Position, m: Move): Position {
-  const q: Position = { ...p };
-  const myMen = p.side === 1 ? 'p1Men' : 'p2Men';
-  const myKings = p.side === 1 ? 'p1Kings' : 'p2Kings';
-  const opMen = p.side === 1 ? 'p2Men' : 'p1Men';
-  const opKings = p.side === 1 ? 'p2Kings' : 'p1Kings';
-
   const fromBit = B1(m.from);
   const toBit = B1(m.to);
+  const isCapture = m.captured.length > 0;
 
-  const movingKing = ((q as any)[myKings] & fromBit) !== 0;
+  let p1Men = p.p1Men;
+  let p1Kings = p.p1Kings;
+  let p2Men = p.p2Men;
+  let p2Kings = p.p2Kings;
 
-  if (movingKing) (q as any)[myKings] = ((q as any)[myKings] & ~fromBit) >>> 0;
-  else            (q as any)[myMen]   = ((q as any)[myMen]   & ~fromBit) >>> 0;
+  if (p.side === 1) {
+    const movingKing = (p1Kings & fromBit) !== 0;
 
-  if (movingKing) (q as any)[myKings] = ((q as any)[myKings] | toBit) >>> 0;
-  else            (q as any)[myMen]   = ((q as any)[myMen]   | toBit) >>> 0;
+    if (movingKing) {
+      p1Kings = ((p1Kings & ~fromBit) | toBit) >>> 0;
+    } else {
+      p1Men = ((p1Men & ~fromBit) | toBit) >>> 0;
+    }
 
-  for (const c of m.captured) {
-    const cb = B1(c);
-    if ((q as any)[opMen] & cb)   (q as any)[opMen]   = ((q as any)[opMen]   & ~cb) >>> 0;
-    else                          (q as any)[opKings] = ((q as any)[opKings] & ~cb) >>> 0;
-  }
+    for (let i = 0; i < m.captured.length; i++) {
+      const cb = B1(m.captured[i]);
+      if (p2Men & cb) p2Men = (p2Men & ~cb) >>> 0;
+      else p2Kings = (p2Kings & ~cb) >>> 0;
+    }
 
-  if (m.promote && !movingKing) {
-    (q as any)[myMen]   = ((q as any)[myMen]   & ~toBit) >>> 0;
-    (q as any)[myKings] = ((q as any)[myKings] | toBit)  >>> 0;
-  }
+    if (m.promote && !movingKing) {
+      p1Men = (p1Men & ~toBit) >>> 0;
+      p1Kings = (p1Kings | toBit) >>> 0;
+    }
+  } else {
+    const movingKing = (p2Kings & fromBit) !== 0;
 
-  q.side = (p.side === 1 ? -1 : 1);
-  q.halfmoveClock = m.captured.length > 0 ? 0 : p.halfmoveClock + 1;
-  return q;
-}
+    if (movingKing) {
+      p2Kings = ((p2Kings & ~fromBit) | toBit) >>> 0;
+    } else {
+      p2Men = ((p2Men & ~fromBit) | toBit) >>> 0;
+    }
 
-// Fast capture availability check — returns true as soon as any capture is found.
-// O(pieces × 4 directions), much cheaper than generating all moves.
-// Used in alphabeta.ts to avoid calling generateMoves twice per child node.
-export function hasCapturesAvailable(p: Position): boolean {
-  const occ      = occupied(p);
-  const myMen    = sideMen(p);
-  const myKings  = sideKings(p);
-  const myAll    = (myMen | myKings) >>> 0;
-  const opOcc    = (p.side === 1 ? (p.p2Men | p.p2Kings) : (p.p1Men | p.p1Kings)) >>> 0;
-  const empty    = (~occ) >>> 0;
+    for (let i = 0; i < m.captured.length; i++) {
+      const cb = B1(m.captured[i]);
+      if (p1Men & cb) p1Men = (p1Men & ~cb) >>> 0;
+      else p1Kings = (p1Kings & ~cb) >>> 0;
+    }
 
-  // Men: forward captures only
-  for (const from of bits(myMen)) {
-    for (const st of STEPS[from]) {
-      if (p.side === 1  && (st.dir === 'DL' || st.dir === 'DR')) continue;
-      if (p.side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
-      const over = st.to;
-      if (over < 0) continue;
-      if (!(opOcc & B1(over))) continue;
-      const landing = nextInDir(over, st.dir);
-      if (landing < 0) continue;
-      if (empty & B1(landing)) return true;
+    if (m.promote && !movingKing) {
+      p2Men = (p2Men & ~toBit) >>> 0;
+      p2Kings = (p2Kings | toBit) >>> 0;
     }
   }
 
-  // Kings: any direction, fly until first enemy, land immediately behind it
+  return {
+    side: p.side === 1 ? -1 : 1,
+    p1Men,
+    p1Kings,
+    p2Men,
+    p2Kings,
+    halfmoveClock: isCapture ? 0 : p.halfmoveClock + 1,
+  };
+}
+
+export function generateMoves(p: Position): Move[] {
+  return generateMovesInto(p, []);
+}
+
+export function generateMovesInto(p: Position, out: Move[]): Move[] {
+  generateCapturesInto(p, out);
+  if (out.length > 0) return out;
+
+  const occ = occupied(p);
+  const empty = (~occ) >>> 0;
+  const men = sideMen(p);
+  const kings = sideKings(p);
+
+  if (p.side === 1) {
+    addMenQuietMoves(p.side, men, empty, out, P1_DIR_A, P1_DIR_B);
+  } else {
+    addMenQuietMoves(p.side, men, empty, out, P2_DIR_A, P2_DIR_B);
+  }
+
+  addKingQuietMoves(kings, occ, out);
+  return out;
+}
+
+export function generateCapturesInto(p: Position, out: Move[]): Move[] {
+  out.length = 0;
+
+  const men = sideMen(p);
+  const kings = sideKings(p);
+
+  for (const from of bits(men)) {
+    genMenCapturesFromFast(p, from, out);
+  }
+
+  for (const from of bits(kings)) {
+    genKingCapturesFromFast(p, from, out);
+  }
+
+  if (out.length <= 1) return out;
+
+  let maxCaps = 0;
+  for (let i = 0; i < out.length; i++) {
+    const n = out[i].captured.length;
+    if (n > maxCaps) maxCaps = n;
+  }
+
+  let write = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (out[i].captured.length === maxCaps) {
+      out[write++] = out[i];
+    }
+  }
+  out.length = write;
+
+  return out;
+}
+
+function addMenQuietMoves(
+  side: 1 | -1,
+  men: BB,
+  empty: BB,
+  out: Move[],
+  dirA: number,
+  dirB: number,
+): void {
+  for (const from of bits(men)) {
+    const toA = NEXT[from][dirA];
+    if (toA >= 0 && (empty & B1(toA))) {
+      pushQuiet(out, from, toA, willPromote(side, toA));
+    }
+
+    const toB = NEXT[from][dirB];
+    if (toB >= 0 && (empty & B1(toB))) {
+      pushQuiet(out, from, toB, willPromote(side, toB));
+    }
+  }
+}
+
+function addKingQuietMoves(kings: BB, occ: BB, out: Move[]): void {
+  for (const from of bits(kings)) {
+    for (let d = 0; d < 4; d++) {
+      const ray = RAYS[from][d];
+
+      for (let i = 0; i < ray.length; i++) {
+        const to = ray[i];
+        if (occ & B1(to)) break;
+        pushQuiet(out, from, to, false);
+      }
+    }
+  }
+}
+
+export function hasCapturesAvailable(p: Position): boolean {
+  const occ = occupied(p);
+  const myMen = sideMen(p);
+  const myKings = sideKings(p);
+  const myAll = (myMen | myKings) >>> 0;
+  const opAll = p.side === 1
+    ? (p.p2Men | p.p2Kings) >>> 0
+    : (p.p1Men | p.p1Kings) >>> 0;
+
+  const empty = (~occ) >>> 0;
+  const dirA = p.side === 1 ? P1_DIR_A : P2_DIR_A;
+  const dirB = p.side === 1 ? P1_DIR_B : P2_DIR_B;
+
+  for (const from of bits(myMen)) {
+    if (hasMenCaptureFrom(from, dirA, opAll, empty)) return true;
+    if (hasMenCaptureFrom(from, dirB, opAll, empty)) return true;
+  }
+
   for (const from of bits(myKings)) {
-    for (const dir of ['UL', 'UR', 'DL', 'DR'] as Dir[]) {
+    for (let d = 0; d < 4; d++) {
+      const ray = RAYS[from][d];
       let seenEnemy = false;
-      for (const sq of ray(from, dir)) {
+
+      for (let i = 0; i < ray.length; i++) {
+        const sq = ray[i];
         const bit = B1(sq);
-        if (myAll & bit) break;           // own piece blocks
-        if (opOcc & bit) {
-          if (seenEnemy) break;           // second enemy — no room to land
+
+        if (myAll & bit) break;
+
+        if (opAll & bit) {
+          if (seenEnemy) break;
           seenEnemy = true;
-        } else if (seenEnemy) {
-          return true;                    // empty square after enemy = capture exists
+          continue;
         }
+
+        if (seenEnemy) return true;
       }
     }
   }
@@ -125,204 +258,186 @@ export function hasCapturesAvailable(p: Position): boolean {
   return false;
 }
 
-export function generateMoves(p: Position): Move[] {
-  const occ = occupied(p);
-  const emptyMask = (~occ) >>> 0;
-  const myMenBB = sideMen(p);
-  const myKingsBB = sideKings(p);
+function hasMenCaptureFrom(from: number, dir: number, opAll: BB, empty: BB): boolean {
+  const over = NEXT[from][dir];
+  if (over < 0) return false;
+  if (!(opAll & B1(over))) return false;
 
-  const captures: Move[] = [];
+  const landing = NEXT[over][dir];
+  if (landing < 0) return false;
 
-  // 1) forced captures — Men
-  for (const from of bits(myMenBB)) {
-    genMenCapturesFrom(p, from, captures);
-  }
-  // 1) forced captures — Kings (flying)
-  for (const from of bits(myKingsBB)) {
-    genKingCapturesFrom(p, from, captures);
-  }
-  if (captures.length) {
-    const maxCaps = Math.max(...captures.map(m => m.captured.length));
-    return captures.filter(m => m.captured.length === maxCaps);
-  }
-
-  // 2) quiet moves — Men (forward one step)
-  const quiet: Move[] = [];
-  for (const from of bits(myMenBB)) {
-    for (const st of STEPS[from]) {
-      if (p.side === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue; // P1 up only
-      if (p.side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue; // P2 down only
-      const toBit = B1(st.to);
-      if (emptyMask & toBit) quiet.push({ from, to: st.to, captured: [], promote: willPromote(p.side, st.to) });
-    }
-  }
-
-  // 2) quiet moves — Kings (fly any distance until blocked)
-  for (const from of bits(myKingsBB)) {
-    for (const dir of ['UL','UR','DL','DR'] as Dir[]) {
-      for (const sq of ray(from, dir)) {
-        const toBit = B1(sq);
-        if (occ & toBit) break;        // blocked
-        quiet.push({ from, to: sq, captured: [], promote: false });
-      }
-    }
-  }
-
-  return quiet;
+  return (empty & B1(landing)) !== 0;
 }
 
-// ---- Men captures (adjacent jump, forward only) ----------------------------
+function genMenCapturesFromFast(p: Position, from: number, out: Move[]): void {
+  const caps = new Int8Array(MAX_CHAIN);
+  const path = new Int8Array(MAX_CHAIN);
 
-function genMenCapturesFrom(p: Position, from: number, out: Move[]) {
-  const myMen0   = p.side === 1 ? p.p1Men   : p.p2Men;
+  const myMen0 = p.side === 1 ? p.p1Men : p.p2Men;
   const myKings0 = p.side === 1 ? p.p1Kings : p.p2Kings;
-  const opMen0   = p.side === 1 ? p.p2Men   : p.p1Men;
+  const opMen0 = p.side === 1 ? p.p2Men : p.p1Men;
   const opKings0 = p.side === 1 ? p.p2Kings : p.p1Kings;
 
-  const path: number[] = [];
-  const caps: number[] = [];
+  const dirA = p.side === 1 ? P1_DIR_A : P2_DIR_A;
+  const dirB = p.side === 1 ? P1_DIR_B : P2_DIR_B;
 
-  function dfs(cur: number, myMen: BB, myKings: BB, opMen: BB, opKings: BB) {
+  function dfs(
+    cur: number,
+    depth: number,
+    myMen: BB,
+    myKings: BB,
+    opMen: BB,
+    opKings: BB,
+  ): void {
     let extended = false;
 
-    // adjacent jumps: look at next step, then step after (landing)
-    for (const st of STEPS[cur]) {
-      // men capture forward only
-      if (p.side === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue; // P1 up only
-      if (p.side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue; // P2 down only
+    extended = tryMenCaptureDir(cur, depth, dirA, myMen, myKings, opMen, opKings) || extended;
+    extended = tryMenCaptureDir(cur, depth, dirB, myMen, myKings, opMen, opKings) || extended;
 
-      const over = st.to;
-      if (over < 0) continue;
-
-      const overBit = B1(over);
-      const occNow  = (myMen | myKings | opMen | opKings) >>> 0;
-      const isEnemy = ((opMen | opKings) & overBit) !== 0;
-      if (!isEnemy) continue;
-
-      const landing = nextInDir(over, st.dir);
-      if (landing < 0) continue;
-      const landingBit = B1(landing);
-      const isEmptyLanding = ((~occNow) >>> 0) & landingBit;
-      if (!isEmptyLanding) continue;
-
-      // apply capture
-      const fromBit = B1(cur);
-      const capturedWasKing = (opKings & overBit) !== 0;
-
-      let myMenN = myMen, myKingsN = myKings, opMenN = opMen, opKingsN = opKings;
-      // move piece
-      if ((myKingsN & fromBit) !== 0) {
-        myKingsN = ((myKingsN & ~fromBit) | landingBit) >>> 0;
-      } else {
-        myMenN = ((myMenN & ~fromBit) | landingBit) >>> 0;
-      }
-      // remove captured
-      if (capturedWasKing) opKingsN = (opKingsN & ~overBit) >>> 0;
-      else                 opMenN   = (opMenN   & ~overBit) >>> 0;
-
-      path.push(landing);
-      caps.push(over);
-      dfs(landing, myMenN, myKingsN, opMenN, opKingsN);
-      path.pop();
-      caps.pop();
-      extended = true;
-    }
-
-    if (!extended && caps.length > 0) {
-      const lastTo = path.length ? path[path.length - 1] : cur;
-      const promote = willPromote(p.side, lastTo);
-      out.push({ from, to: lastTo, captured: [...caps], promote, path: [...path] });
+    if (!extended && depth > 0) {
+      const to = path[depth - 1];
+      pushCapture(out, from, to, willPromote(p.side, to), caps, path, depth);
     }
   }
 
-  dfs(from, myMen0, myKings0, opMen0, opKings0);
+  function tryMenCaptureDir(
+    cur: number,
+    depth: number,
+    dir: number,
+    myMen: BB,
+    myKings: BB,
+    opMen: BB,
+    opKings: BB,
+  ): boolean {
+    if (depth >= MAX_CHAIN) return false;
+
+    const over = NEXT[cur][dir];
+    if (over < 0) return false;
+
+    const overBit = B1(over);
+    if (!((opMen | opKings) & overBit)) return false;
+
+    const landing = NEXT[over][dir];
+    if (landing < 0) return false;
+
+    const landingBit = B1(landing);
+    const occNow = (myMen | myKings | opMen | opKings) >>> 0;
+
+    if (occNow & landingBit) return false;
+
+    const fromBit = B1(cur);
+    let myMenN = myMen;
+    let myKingsN = myKings;
+    let opMenN = opMen;
+    let opKingsN = opKings;
+
+    if (myKingsN & fromBit) {
+      myKingsN = ((myKingsN & ~fromBit) | landingBit) >>> 0;
+    } else {
+      myMenN = ((myMenN & ~fromBit) | landingBit) >>> 0;
+    }
+
+    if (opKingsN & overBit) opKingsN = (opKingsN & ~overBit) >>> 0;
+    else opMenN = (opMenN & ~overBit) >>> 0;
+
+    caps[depth] = over;
+    path[depth] = landing;
+
+    dfs(landing, depth + 1, myMenN, myKingsN, opMenN, opKingsN);
+    return true;
+  }
+
+  dfs(from, 0, myMen0, myKings0, opMen0, opKings0);
 }
 
-// ---- King captures (flying) ------------------------------------------------
+function genKingCapturesFromFast(p: Position, from: number, out: Move[]): void {
+  const caps = new Int8Array(MAX_CHAIN);
+  const path = new Int8Array(MAX_CHAIN);
 
-function genKingCapturesFrom(p: Position, from: number, out: Move[]) {
-  const myMen0   = p.side === 1 ? p.p1Men   : p.p2Men;
+  const myMen0 = p.side === 1 ? p.p1Men : p.p2Men;
   const myKings0 = p.side === 1 ? p.p1Kings : p.p2Kings;
-  const opMen0   = p.side === 1 ? p.p2Men   : p.p1Men;
+  const opMen0 = p.side === 1 ? p.p2Men : p.p1Men;
   const opKings0 = p.side === 1 ? p.p2Kings : p.p1Kings;
 
-  const path: number[] = [];
-  const caps: number[] = [];
+  if (!(myKings0 & B1(from))) return;
 
-  function dfs(cur: number, myMen: BB, myKings: BB, opMen: BB, opKings: BB) {
+  function dfs(
+    cur: number,
+    depth: number,
+    myMen: BB,
+    myKings: BB,
+    opMen: BB,
+    opKings: BB,
+  ): void {
     let extended = false;
 
-    for (const dir of ['UL','UR','DL','DR'] as Dir[]) {
-      // march outward until first enemy (no friendly allowed in-between)
-      let seenEnemy = false;
-      let enemyIdx = -1;
+    for (let d = 0; d < 4; d++) {
+      if (tryKingCaptureDir(cur, depth, d, myMen, myKings, opMen, opKings)) {
+        extended = true;
+      }
+    }
 
-      // step squares one by one along the ray
-      for (const sq of ray(cur, dir)) {
-        const bit = B1(sq);
-        const occNow = (myMen | myKings | opMen | opKings) >>> 0;
+    if (!extended && depth > 0) {
+      const to = path[depth - 1];
+      pushCapture(out, from, to, false, caps, path, depth);
+    }
+  }
 
-        const isMine   = ((myMen | myKings) & bit) !== 0;
-        const isEnemy  = ((opMen | opKings) & bit) !== 0;
-        const isEmpty  = ((~occNow) >>> 0 & bit) !== 0;
+  function tryKingCaptureDir(
+    cur: number,
+    depth: number,
+    dir: number,
+    myMen: BB,
+    myKings: BB,
+    opMen: BB,
+    opKings: BB,
+  ): boolean {
+    if (depth >= MAX_CHAIN) return false;
 
-        if (isMine) break; // blocked by own piece
+    const ray = RAYS[cur][dir];
+    let enemy = -1;
 
-        if (!seenEnemy) {
-          if (isEmpty) {
-            // just an empty along the way before enemy; continue scanning
-            continue;
-          } else if (isEnemy) {
-            seenEnemy = true;
-            enemyIdx = sq;
-            // continue to look for landing squares beyond the enemy
-            continue;
-          } else {
-            // should not happen
-            break;
-          }
-        } else {
-          // already saw exactly one enemy; landing must be the first empty square behind it
-          if (!isEmpty) break; // blocked after enemy
-          const landing = sq;
-          const fromBit = B1(cur);
-          const landingBit = B1(landing);
-          const enemyBit = B1(enemyIdx);
-          const capturedWasKing = (opKings & enemyBit) !== 0;
+    for (let i = 0; i < ray.length; i++) {
+      const sq = ray[i];
+      const bit = B1(sq);
 
-          // apply capture
-          let myMenN = myMen, myKingsN = myKings, opMenN = opMen, opKingsN = opKings;
-          // always king moves here
-          myKingsN = ((myKingsN & ~fromBit) | landingBit) >>> 0;
+      if ((myMen | myKings) & bit) return false;
 
-          if (capturedWasKing) opKingsN = (opKingsN & ~enemyBit) >>> 0;
-          else                 opMenN   = (opMenN   & ~enemyBit) >>> 0;
-
-          path.push(landing);
-          caps.push(enemyIdx);
-          dfs(landing, myMenN, myKingsN, opMenN, opKingsN);
-          path.pop();
-          caps.pop();
-
-          extended = true;
-          break; // only the immediate landing square is legal
+      if (enemy < 0) {
+        if ((opMen | opKings) & bit) {
+          enemy = sq;
         }
+        continue;
       }
+
+      // Thai-hos behavior from old code:
+      // once an enemy is seen, landing must be the first empty square behind it.
+      if ((myMen | myKings | opMen | opKings) & bit) return false;
+
+      const landing = sq;
+      const fromBit = B1(cur);
+      const landingBit = B1(landing);
+      const enemyBit = B1(enemy);
+
+      let myMenN = myMen;
+      let myKingsN = myKings;
+      let opMenN = opMen;
+      let opKingsN = opKings;
+
+      myKingsN = ((myKingsN & ~fromBit) | landingBit) >>> 0;
+
+      if (opKingsN & enemyBit) opKingsN = (opKingsN & ~enemyBit) >>> 0;
+      else opMenN = (opMenN & ~enemyBit) >>> 0;
+
+      caps[depth] = enemy;
+      path[depth] = landing;
+
+      dfs(landing, depth + 1, myMenN, myKingsN, opMenN, opKingsN);
+      return true;
     }
 
-    if (!extended && caps.length > 0) {
-      const lastTo = path.length ? path[path.length - 1] : cur;
-      // king never promotes
-      out.push({ from, to: lastTo, captured: [...caps], promote: false, path: [...path] });
-    }
+    return false;
   }
 
-  // ensure the moving piece is actually a king at `from`
-  const fromBit = B1(from);
-  const isKing = (myKings0 & fromBit) !== 0;
-  if (!isKing) return;
-
-  dfs(from, myMen0, myKings0, opMen0, opKings0);
+  dfs(from, 0, myMen0, myKings0, opMen0, opKings0);
 }
-
-
