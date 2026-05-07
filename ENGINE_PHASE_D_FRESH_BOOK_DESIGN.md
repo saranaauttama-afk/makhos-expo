@@ -6,6 +6,25 @@ Design a fresh opening book system from scratch while treating the current legac
 
 This document is design-only. It does not change engine behavior, benchmark behavior, or legacy book wiring.
 
+## Scaffold Status
+
+Phase D.4 scaffold implementation is now present as a separate, disabled module:
+
+- `src/coreClaude/search/openingBookFresh.ts`
+
+Current scaffold status:
+
+- separate fresh-book runtime module exists
+- global fresh-book flag exists and defaults `OFF`
+- fresh-book data structure exists with zero entries
+- deterministic-only selection helper exists
+- legal move validation hook exists
+- hash + verify lookup hook exists
+- passive stats structure exists
+- benchmark bypass rejection path exists
+
+No runtime behavior should change while the scaffold remains disabled and unintegrated.
+
 ## 1. Why Legacy Book Is Reference-Only
 
 The legacy opening book is useful for understanding:
@@ -76,6 +95,11 @@ Recommended storage options later:
 
 - checked-in JSON for readability
 - optionally precompiled TS or compact JSON for production loading
+
+Current scaffold note:
+
+- the scaffold currently keeps an empty in-module dataset so there is no real opening content yet
+- external file loading is intentionally deferred to a later step
 
 ## 3. How Positions Are Keyed / Hash Verified
 
@@ -190,6 +214,11 @@ Recommended architecture:
 
 That keeps tactical benchmark results attributable to search behavior rather than opening policy.
 
+Current scaffold note:
+
+- the fresh module is not imported by `scripts/aiBenchmark.ts`
+- the benchmark bypass path is prepared inside the module for future guarded callers
+
 ## 8. How Book Stats Should Work
 
 Fresh book stats should be lightweight, explicit, and separated from search stats.
@@ -226,6 +255,10 @@ Rules:
 - no console spam during normal play
 - no hot-path string building
 - benchmark and debug code should read stats explicitly
+
+Current scaffold note:
+
+- stats are prepared but not yet surfaced in any benchmark or UI output
 
 ## 9. Migration Plan From Legacy Book
 
@@ -299,6 +332,39 @@ This allows rollback without touching:
 7. Only after deterministic behavior is stable:
    - consider optional randomness behind flags
    - consider legacy conversion tooling
+
+## What Is Still Intentionally Missing
+
+The D.4 scaffold intentionally does not include:
+
+- any real fresh opening entries
+- any caller integration in UI, matchup, or benchmark
+- any replacement of the legacy book
+- any randomness
+- any benchmark reporting changes
+- any automatic loading from external JSON
+- any migration/conversion tooling
+- any enable-by-default path
+
+These omissions are intentional so the scaffold can land without changing runtime behavior.
+
+## Next Safe Steps
+
+1. Add a narrow caller gate for fresh-book lookup without enabling it by default.
+
+2. Add an explicit selection-point integration plan:
+   - direct script path first, or
+   - isolated UI path first
+
+3. Keep the first live experiment behind:
+   - the global fresh-book enable flag
+   - a caller-specific gate
+
+4. Add a tiny reviewed seed dataset only after:
+   - lookup path is proven inert while disabled
+   - tactical benchmark bypass remains explicit
+
+5. Keep legacy and fresh stats separate throughout rollout.
 
 ## Recommended Architecture Summary
 
