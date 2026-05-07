@@ -991,14 +991,21 @@ for (const [hash, from, to, weight = 1, score] of BOOK) {
   else BOOK_MAP.set(hash, [row]);
 }
 
-function weightedPick<T extends { weight: number }>(items: T[]): T {
-  const total = items.reduce((sum, item) => sum + Math.max(0.001, item.weight), 0);
-  let roll = Math.random() * total;
-  for (const item of items) {
-    roll -= Math.max(0.001, item.weight);
-    if (roll <= 0) return item;
+function compareOpeningBookCandidates(a: OpeningBookCandidate, b: OpeningBookCandidate): number {
+  return (
+    b.weight - a.weight ||
+    (b.score ?? Number.NEGATIVE_INFINITY) - (a.score ?? Number.NEGATIVE_INFINITY) ||
+    a.move.from - b.move.from ||
+    a.move.to - b.move.to
+  );
+}
+
+function pickDeterministicOpeningBookCandidate(candidates: OpeningBookCandidate[]): OpeningBookCandidate {
+  let best = candidates[0];
+  for (let i = 1; i < candidates.length; i++) {
+    if (compareOpeningBookCandidates(candidates[i], best) < 0) best = candidates[i];
   }
-  return items[0];
+  return best;
 }
 
 export function resetOpeningBookStats(): void {
@@ -1060,5 +1067,7 @@ export function lookupOpeningBook(
 ): { move: Move } | undefined {
   const hit = lookupOpeningBookCandidates(pos, options);
   if (!hit) return undefined;
-  return { move: weightedPick(hit.candidates).move };
+  // Phase D.2 keeps legacy book lookup deterministic by selecting the top
+  // validated candidate using a stable tie-breaker.
+  return { move: pickDeterministicOpeningBookCandidate(hit.candidates).move };
 }

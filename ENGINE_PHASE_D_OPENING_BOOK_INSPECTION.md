@@ -2,7 +2,10 @@
 
 ## Scope
 
-Phase D.0 is inspection only. No engine behavior was changed.
+Phase D started as inspection only. This document now also records the narrow D.1 and D.2 legacy opening-book changes:
+
+- D.1: instrumentation and benchmark isolation only
+- D.2: deterministic direct selection for the legacy direct-book path
 
 ## Files Inspected
 
@@ -25,7 +28,7 @@ Phase D.0 is inspection only. No engine behavior was changed.
    - generates current legal moves
    - keeps only rows whose `from/to` pair still matches a legal move
    - returns candidates sorted by descending weight
-5. `lookupOpeningBook(pos)` calls `lookupOpeningBookCandidates(pos)` and picks one candidate with weighted randomness.
+5. `lookupOpeningBook(pos)` calls `lookupOpeningBookCandidates(pos)` and selects one deterministic top validated candidate.
 6. In the app path, `src/ui/useCodexEngine.ts` does not play a direct book move. It reads `lookupOpeningBookCandidates(pos)`, converts candidate weights into `rootMoveScores`, and passes those hints into `iterativeDeepening(...)`.
 7. In `scripts/matchup.ts`, the enhanced side does use `lookupOpeningBook(pos)` directly before falling back to search.
 
@@ -93,17 +96,32 @@ Deterministic pieces:
 - `lookupOpeningBookCandidates(pos)` is deterministic for a fixed position and legal move list.
 - Candidate ordering is sorted by descending weight.
 - Legal move filtering is deterministic.
+- `lookupOpeningBook(pos)` now selects the top validated candidate deterministically.
 - `scripts/buildOpeningBook.ts` deterministically filters candidate moves by score margin and rank once a search result exists.
 
 Random pieces:
 
-- `lookupOpeningBook(pos)` uses `weightedPick(...)`, which calls `Math.random()`.
-- `src/coreClaude/search/alphabeta.ts` also has `pickDiversifiedRoot(...)`, which uses `Math.random()` when `diversifyRoot` is enabled.
+- `src/coreClaude/search/alphabeta.ts` has `pickDiversifiedRoot(...)`, which uses `Math.random()` when `diversifyRoot` is enabled.
 
 Important distinction:
 
-- The opening book module itself supports both deterministic candidate lookup and random direct move selection.
+- The opening book module now uses deterministic candidate lookup and deterministic direct legacy selection.
 - The current app engine path is not a pure direct-book path. It is a book-guided search path, and it can also interact with root diversification.
+
+## D.2 Result
+
+Phase D.2 changes only the legacy direct selection path.
+
+- old behavior:
+  - `lookupOpeningBook(pos)` used weighted random selection
+- new behavior:
+  - `lookupOpeningBook(pos)` selects the top validated candidate deterministically
+  - ties are broken stably by weight, then score when present, then `from`, then `to`
+- impacted caller:
+  - `scripts/matchup.ts`
+- not impacted:
+  - `src/ui/useCodexEngine.ts` still uses candidate-guided search rather than direct book move execution
+  - `scripts/aiBenchmark.ts` still bypasses the opening book entirely
 
 ## Where The Old Book Is Wired In
 
@@ -113,7 +131,7 @@ Important distinction:
   - owns the legacy embedded book data
   - performs hash lookup
   - performs legal move filtering
-  - performs weighted random direct selection when `lookupOpeningBook(...)` is used
+  - performs deterministic direct selection when `lookupOpeningBook(...)` is used
 
 - `src/coreClaude/search/alphabeta.ts`
   - does not import the opening book directly
@@ -132,7 +150,7 @@ Important distinction:
 
 - `scripts/matchup.ts`
   - imports `lookupOpeningBook`
-  - directly selects a weighted random book move for the enhanced side when a hit exists
+  - now directly selects a deterministic top validated book move for the enhanced side when a hit exists
 
 - `scripts/buildOpeningBook.ts`
   - regenerates the legacy book data offline
@@ -153,9 +171,9 @@ The tactical benchmark already bypasses the opening book.
 
 Evidence:
 
-- `scripts/aiBenchmark.ts` does not import `openingBook.ts`.
-- It drives move selection through `iterativeDeepening(...)` and `selectStrictLevelMove(...)` directly.
-- The benchmark scripts in `package.json` compile and run `scripts/aiBenchmark.ts`, so current `bench:ai*` flows do not rely on the opening book.
+- `scripts/aiBenchmark.ts` does not import `openingBook.ts`
+- it drives move selection through `iterativeDeepening(...)` and `selectStrictLevelMove(...)` directly
+- benchmark reporting explicitly records `openingBookBypassed: true`
 
 ## Legal Move Verification
 
@@ -198,8 +216,8 @@ Notes:
 The tactical benchmark remains opening-book-free.
 
 - `scripts/aiBenchmark.ts` still does not import `openingBook.ts`
-- benchmark reporting now explicitly records `openingBookBypassed: true`
-- console summary now prints that the opening book was bypassed
+- benchmark reporting explicitly records `openingBookBypassed: true`
+- console summary prints that the opening book was bypassed
 
 This keeps tactical benchmark results insulated from legacy book behavior.
 
@@ -207,8 +225,8 @@ This keeps tactical benchmark results insulated from legacy book behavior.
 
 Direct opening book selection is now deterministic where it is used directly.
 
-- `lookupOpeningBookCandidates(...)` returns deterministically sorted candidates
-- `lookupOpeningBook(...)` now selects the top candidate deterministically
+- `lookupOpeningBookCandidates(...)` still returns deterministically ordered candidates by weight
+- `lookupOpeningBook(...)` now selects a stable top candidate deterministically
 - `scripts/matchup.ts` uses that deterministic direct path
 
 The UI path was already candidate-driven rather than random direct selection, but it still remains search-guided rather than a pure standalone book path.
@@ -219,9 +237,9 @@ The UI path was already candidate-driven rather than random direct selection, bu
    - `useCodexEngine.ts` uses book candidates as root hints rather than directly forcing a book move.
    - That means changing book behavior can indirectly affect search ordering and final move choice.
 
-2. Direct book selection is random.
-   - `lookupOpeningBook(pos)` uses weighted randomness.
-   - Any benchmark or experiment that calls this path directly must be treated as non-deterministic unless randomness is explicitly controlled.
+2. The legacy direct-book path is now deterministic, but only in one caller.
+   - `lookupOpeningBook(pos)` now chooses a stable top validated candidate.
+   - That reduces legacy randomness in `scripts/matchup.ts`, but does not create a fresh book system.
 
 3. Opening diversification adds another random layer.
    - `useCodexEngine.ts` sets `diversifyRoot` during opening play when depth is high enough.
@@ -235,26 +253,21 @@ The UI path was already candidate-driven rather than random direct selection, bu
    - Regeneration requires manual paste-back into `openingBook.ts`.
    - That creates a risk of stale docs, stale entry counts, or mismatched assumptions after regeneration.
 
-6. There is no dedicated runtime book stats surface in the inspected code.
-   - Current inspection did not find an existing book hit-rate or selection audit path.
-   - That makes safe experimentation harder without first deciding where passive measurement should live.
+6. There is no dedicated runtime book stats surface beyond the new lightweight counters.
+   - There is still no broader audit or evaluation framework for legacy book quality.
 
 7. The current book is wired into two different behavior surfaces.
    - The UI uses book-guided search.
-   - The matchup script uses direct random book selection.
-   - That split makes it easy to discuss “the opening book” as one thing when it is actually two different runtime behaviors.
+   - The matchup script uses direct deterministic book selection.
+   - That split makes it easy to discuss "the opening book" as one thing when it is actually two different runtime behaviors.
 
 8. The current book format and workflow are legacy-oriented.
    - The system is compact and workable as a reference.
    - It is not an ideal clean foundation for a fresh opening book implementation.
 
-9. Deterministic direct selection does not remove all opening-path variability.
-   - The UI still feeds book hints into search rather than executing an isolated direct-book policy.
-   - Any future measurement work must keep book guidance separate from search behavior.
-
 ## How To Disable Or Isolate The Old Book Safely Later
 
-Do not perform these in D.0. These are planning notes only.
+Do not perform these in D.2. These are planning notes only.
 
 1. Safest isolation point for app behavior:
    - gate the `lookupOpeningBookCandidates(pos)` call in `src/ui/useCodexEngine.ts`
@@ -286,7 +299,7 @@ Recommended treatment: replace later, keep as reference now.
 
 - `scripts/matchup.ts` direct-book path
   - recommendation: `ignore for tactical validation, inspect separately for book experiments`
-  - reason: it uses direct weighted random book selection rather than a deterministic benchmark path
+  - reason: it now uses deterministic direct legacy-book selection, but is still not the tactical benchmark path
 
 - embedded `BOOK` data
   - recommendation: `do not delete yet`
@@ -310,27 +323,24 @@ Document current policy explicitly before behavior changes:
 
 - keep tactical benchmark book-free
 - distinguish direct book move selection from book-guided search
-- distinguish deterministic candidate lookup from random weighted pick
+- distinguish deterministic candidate lookup from direct selection policy
 - mark the current book implementation as legacy/reference-only
 
 ### D.2
 
-Add passive inspection only, outside the search hot path if needed later:
+Make only the legacy direct-book caller deterministic:
 
-- book hit count
-- candidate count by position
-- direct-book path usage vs guided-search path usage
-- explicit boundary between legacy book and future replacement book
-
-No behavior changes should happen in this step.
+- top validated candidate selection
+- stable tie-breaker
+- no search-path change
+- tactical benchmark still bypassed
 
 ### D.3
 
 If experiments are approved later, gate them narrowly:
 
 - legacy book on/off flag at the UI call site
-- direct weighted book move selection flag
-- deterministic top candidate selection flag
+- direct deterministic vs alternative legacy selection flag if needed
 - opening diversification interaction flag
 - separate flag namespace for any fresh replacement book
 
@@ -342,19 +352,19 @@ Validate book experiments separately from tactical search quality:
 
 - keep `bench:ai*` book-free
 - use a dedicated opening/book experiment script or matchup script
-- compare deterministic and random book policies in isolation before mixing them into normal app play
+- compare legacy direct-book behavior and candidate-guided behavior in isolation
 - compare legacy and replacement book behavior only after both can be isolated cleanly
 
 ## Summary
 
 The current opening book system is already present and functional, but it is used in two different ways:
 
-- direct weighted move selection in `scripts/matchup.ts`
+- deterministic direct move selection in `scripts/matchup.ts`
 - candidate-guided search in `src/ui/useCodexEngine.ts`
 
 The tactical benchmark already avoids the book, legal move validation exists, and the biggest risk for Phase D is mixing together:
 
-- book randomness
+- legacy book policy
 - root diversification
 - search guidance
 
