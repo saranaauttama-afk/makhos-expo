@@ -35,6 +35,31 @@ export interface CancelToken  { cancelled: boolean; }
 export type RootMoveScores = ReadonlyMap<number, number>;
 type OnInfo = (info: SearchInfo) => void;
 type RootCandidate = RootSearchCandidate;
+type RootMoveSource =
+  | 'normalSearch'
+  | 'openingDiversification'
+  | 'trapOverride'
+  | 'lowMobilityRecaptureOverride'
+  | 'promotionOverride'
+  | 'rootTacticalSafetyOverride'
+  | 'antiHangSafetyOverride'
+  | 'fallbackLegalMove';
+
+interface RootOverrideCounter {
+  attempts: number;
+  accepted: number;
+}
+
+export interface RootOverrideStats {
+  searches: number;
+  openingDiversification: RootOverrideCounter;
+  trapOverride: RootOverrideCounter;
+  lowMobilityRecaptureOverride: RootOverrideCounter;
+  promotionOverride: RootOverrideCounter;
+  rootTacticalSafetyOverride: RootOverrideCounter;
+  antiHangSafetyOverride: RootOverrideCounter;
+  finalMoveSource: Record<RootMoveSource, number>;
+}
 
 // Eval override — allows A/B testing without changing all call sites
 let _eval: (p: Position) => number = evaluate;
@@ -65,6 +90,51 @@ const LMR: Uint8Array[] = Array.from({ length: 32 }, (_, i) =>
 );
 
 export function moveKey(m: Move) { return (m.from << 5) | m.to; }
+
+function makeRootOverrideCounter(): RootOverrideCounter {
+  return { attempts: 0, accepted: 0 };
+}
+
+function makeRootOverrideStats(): RootOverrideStats {
+  return {
+    searches: 0,
+    openingDiversification: makeRootOverrideCounter(),
+    trapOverride: makeRootOverrideCounter(),
+    lowMobilityRecaptureOverride: makeRootOverrideCounter(),
+    promotionOverride: makeRootOverrideCounter(),
+    rootTacticalSafetyOverride: makeRootOverrideCounter(),
+    antiHangSafetyOverride: makeRootOverrideCounter(),
+    finalMoveSource: {
+      normalSearch: 0,
+      openingDiversification: 0,
+      trapOverride: 0,
+      lowMobilityRecaptureOverride: 0,
+      promotionOverride: 0,
+      rootTacticalSafetyOverride: 0,
+      antiHangSafetyOverride: 0,
+      fallbackLegalMove: 0,
+    },
+  };
+}
+
+let rootOverrideStats = makeRootOverrideStats();
+
+export function resetRootOverrideStats(): void {
+  rootOverrideStats = makeRootOverrideStats();
+}
+
+export function getRootOverrideStats(): RootOverrideStats {
+  return {
+    searches: rootOverrideStats.searches,
+    openingDiversification: { ...rootOverrideStats.openingDiversification },
+    trapOverride: { ...rootOverrideStats.trapOverride },
+    lowMobilityRecaptureOverride: { ...rootOverrideStats.lowMobilityRecaptureOverride },
+    promotionOverride: { ...rootOverrideStats.promotionOverride },
+    rootTacticalSafetyOverride: { ...rootOverrideStats.rootTacticalSafetyOverride },
+    antiHangSafetyOverride: { ...rootOverrideStats.antiHangSafetyOverride },
+    finalMoveSource: { ...rootOverrideStats.finalMoveSource },
+  };
+}
 
 function rootHint(rootMoveScores: RootMoveScores | undefined, k: number): number {
   return rootMoveScores?.get(k) ?? 0;
@@ -695,6 +765,7 @@ export async function iterativeDeepening(
   rootMoveScores?: RootMoveScores,
   diversifyRoot = false,
 ): Promise<SearchResult> {
+  rootOverrideStats.searches++;
   const deadline  = Date.now() + timeMs;
   const startTime = Date.now();
   const rootHash  = hashPosition(root);
@@ -729,6 +800,7 @@ export async function iterativeDeepening(
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
   let overrideReason: string | undefined;
+  let finalMoveSource: RootMoveSource = 'normalSearch';
   let lastRootCandidates: RootCandidate[] | undefined;
   let lastRootScore = 0;
   let lastScore = 0, haveLast = false;
@@ -840,6 +912,9 @@ export async function iterativeDeepening(
     if (stableDepths >= 3 && Date.now() > startTime + timeMs * 0.5) break;
   }
 
+  // Disabling this override caused tactical regression during Phase B.1 experiment.
+  const ENABLE_LOW_MOBILITY_RECAPTURE_OVERRIDE = true;
+
   if (lastRootCandidates?.length) {
     // Before adding opening variety, re-check the top root alternatives with a
     // wide window. This catches occasional aspiration / ordering artifacts at
@@ -878,45 +953,60 @@ export async function iterativeDeepening(
     }
 
     if (diversifyRoot) {
+      rootOverrideStats.openingDiversification.attempts++;
       const selected = pickDiversifiedRoot(lastRootCandidates, lastRootScore);
       if (selected) {
+        rootOverrideStats.openingDiversification.accepted++;
         best = selected.move;
         bestScore = selected.score;
         overrideReason = 'opening diversification';
+        finalMoveSource = 'openingDiversification';
       }
     }
 
+    rootOverrideStats.trapOverride.attempts++;
     const trap = pickSoundForcedTrap(root, lastRootCandidates, bestScore);
     if (trap) {
+      rootOverrideStats.trapOverride.accepted++;
       best = trap.move;
       bestScore = trap.score;
       overrideReason = 'forced recapture trap';
+      finalMoveSource = 'trapOverride';
     }
 
-    const lowMobilityRecapture = pickLowMobilityRecaptureCandidate(root, lastRootCandidates, bestScore);
+    const lowMobilityRecapture = ENABLE_LOW_MOBILITY_RECAPTURE_OVERRIDE
+      ? (rootOverrideStats.lowMobilityRecaptureOverride.attempts++, pickLowMobilityRecaptureCandidate(root, lastRootCandidates, bestScore))
+      : undefined;
     if (lowMobilityRecapture) {
+      rootOverrideStats.lowMobilityRecaptureOverride.accepted++;
       best = lowMobilityRecapture.move;
       bestScore = lowMobilityRecapture.score;
       overrideReason = 'low-mobility recapture';
+      finalMoveSource = 'lowMobilityRecaptureOverride';
     }
 
+    rootOverrideStats.promotionOverride.attempts++;
     const promotion = pickEndgamePromotionCandidate(root, lastRootCandidates, bestScore);
     if (promotion) {
+      rootOverrideStats.promotionOverride.accepted++;
       best = promotion.move;
       bestScore = promotion.score;
       overrideReason = 'endgame promotion race';
+      finalMoveSource = 'promotionOverride';
     }
 
     // Tactical blunder guard at root:
     // if the top-eval move hangs an immediate multi-capture and there is a
     // near-equal safer move, prefer the safer move.
     const safer = reached >= 2
-      ? pickSaferRootCandidate(root, lastRootCandidates, bestScore, best)
+      ? (rootOverrideStats.rootTacticalSafetyOverride.attempts++, pickSaferRootCandidate(root, lastRootCandidates, bestScore, best))
       : undefined;
     if (safer) {
+      rootOverrideStats.rootTacticalSafetyOverride.accepted++;
       best = safer.move;
       bestScore = safer.score;
       overrideReason = 'root tactical safety';
+      finalMoveSource = 'rootTacticalSafetyOverride';
     }
   }
 
@@ -925,14 +1015,22 @@ export async function iterativeDeepening(
   // legal moves exist, return the first one so the game never stalls.
   if (!best) {
     const fallback = generateMoves(root);
-    if (fallback.length) best = fallback[0];
+    if (fallback.length) {
+      best = fallback[0];
+      finalMoveSource = 'fallbackLegalMove';
+    }
   }
 
+  rootOverrideStats.antiHangSafetyOverride.attempts++;
   const antiHang = pickAbsoluteAntiHangMove(root, best);
   if (antiHang) {
+    rootOverrideStats.antiHangSafetyOverride.accepted++;
     best = antiHang;
     overrideReason = 'absolute anti-hang safety';
+    finalMoveSource = 'antiHangSafetyOverride';
   }
+
+  rootOverrideStats.finalMoveSource[finalMoveSource]++;
 
   return {
     best,
