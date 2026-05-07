@@ -114,7 +114,7 @@ export function useCodexEngine() {
       const blendedScores = new Map<number, number>();
 
       if (openingPly) {
-        const book = lookupOpeningBookCandidates(pos);
+        const book = lookupOpeningBookCandidates(pos, { source: 'ui' });
         if (book) {
           const bestWeight = Math.max(0.001, book.candidates[0]?.weight ?? 1);
           for (const candidate of book.candidates) {

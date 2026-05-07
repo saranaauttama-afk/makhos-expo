@@ -76,6 +76,7 @@ interface BenchmarkReport {
   mode: BenchmarkMode;
   generatedAt: string;
   config: {
+    openingBookBypassed: boolean;
     timeScale: number;
     oracleMs: number;
     oracleDepth: number;
@@ -101,6 +102,7 @@ interface BenchmarkCheckpoint {
   headToHead: HeadToHeadCheckpoint;
 }
 
+const OPENING_BOOK_BYPASSED = true;
 const MODE: BenchmarkMode = process.argv.includes('--teacher')
   ? 'teacher'
   : process.argv.includes('--full')
@@ -562,6 +564,7 @@ async function runTacticalBenchmark(checkpoint: BenchmarkCheckpoint): Promise<Ta
 
 function summarizeTactical(samples: TacticalSample[]) {
   console.log(`\nTactical benchmark (${MODE}, time scale ${TIME_SCALE})`);
+  console.log(`openingBookBypassed=${OPENING_BOOK_BYPASSED ? 'yes' : 'no'}`);
   console.log('level   solve   blunder   avgMs   p95Ms   avgDepth   avgNodes   avgQNodes');
   for (const level of STRICT_LEVELS) {
     const rows = samples.filter(sample => sample.level === level);
@@ -621,6 +624,7 @@ function writeReport(samples: TacticalSample[], gateOk: boolean, headToHead?: He
     mode: MODE,
     generatedAt: new Date().toISOString(),
     config: {
+      openingBookBypassed: OPENING_BOOK_BYPASSED,
       timeScale: TIME_SCALE,
       oracleMs: ORACLE_MS,
       oracleDepth: ORACLE_DEPTH,

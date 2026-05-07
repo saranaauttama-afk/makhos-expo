@@ -24,7 +24,7 @@ async function pickMove(
   useBook: boolean,
 ): Promise<Move | undefined> {
   if (useBook) {
-    const hit = lookupOpeningBook(pos);
+    const hit = lookupOpeningBook(pos, { source: 'matchup' });
     if (hit) return hit.move;
   }
   const res = await iterativeDeepening(pos, THINK_MS, tt, undefined, history);
