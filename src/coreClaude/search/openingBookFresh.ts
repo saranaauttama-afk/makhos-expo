@@ -63,6 +63,19 @@ export interface FreshOpeningBookStats {
   candidateCountTotal: number;
 }
 
+export interface FreshOpeningBookRuntime {
+  lookupCandidates: (
+    pos: Position,
+    options?: FreshOpeningBookLookupOptions,
+  ) => { candidates: FreshOpeningBookCandidate[] } | undefined;
+  lookup: (
+    pos: Position,
+    options?: FreshOpeningBookLookupOptions,
+  ) => { move: Move } | undefined;
+  resetStats: () => void;
+  getStats: () => FreshOpeningBookStats;
+}
+
 // Phase D.4 scaffold only. This stays off until a later integration step
 // explicitly enables the fresh book path.
 export const ENABLE_FRESH_OPENING_BOOK: boolean = false;
@@ -83,24 +96,29 @@ export const FRESH_OPENING_BOOK: FreshOpeningBookFile = {
   entries: [],
 };
 
-const freshOpeningBookStats: FreshOpeningBookStats = {
-  lookupAttempts: 0,
-  successfulHits: 0,
-  disabledRejects: 0,
-  benchmarkBypassRejects: 0,
-  hashMisses: 0,
-  verifyMisses: 0,
-  illegalMoves: 0,
-  selectedDeterministic: 0,
-  selectedRandomized: 0,
-  candidateCountTotal: 0,
-};
+function makeEmptyFreshOpeningBookStats(): FreshOpeningBookStats {
+  return {
+    lookupAttempts: 0,
+    successfulHits: 0,
+    disabledRejects: 0,
+    benchmarkBypassRejects: 0,
+    hashMisses: 0,
+    verifyMisses: 0,
+    illegalMoves: 0,
+    selectedDeterministic: 0,
+    selectedRandomized: 0,
+    candidateCountTotal: 0,
+  };
+}
 
-const FRESH_OPENING_BOOK_MAP = new Map<number, FreshOpeningBookEntry[]>();
-for (const entry of FRESH_OPENING_BOOK.entries) {
-  const bucket = FRESH_OPENING_BOOK_MAP.get(entry.key);
-  if (bucket) bucket.push(entry);
-  else FRESH_OPENING_BOOK_MAP.set(entry.key, [entry]);
+function buildFreshOpeningBookMap(book: FreshOpeningBookFile): Map<number, FreshOpeningBookEntry[]> {
+  const map = new Map<number, FreshOpeningBookEntry[]>();
+  for (const entry of book.entries) {
+    const bucket = map.get(entry.key);
+    if (bucket) bucket.push(entry);
+    else map.set(entry.key, [entry]);
+  }
+  return map;
 }
 
 function computeFreshOpeningBookVerify(pos: Position): number {
@@ -136,85 +154,125 @@ function pickDeterministicFreshOpeningBookCandidate(
   return best;
 }
 
+export function createFreshOpeningBookRuntime(
+  book: FreshOpeningBookFile,
+  defaultEnabled = false,
+): FreshOpeningBookRuntime {
+  const stats = makeEmptyFreshOpeningBookStats();
+  const bookMap = buildFreshOpeningBookMap(book);
+
+  function resetStats(): void {
+    stats.lookupAttempts = 0;
+    stats.successfulHits = 0;
+    stats.disabledRejects = 0;
+    stats.benchmarkBypassRejects = 0;
+    stats.hashMisses = 0;
+    stats.verifyMisses = 0;
+    stats.illegalMoves = 0;
+    stats.selectedDeterministic = 0;
+    stats.selectedRandomized = 0;
+    stats.candidateCountTotal = 0;
+  }
+
+  function getStats(): FreshOpeningBookStats {
+    return { ...stats };
+  }
+
+  function lookupCandidates(
+    pos: Position,
+    options: FreshOpeningBookLookupOptions = {},
+  ): { candidates: FreshOpeningBookCandidate[] } | undefined {
+    stats.lookupAttempts++;
+
+    if (options.source === 'benchmark') {
+      stats.benchmarkBypassRejects++;
+      return undefined;
+    }
+
+    const enabled = options.enabled ?? defaultEnabled;
+    if (!enabled) {
+      stats.disabledRejects++;
+      return undefined;
+    }
+
+    const entries = bookMap.get(hashPosition(pos));
+    if (!entries?.length) {
+      stats.hashMisses++;
+      return undefined;
+    }
+
+    const verify = computeFreshOpeningBookVerify(pos);
+    const verifiedEntry = entries.find(entry => entry.verify == null || entry.verify === verify);
+    if (!verifiedEntry) {
+      stats.verifyMisses++;
+      return undefined;
+    }
+
+    const legal = generateMoves(pos);
+    let illegalEntryCount = 0;
+    const candidates = verifiedEntry.moves
+      .map((entry): FreshOpeningBookCandidate | undefined => {
+        const move = legal.find(candidate => candidate.from === entry.from && candidate.to === entry.to);
+        if (!move) {
+          illegalEntryCount++;
+          return undefined;
+        }
+        return {
+          move,
+          weight: entry.weight,
+          scoreCp: entry.scoreCp,
+          rank: entry.rank,
+          note: entry.note,
+        };
+      })
+      .filter((entry): entry is FreshOpeningBookCandidate => entry != null)
+      .sort(compareFreshOpeningBookCandidates);
+
+    stats.illegalMoves += illegalEntryCount;
+    stats.candidateCountTotal += candidates.length;
+    if (candidates.length) stats.successfulHits++;
+
+    return candidates.length ? { candidates } : undefined;
+  }
+
+  function lookup(
+    pos: Position,
+    options: FreshOpeningBookLookupOptions = {},
+  ): { move: Move } | undefined {
+    const hit = lookupCandidates(pos, options);
+    if (!hit) return undefined;
+    stats.selectedDeterministic++;
+    return { move: pickDeterministicFreshOpeningBookCandidate(hit.candidates).move };
+  }
+
+  return {
+    lookupCandidates,
+    lookup,
+    resetStats,
+    getStats,
+  };
+}
+
+const freshOpeningBookRuntime = createFreshOpeningBookRuntime(FRESH_OPENING_BOOK, ENABLE_FRESH_OPENING_BOOK);
+
 export function resetFreshOpeningBookStats(): void {
-  freshOpeningBookStats.lookupAttempts = 0;
-  freshOpeningBookStats.successfulHits = 0;
-  freshOpeningBookStats.disabledRejects = 0;
-  freshOpeningBookStats.benchmarkBypassRejects = 0;
-  freshOpeningBookStats.hashMisses = 0;
-  freshOpeningBookStats.verifyMisses = 0;
-  freshOpeningBookStats.illegalMoves = 0;
-  freshOpeningBookStats.selectedDeterministic = 0;
-  freshOpeningBookStats.selectedRandomized = 0;
-  freshOpeningBookStats.candidateCountTotal = 0;
+  freshOpeningBookRuntime.resetStats();
 }
 
 export function getFreshOpeningBookStats(): FreshOpeningBookStats {
-  return { ...freshOpeningBookStats };
+  return freshOpeningBookRuntime.getStats();
 }
 
 export function lookupFreshOpeningBookCandidates(
   pos: Position,
   options: FreshOpeningBookLookupOptions = {},
 ): { candidates: FreshOpeningBookCandidate[] } | undefined {
-  freshOpeningBookStats.lookupAttempts++;
-
-  if (options.source === 'benchmark') {
-    freshOpeningBookStats.benchmarkBypassRejects++;
-    return undefined;
-  }
-
-  if (!ENABLE_FRESH_OPENING_BOOK || options.enabled === false) {
-    freshOpeningBookStats.disabledRejects++;
-    return undefined;
-  }
-
-  const entries = FRESH_OPENING_BOOK_MAP.get(hashPosition(pos));
-  if (!entries?.length) {
-    freshOpeningBookStats.hashMisses++;
-    return undefined;
-  }
-
-  const verify = computeFreshOpeningBookVerify(pos);
-  const verifiedEntry = entries.find(entry => entry.verify == null || entry.verify === verify);
-  if (!verifiedEntry) {
-    freshOpeningBookStats.verifyMisses++;
-    return undefined;
-  }
-
-  const legal = generateMoves(pos);
-  let illegalEntryCount = 0;
-  const candidates = verifiedEntry.moves
-    .map((entry): FreshOpeningBookCandidate | undefined => {
-      const move = legal.find(candidate => candidate.from === entry.from && candidate.to === entry.to);
-      if (!move) {
-        illegalEntryCount++;
-        return undefined;
-      }
-      return {
-        move,
-        weight: entry.weight,
-        scoreCp: entry.scoreCp,
-        rank: entry.rank,
-        note: entry.note,
-      };
-    })
-    .filter((entry): entry is FreshOpeningBookCandidate => entry != null)
-    .sort(compareFreshOpeningBookCandidates);
-
-  freshOpeningBookStats.illegalMoves += illegalEntryCount;
-  freshOpeningBookStats.candidateCountTotal += candidates.length;
-  if (candidates.length) freshOpeningBookStats.successfulHits++;
-
-  return candidates.length ? { candidates } : undefined;
+  return freshOpeningBookRuntime.lookupCandidates(pos, options);
 }
 
 export function lookupFreshOpeningBook(
   pos: Position,
   options: FreshOpeningBookLookupOptions = {},
 ): { move: Move } | undefined {
-  const hit = lookupFreshOpeningBookCandidates(pos, options);
-  if (!hit) return undefined;
-  freshOpeningBookStats.selectedDeterministic++;
-  return { move: pickDeterministicFreshOpeningBookCandidate(hit.candidates).move };
+  return freshOpeningBookRuntime.lookup(pos, options);
 }

@@ -25,6 +25,24 @@ Current scaffold status:
 
 No runtime behavior should change while the scaffold remains disabled and unintegrated.
 
+## Validation Status
+
+Phase D.5 adds lightweight scaffold validation coverage.
+
+Validated behaviors:
+
+- empty scaffold returns no move safely while disabled
+- illegal stored move rejection works
+- deterministic selection is stable for identical input
+- benchmark bypass path rejects lookup when source is `benchmark`
+- stats reset/read works for the scaffold runtime
+
+Validation approach:
+
+- lightweight standalone script
+- no heavy framework added
+- no benchmark integration added
+
 ## 1. Why Legacy Book Is Reference-Only
 
 The legacy opening book is useful for understanding:
@@ -259,6 +277,7 @@ Rules:
 Current scaffold note:
 
 - stats are prepared but not yet surfaced in any benchmark or UI output
+- a lightweight validation path now exercises stats behavior without enabling runtime usage
 
 ## 9. Migration Plan From Legacy Book
 
@@ -348,6 +367,16 @@ The D.4 scaffold intentionally does not include:
 
 These omissions are intentional so the scaffold can land without changing runtime behavior.
 
+## Known Limitations
+
+Current scaffold limitations:
+
+- no production caller uses the fresh runtime yet
+- no external book file loading exists yet
+- verification is scaffold-level only and not yet tied to generated real data
+- stats exist only in memory
+- validation covers scaffold behavior, not playing strength
+
 ## Next Safe Steps
 
 1. Add a narrow caller gate for fresh-book lookup without enabling it by default.
@@ -365,6 +394,10 @@ These omissions are intentional so the scaffold can land without changing runtim
    - tactical benchmark bypass remains explicit
 
 5. Keep legacy and fresh stats separate throughout rollout.
+
+6. Keep validation lightweight as integration expands:
+   - extend the standalone scaffold validation first
+   - avoid mixing fresh-book validation into tactical benchmark
 
 ## Recommended Architecture Summary
 
