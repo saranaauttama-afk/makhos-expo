@@ -13,6 +13,23 @@ import { Position } from './position';
 const START_TOTAL = 16;
 const VAL_MAN     = 100;
 const VAL_KING    = 280;
+const ENABLE_EVAL_EXPERIMENTS = false;
+
+interface EvalExperimentConfig {
+  mobilityScalePct: number;
+  promotionThreatScalePct: number;
+  hangingPiecesScalePct: number;
+  backRankGuardScalePct: number;
+}
+
+// Infrastructure only: keep experiment scales neutral while disabled so the
+// current stable eval remains identical until a future tiny experiment is approved.
+const EVAL_EXPERIMENTS: EvalExperimentConfig = {
+  mobilityScalePct: 100,
+  promotionThreatScalePct: 100,
+  hangingPiecesScalePct: 100,
+  backRankGuardScalePct: 100,
+};
 
 export interface EvalBreakdown {
   material: number;
@@ -28,6 +45,11 @@ export interface EvalBreakdown {
   endgameFactor: number;
   kingValue: number;
   finalScore: number;
+}
+
+function applyEvalExperimentScale(base: number, scalePct: number): number {
+  if (!ENABLE_EVAL_EXPERIMENTS || scalePct === 100) return base;
+  return Math.round(base * scalePct / 100);
 }
 
 // ── Piece-Square Tables (built once at module load, zero runtime cost) ────────
@@ -365,11 +387,11 @@ export function handEvaluate(p: Position): number {
   let score = 0;
   score += materialScore(p, kingVal);
   score += psqtScore(p);
-  score += mobilityScore(p);
-  score += promotionThreatScore(p);
-  score += hangingPiecesPenalty(p); // NEW: detect undefended pieces
+  score += applyEvalExperimentScale(mobilityScore(p), EVAL_EXPERIMENTS.mobilityScalePct);
+  score += applyEvalExperimentScale(promotionThreatScore(p), EVAL_EXPERIMENTS.promotionThreatScalePct);
+  score += applyEvalExperimentScale(hangingPiecesPenalty(p), EVAL_EXPERIMENTS.hangingPiecesScalePct); // NEW: detect undefended pieces
   // protectedMenBonus: Texel tuning found weight 0 — omitted
-  score += backRankGuard(p) * (1 - eg); // less critical in endgame
+  score += applyEvalExperimentScale(backRankGuard(p) * (1 - eg), EVAL_EXPERIMENTS.backRankGuardScalePct); // less critical in endgame
   score += simplificationBonus(p);
   score += Math.round(kingEndgameScore(p) * eg * 0.35);
   score += Math.round(allKingsEndgameScore(p) * eg * 0.5);
@@ -412,10 +434,10 @@ export function fillEvalBreakdown(p: Position, out: EvalBreakdown): number {
 
   out.material = materialScore(p, kingVal);
   out.psqt = psqtScore(p);
-  out.mobility = mobilityScore(p);
-  out.promotionThreat = promotionThreatScore(p);
-  out.hangingPieces = hangingPiecesPenalty(p);
-  out.backRankGuard = backRankGuard(p) * (1 - eg);
+  out.mobility = applyEvalExperimentScale(mobilityScore(p), EVAL_EXPERIMENTS.mobilityScalePct);
+  out.promotionThreat = applyEvalExperimentScale(promotionThreatScore(p), EVAL_EXPERIMENTS.promotionThreatScalePct);
+  out.hangingPieces = applyEvalExperimentScale(hangingPiecesPenalty(p), EVAL_EXPERIMENTS.hangingPiecesScalePct);
+  out.backRankGuard = applyEvalExperimentScale(backRankGuard(p) * (1 - eg), EVAL_EXPERIMENTS.backRankGuardScalePct);
   out.simplification = simplificationBonus(p);
   out.kingEndgame = Math.round(kingEndgameScore(p) * eg * 0.35);
   out.allKingsEndgame = Math.round(allKingsEndgameScore(p) * eg * 0.5);

@@ -25,6 +25,87 @@ Current implementation approach:
 - callers can reuse a provided sink object through `fillEvalBreakdown(...)`
 - `evaluateWithBreakdown(...)` allocates only when explicitly called
 
+## Eval Experiment Framework Status
+
+Phase F.6 adds a minimal experiment scaffold in `src/coreClaude/eval.ts`.
+
+Framework structure:
+
+- `ENABLE_EVAL_EXPERIMENTS = false`
+- `EvalExperimentConfig`
+- `EVAL_EXPERIMENTS`
+- `applyEvalExperimentScale(base, scalePct)`
+
+Current scope:
+
+- only existing eval terms may be scaled
+- no new eval terms are enabled
+- all scales remain neutral at `100`
+- the framework is mirrored in both `handEvaluate(...)` and `fillEvalBreakdown(...)`
+
+Why this shape was chosen:
+
+- it keeps future tiny experiments localized
+- it avoids adding objects or logging to the hot path
+- it makes rollback simple because the experiment touch points stay narrow
+- it keeps the debug breakdown consistent with any future approved experiment
+
+## How Future Experiments Should Be Isolated
+
+Recommended rules:
+
+1. keep `ENABLE_EVAL_EXPERIMENTS` off by default
+2. change one small term at a time
+3. prefer scaling or gating an existing term before adding a new subsystem
+4. keep the edit inside `eval.ts` unless a debug-only script truly needs help
+5. update `ENGINE_PHASE_F_EVAL_SIGNAL_GAPS.md` with:
+   - exact change
+   - expected effect
+   - rollback instructions
+   - benchmark outcome
+
+Preferred experiment pattern:
+
+- add one named config field
+- wire it through `applyEvalExperimentScale(...)` or a similarly tiny helper
+- validate with perft first
+- benchmark separately
+- revert immediately if tactical regression appears
+
+## Why F.5 Failed
+
+Phase F.5 added a direct mobility crowding penalty to push `low-mobility-squeeze`
+from `mob=0` to `mob=-4`.
+
+That local signal moved in the intended direction, but it also caused catastrophic
+regression in `sac-two-win-three-p1`. The lesson is that even a tiny-looking eval
+term can alter tactical choice quality sharply when it directly changes the main
+score path.
+
+Implication for future work:
+
+- prefer controlled, opt-in experiment hooks over ad hoc term edits
+- isolate one knob at a time
+- treat any tactical regression as immediate rollback territory
+
+## Rollback Guidance
+
+If the framework itself ever becomes unwanted:
+
+1. remove `ENABLE_EVAL_EXPERIMENTS`
+2. remove `EvalExperimentConfig`
+3. remove `EVAL_EXPERIMENTS`
+4. remove `applyEvalExperimentScale(...)`
+5. restore direct term accumulation in:
+   - `handEvaluate(...)`
+   - `fillEvalBreakdown(...)`
+
+If only an individual experiment fails later:
+
+1. set its scale back to `100`
+2. or leave the field present but disabled
+3. document the result in the Phase F signal-gap notes
+
 ## 1. Eval Terms To Expose As Breakdown Fields
 
 The first instrumentation pass should expose the terms that already exist in `src/coreClaude/eval.ts`.
