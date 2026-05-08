@@ -26,6 +26,13 @@ interface TacticalSample {
   overrideReason?: string;
 }
 
+const KNOWN_WARNING_CASES = new Set([
+  'small-piece-king-vs-men',
+]);
+const WARNING_CASE_REASONS: Partial<Record<string, string>> = {
+  'small-piece-king-vs-men': 'probe-suspect known case',
+};
+
 interface HeadToHead {
   score: Record<Level, Record<Level, number>>;
   completed: string[];
@@ -45,6 +52,15 @@ const DEFAULT_PATH = '.tmp/benchmarks/ai-benchmark-full-latest.json';
 
 function pct(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
+}
+
+function sampleTags(sample: TacticalSample): string[] {
+  const tags: string[] = [];
+  if (KNOWN_WARNING_CASES.has(sample.caseId)) tags.push('probe-unstable');
+  if (sample.chosenMove !== sample.oracleMove && sample.scoreDrop === 0) {
+    tags.push('oracle-tied-or-equivalent');
+  }
+  return tags;
 }
 
 function orderedPairGames(headToHead: HeadToHead, a: Level, b: Level): number {
@@ -70,14 +86,34 @@ function printTactical(report: BenchmarkReport): void {
   }
 
   const misses = report.tacticalSamples.filter(sample => !sample.solved || sample.severeBlunder);
-  if (!misses.length) return;
+  const knownInstability = misses.filter(sample => KNOWN_WARNING_CASES.has(sample.caseId));
+  const remainingMisses = misses.filter(sample => !KNOWN_WARNING_CASES.has(sample.caseId));
+
+  if (knownInstability.length) {
+    console.log('');
+    console.log('Warning-only known instability');
+    for (const miss of knownInstability) {
+      const tags = sampleTags(miss);
+      console.log(
+        `${miss.level} ${miss.caseId}: chose ${miss.chosenMove}, oracle ${miss.oracleMove}, ` +
+        `drop=${miss.scoreDrop}, elapsed=${miss.elapsedMs}ms, ` +
+        `note=${WARNING_CASE_REASONS[miss.caseId] ?? 'known warning case'}` +
+        `${tags.length ? `, tags=${tags.join(',')}` : ''}`,
+      );
+    }
+  }
+
+  if (!remainingMisses.length) return;
 
   console.log('');
   console.log('Tactical misses / blunders');
-  for (const miss of misses) {
+  for (const miss of remainingMisses) {
+    const tags = sampleTags(miss);
     console.log(
       `${miss.level} ${miss.caseId}: chose ${miss.chosenMove}, oracle ${miss.oracleMove}, ` +
-      `drop=${miss.scoreDrop}, elapsed=${miss.elapsedMs}ms${miss.overrideReason ? `, ${miss.overrideReason}` : ''}`,
+      `drop=${miss.scoreDrop}, elapsed=${miss.elapsedMs}ms` +
+      `${miss.overrideReason ? `, ${miss.overrideReason}` : ''}` +
+      `${tags.length ? `, tags=${tags.join(',')}` : ''}`,
     );
   }
 }
