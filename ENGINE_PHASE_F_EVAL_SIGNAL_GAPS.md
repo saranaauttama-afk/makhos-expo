@@ -215,6 +215,45 @@ Recommended order:
 3. inspect whether quiet-hanging patterns correlate with current `hangingPiecesPenalty`
 4. only then choose the first scored experiment
 
+## F.5 Tiny Mobility Experiment
+
+Result: rejected
+
+Benchmark symptom:
+
+- `sac-two-win-three-p1` regressed catastrophically by roughly `998k-999k`
+- the regression appeared across `normal`, `hard`, and `expert`
+
+Source location:
+
+- `mobilityScore(p)` in `src/coreClaude/eval.ts`
+
+What changed during the experiment:
+
+- `mobilityScore(p)` temporarily added a small forward-target crowding penalty
+- while counting the current side's forward step squares, the evaluator also tracked
+  the set of unique forward destination squares
+- the experimental return became:
+  - `1 * (my - op) - 4 * myCrowdingPenalty`
+
+Observed local effect:
+
+- `low-mobility-squeeze` changed from `mob=0` to `mob=-4`
+- that confirmed the tweak was injecting the intended squeeze signal
+- however, the tactical regression was severe enough that the experiment was rejected
+
+Conclusion:
+
+- even a very small mobility tweak can destabilize tactical choice quality
+- improving squeeze recognition inside the main eval needs more caution than this direct penalty
+- this experiment should remain documented as a failed probe, not a recommended baseline change
+
+Rollback status:
+
+- complete
+- `mobilityScore(p)` is restored to:
+  - `return 1 * (my - op);`
+
 ## Summary
 
 The current eval breakdown is internally consistent, but it is revealing signal gaps:
