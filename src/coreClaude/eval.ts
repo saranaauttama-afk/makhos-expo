@@ -14,6 +14,22 @@ const START_TOTAL = 16;
 const VAL_MAN     = 100;
 const VAL_KING    = 280;
 
+export interface EvalBreakdown {
+  material: number;
+  psqt: number;
+  mobility: number;
+  promotionThreat: number;
+  hangingPieces: number;
+  backRankGuard: number;
+  simplification: number;
+  kingEndgame: number;
+  allKingsEndgame: number;
+  totalPieces: number;
+  endgameFactor: number;
+  kingValue: number;
+  finalScore: number;
+}
+
 // ── Piece-Square Tables (built once at module load, zero runtime cost) ────────
 //
 // P1_MAN_PST[sq]  : bonus for a P1 man at square sq
@@ -363,4 +379,64 @@ export function handEvaluate(p: Position): number {
 
 export function evaluate(p: Position): number {
   return handEvaluate(p);
+}
+
+export function createEmptyEvalBreakdown(): EvalBreakdown {
+  return {
+    material: 0,
+    psqt: 0,
+    mobility: 0,
+    promotionThreat: 0,
+    hangingPieces: 0,
+    backRankGuard: 0,
+    simplification: 0,
+    kingEndgame: 0,
+    allKingsEndgame: 0,
+    totalPieces: 0,
+    endgameFactor: 0,
+    kingValue: 0,
+    finalScore: 0,
+  };
+}
+
+// Debug-only helper path for eval inspection. Normal search should keep using
+// evaluate()/handEvaluate() so the hot path remains allocation-free.
+export function fillEvalBreakdown(p: Position, out: EvalBreakdown): number {
+  const total = bitCount(p.p1Men | p.p1Kings | p.p2Men | p.p2Kings);
+  const eg = total <= 8 ? (8 - total) / 8 : 0;
+  const kingVal = (VAL_KING + eg * 100) | 0;
+
+  out.totalPieces = total;
+  out.endgameFactor = eg;
+  out.kingValue = kingVal;
+
+  out.material = materialScore(p, kingVal);
+  out.psqt = psqtScore(p);
+  out.mobility = mobilityScore(p);
+  out.promotionThreat = promotionThreatScore(p);
+  out.hangingPieces = hangingPiecesPenalty(p);
+  out.backRankGuard = backRankGuard(p) * (1 - eg);
+  out.simplification = simplificationBonus(p);
+  out.kingEndgame = Math.round(kingEndgameScore(p) * eg * 0.35);
+  out.allKingsEndgame = Math.round(allKingsEndgameScore(p) * eg * 0.5);
+
+  out.finalScore = (
+    out.material +
+    out.psqt +
+    out.mobility +
+    out.promotionThreat +
+    out.hangingPieces +
+    out.backRankGuard +
+    out.simplification +
+    out.kingEndgame +
+    out.allKingsEndgame
+  ) | 0;
+
+  return out.finalScore;
+}
+
+export function evaluateWithBreakdown(p: Position): EvalBreakdown {
+  const breakdown = createEmptyEvalBreakdown();
+  fillEvalBreakdown(p, breakdown);
+  return breakdown;
 }
