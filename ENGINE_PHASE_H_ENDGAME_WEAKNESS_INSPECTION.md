@@ -573,6 +573,38 @@ Specifically:
 3. compare root fallback-search output against child exact scores in a dedicated debug script
 4. only after that decide whether benchmark/oracle handling should be adjusted before any eval experiment is attempted
 
+### H.4 Endgame Probe Diagnostics
+
+Status:
+
+- implemented as `scripts/endgameProbeDebug.ts`
+
+What the script reports:
+
+1. root probe result for the original fixture
+2. root probe result for the mirrored fixture
+3. legal root move count
+4. child probe result for each legal root move
+5. fallback root search result when the root probe returns `undefined`
+6. whether child exact scores disagree with the root fallback choice
+7. whether the mirrored position shows the same pattern
+
+Why this is useful:
+
+- it isolates `probeSmallEndgame(...)` behavior without touching benchmark logic
+- it makes the root-vs-child special-path split visible directly
+- it helps distinguish:
+  - root probe timeout / fallback behavior
+  - exact child endgame outcomes
+  - mirrored asymmetry in sparse endgame handling
+
+Recommended workflow:
+
+1. run `npm run test:perft`
+2. run the probe debug script on `small-piece-king-vs-men`
+3. compare original vs mirror
+4. only then consider any deeper search/oracle instrumentation or tuning discussion
+
 ### H.3 Tiny Endgame-Specific Eval Experiment
 
 Only after fixture/oracle inspection:
