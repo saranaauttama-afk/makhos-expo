@@ -169,9 +169,11 @@ function lowMobilityResearchSignal(p: Position): number {
   const side = p.side;
   const opp = (side === 1 ? -1 : 1) as 1 | -1;
 
-  const scoreMen = (men: BB, menSide: 1 | -1): number => {
+  const statsForMen = (men: BB, menSide: 1 | -1) => {
     let blocked = 0;
     let cramped = 0;
+    let free = 0;
+    let totalForward = 0;
     for (const sq of bits(men)) {
       let forwardSteps = 0;
       for (const st of STEPS[sq]) {
@@ -179,15 +181,23 @@ function lowMobilityResearchSignal(p: Position): number {
         if (menSide === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
         if (!(occ & B1(st.to))) forwardSteps++;
       }
+      totalForward += forwardSteps;
       if (forwardSteps === 0) blocked++;
       else if (forwardSteps === 1) cramped++;
+      else free++;
     }
-    return blocked * 2 + cramped;
+    return { blocked, cramped, free, totalForward };
   };
 
   const myMen = side === 1 ? p.p1Men : p.p2Men;
   const opMen = side === 1 ? p.p2Men : p.p1Men;
-  return 4 * (scoreMen(opMen, opp) - scoreMen(myMen, side));
+  const my = statsForMen(myMen, side);
+  const op = statsForMen(opMen, opp);
+  const hasBlockedAsymmetry = op.blocked !== my.blocked;
+  const bothNoFreeMen = my.free === 0 && op.free === 0;
+  const nearTotalExhaustion = my.totalForward <= 3 && op.totalForward <= 3;
+  if (!hasBlockedAsymmetry || !bothNoFreeMen || !nearTotalExhaustion) return 0;
+  return 4 * ((op.blocked * 2 + op.cramped) - (my.blocked * 2 + my.cramped));
 }
 
 // ── Back rank guard ───────────────────────────────────────────────────────────

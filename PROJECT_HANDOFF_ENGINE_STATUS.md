@@ -47,6 +47,10 @@ Interpretation:
 - Phase H:
   - endgame weakness fixtures/debug tooling added
   - `small-piece-king-vs-men` identified as probe-suspect
+- Phase Q:
+  - tiny low-mobility research signal added
+  - signal remains experiment-only and `OFF` by default
+  - default gate behavior unchanged
 
 ## 4. Current Regression Harness Workflow
 
@@ -62,6 +66,9 @@ Current harness behavior:
 - parses latest quick benchmark JSON
 - prints `classification`, `fatalReasons`, `warnings`
 - checks `openingBookBypassed=yes`
+- current default-OFF gate status:
+  - `classification=WARN`
+  - `fatalReasons=(none)`
 
 Current hard-stop cases:
 
@@ -131,6 +138,7 @@ Safest likely next areas:
 - deeper probe/oracle diagnosis for `small-piece-king-vs-men`
 - optional root-probe diagnostics refinement, still debug-only
 - small eval experiments only behind the existing disabled framework
+- inspect why the low-mobility research signal affects `quiet-hanging-piece-p1` before any further tuning
 - fresh opening book integration only after the fresh scaffold remains isolated and validated
 
 Avoid next:
@@ -155,6 +163,15 @@ Recommended discipline:
 ## Summary
 
 The project is in a careful research/tuning phase, not a broad refactor phase.
+
+Latest Phase Q result:
+
+- low-mobility research signal exists in the eval experiment framework
+- it is `OFF` by default and not promoted
+- default gate remains `WARN` with `fatalReasons=(none)`
+- experiment improved `low-mobility-squeeze` from `drop=1094` to `drop=807`, but did not fix it
+- `quiet-hanging-piece-p1` worsened / shifted into a repeated medium miss across `easy` / `hard` / `expert`
+- safest next step is to inspect why that signal affects `quiet-hanging-piece-p1` before tuning further
 
 The safest mindset is:
 

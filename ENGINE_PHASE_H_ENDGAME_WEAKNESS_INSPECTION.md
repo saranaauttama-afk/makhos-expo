@@ -769,6 +769,47 @@ Current policy conclusion remains:
 - keep it OFF by default
 - do not promote it
 
+### H.8 Phase U Guarded True-Squeeze Experiment Result
+
+Phase U kept the same low-mobility research signal but narrowed activation to true squeeze / no-escape structures only.
+
+Guarded result:
+
+- true-squeeze guard reduced activation leakage
+- `quiet-hanging-piece-p1` leakage disappeared in the experiment-on quick benchmark
+- `low-mobility-squeeze`
+  - expert improved further from `drop=807` to `drop=588`
+  - still not fixed
+- `low-mobility-squeeze-p2`
+  - remained unchanged in the experiment-on quick benchmark
+
+Current conclusion:
+
+- the guarded patch looks worth keeping behind the explicit experiment flag
+- it is still not safe to promote
+- keep it experiment-only and `OFF` by default
+
+### H.9 Phase W Clean OFF Stability Finding
+
+Phase W checked whether the unexpected default-OFF `FAIL` was reproducible under repeated clean no-env quick benchmarks.
+
+Current recorded finding:
+
+- one preserved default-OFF `FAIL` artifact did exist
+- repeated clean OFF reruns did **not** reproduce the same `FAIL`
+- `MAKHOS_*` flags were unset during the clean OFF reruns
+- direct OFF-path eval inspection still showed `lowMobilityResearch=0`
+- `sac-two-win-three-p1` and `sac-two-win-three-p2` stayed clean in all 3 clean OFF reruns
+- the remaining instability was mainly:
+  - expert `low-mobility-squeeze`
+  - known `small-piece-king-vs-men` instability
+
+Current conclusion:
+
+- Phase U is unlikely to be the direct cause of OFF-path behavior changes
+- single quick artifacts are not sufficient evidence for promotion or rollback decisions
+- require repeated clean OFF baselines before judging future experiments
+
 ## Summary
 
 Current status of the focus set:

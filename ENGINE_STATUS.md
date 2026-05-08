@@ -114,6 +114,14 @@ Key doc/tool:
 - `small-piece-king-vs-men` identified as probe-suspect rather than a clean pure-eval failure
 - endgame probe diagnostics added
 
+### Phase Q
+
+- tiny low-mobility research signal added behind explicit eval experiment flags
+- signal remains experiment-only and `OFF` by default
+- default gate behavior unchanged
+- quick experiment improved `low-mobility-squeeze` from `drop=1094` to `drop=807`, but did not fix it
+- `quiet-hanging-piece-p1` worsened / shifted into a repeated medium miss under the experiment
+
 Key doc/tools:
 
 - `ENGINE_PHASE_H_ENDGAME_WEAKNESS_INSPECTION.md`
@@ -159,6 +167,9 @@ Current harness behavior:
   - `classification`
   - `fatalReasons`
   - `warnings`
+- current default-OFF gate status:
+  - `classification=WARN`
+  - `fatalReasons=(none)`
 
 Current high-signal fatal cases:
 
@@ -184,12 +195,14 @@ Primary active/diagnostic cases:
 - `low-mobility-squeeze`
   - vulnerable case
   - lower levels historically benefited from root override help
+  - tiny Phase Q research signal helped but did not fix the expert miss
 - `small-endgame`
   - currently often passes
   - still looks weakly discriminated by eval
 - `quiet-hanging-piece`
   - currently often passes
   - static hanging term does not explain the result well
+  - under the Phase Q experiment, `quiet-hanging-piece-p1` worsened / shifted into a repeated medium miss
 
 ## 6. Known Probe / Oracle Caveats
 
@@ -207,6 +220,7 @@ Practical meaning:
 
 - do not interpret this case as a pure eval failure without checking probe/oracle context
 - inspect probe diagnostics before changing search or eval for this case
+- do not treat the latest disappearance of `small-piece-king-vs-men` from the warning output as a confirmed fix
 
 ## 7. Stable Benchmark Expectations / Ranges
 
@@ -257,6 +271,12 @@ Validation / safety tools:
 - `scripts/perftThaiCheckers.ts`
 - `scripts/tacticalSuite.ts`
 - `scripts/ruleInvariantSuite.ts`
+
+## 9. Current Recommended Next Step
+
+- inspect why the low-mobility research signal affects `quiet-hanging-piece-p1` before any further tuning
+- keep the low-mobility signal experiment-only and `OFF` by default
+- do not promote the signal until it helps low-mobility without destabilizing other named cases
 
 ## 9. Important Docs Index
 
