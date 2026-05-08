@@ -748,6 +748,27 @@ Current conclusion:
 - it is **not** safe enough to promote
 - keep the signal isolated, disabled by default, and research-only for now
 
+Latest post-Phase-Q quick benchmark readout:
+
+- current quick artifact reported:
+  - `classification=WARN`
+  - `fatalReasons=(none)`
+- `small-piece-king-vs-men` no longer appears in the current warning output
+  - do **not** reinterpret that as a confirmed fix
+  - this case remains probe/oracle-unstable and should still be treated cautiously
+- `low-mobility-squeeze`
+  - improved to `drop=807`
+  - still misses
+- `quiet-hanging-piece-p1`
+  - worsened / shifted into a repeated medium miss across `easy` / `hard` / `expert`
+  - current repeated-miss readout shows `maxDrop=540`
+
+Current policy conclusion remains:
+
+- keep the low-mobility research signal experiment-only
+- keep it OFF by default
+- do not promote it
+
 ## Summary
 
 Current status of the focus set:
