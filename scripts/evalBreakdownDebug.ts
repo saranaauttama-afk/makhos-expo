@@ -1,17 +1,7 @@
 import { B1, bitCount, toIndex, toRC } from '../src/coreClaude/bitboards';
 import { evaluate, evaluateWithBreakdown, type EvalBreakdown } from '../src/coreClaude/eval';
 import { Position } from '../src/coreClaude/position';
-
-function makePosition(fields: Partial<Position> & Pick<Position, 'side'>): Position {
-  return {
-    p1Men: 0,
-    p1Kings: 0,
-    p2Men: 0,
-    p2Kings: 0,
-    halfmoveClock: 0,
-    ...fields,
-  };
-}
+import { getEndgameWeaknessFixtures, type EndgameWeaknessFixtureId } from './endgameWeaknessFixtures';
 
 function sumBreakdownTerms(b: EvalBreakdown): number {
   return (
@@ -70,19 +60,11 @@ function compactBreakdown(b: EvalBreakdown): string {
   ].join(' ');
 }
 
-const CASES: Array<{ id: string; pos: Position }> = [
-  {
-    id: 'quiet-hanging-piece-p1',
-    pos: makePosition({ side: 1, p1Men: B1(21) | B1(25) | B1(30), p2Men: B1(13) | B1(14) | B1(17) }),
-  },
-  {
-    id: 'low-mobility-squeeze',
-    pos: makePosition({ side: 1, p1Men: B1(24) | B1(25) | B1(29), p2Men: B1(16) | B1(17) | B1(20) }),
-  },
-  {
-    id: 'small-endgame',
-    pos: makePosition({ side: -1, p1Kings: B1(18), p1Men: B1(25), p2Kings: B1(10), p2Men: B1(6) }),
-  },
+const CASE_IDS: EndgameWeaknessFixtureId[] = [
+  'quiet-hanging-piece-p1',
+  'low-mobility-squeeze',
+  'small-endgame',
+  'small-piece-king-vs-men',
 ];
 
 function inspectCase(id: string, pos: Position): void {
@@ -104,7 +86,7 @@ function inspectCase(id: string, pos: Position): void {
 
 function main(): void {
   console.log('Eval breakdown debug');
-  for (const entry of CASES) inspectCase(entry.id, entry.pos);
+  for (const entry of getEndgameWeaknessFixtures(CASE_IDS)) inspectCase(entry.id, entry.pos);
 }
 
 main();

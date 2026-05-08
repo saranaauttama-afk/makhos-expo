@@ -267,6 +267,35 @@ Goal:
 
 - make these cases inspectable without running the full benchmark repeatedly
 
+Status:
+
+- implemented in `scripts/endgameWeaknessFixtures.ts`
+- existing `scripts/evalBreakdownDebug.ts` now reuses the shared fixtures instead of duplicating positions
+
+Fixture structure:
+
+- `EndgameWeaknessFixture`
+  - `id`
+  - `bucket`
+  - `note`
+  - `pos`
+
+Supported fixture cases:
+
+- `small-piece-king-vs-men`
+- `small-endgame`
+- `low-mobility-squeeze`
+- `low-mobility-squeeze-p2`
+- `quiet-hanging-piece-p1`
+- `quiet-hanging-piece-p2`
+
+Future debugging workflow:
+
+1. add or update a fixture in `scripts/endgameWeaknessFixtures.ts`
+2. point a debug-only script at one or more fixture ids
+3. inspect eval breakdown or oracle behavior offline
+4. only then consider a tiny targeted experiment
+
 ### H.2 Inspect Oracle / Expected Move Reliability
 
 Especially for:
