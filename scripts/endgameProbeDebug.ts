@@ -19,6 +19,13 @@ function fmtMove(move: Move | undefined): string {
   return `${move.from + 1}->${move.to + 1}${caps}${promo}`;
 }
 
+function moveEquals(a: Move | undefined, b: Move | undefined): boolean {
+  if (!a || !b) return false;
+  if (a.from !== b.from || a.to !== b.to || a.promote !== b.promote) return false;
+  if (a.captured.length !== b.captured.length) return false;
+  return a.captured.every((sq, idx) => sq === b.captured[idx]);
+}
+
 function mapBits(bb: number, mapper: (sq: number) => number): number {
   let out = 0;
   for (let sq = 0; sq < 32; sq++) if (bb & B1(sq)) out |= B1(mapper(sq));
@@ -76,6 +83,25 @@ async function inspectRoot(label: string, pos: Position): Promise<void> {
   const legal = generateMoves(pos);
   const rootProbe = probeSmallEndgame(pos, [hashPosition(pos)], ORACLE_TABLEBASE_MS);
   const fallback = await fallbackSearch(pos);
+  const childRows: { move: Move; childProbe: ReturnType<typeof probeSmallEndgame>; childOracleScore: number }[] = [];
+
+  for (const move of legal) {
+    const child = applyMove(pos, move);
+    const childHistory = [hashPosition(pos), hashPosition(child)];
+    const childProbe = probeSmallEndgame(child, childHistory, ORACLE_TABLEBASE_MS);
+    const childOracleScore = await scoreMoveWithOracle(pos, move);
+    childRows.push({ move, childProbe, childOracleScore });
+  }
+
+  let oracleBest = childRows[0];
+  for (const row of childRows) {
+    if (!oracleBest || row.childOracleScore > oracleBest.childOracleScore) oracleBest = row;
+  }
+  const fallbackRow = childRows.find(row => moveEquals(row.move, fallback.best));
+  const fallbackMatchesOracle = !!oracleBest && !!fallbackRow && fallbackRow.childOracleScore === oracleBest.childOracleScore;
+  const scoreDropVsOracle = oracleBest && fallbackRow
+    ? Math.max(0, oracleBest.childOracleScore - fallbackRow.childOracleScore)
+    : undefined;
 
   console.log(`\n=== ${label} ===`);
   console.log(`side=${pos.side} legalMoves=${legal.length}`);
@@ -87,12 +113,14 @@ async function inspectRoot(label: string, pos: Position): Promise<void> {
     `fallback best=${fmtMove(fallback.best)} score=${fallback.score} depth=${fallback.depth} ` +
     `nodes=${fallback.nodes} qnodes=${fallback.qnodes} override=${fallback.overrideReason ?? '(none)'}`,
   );
+  console.log(
+    `oracleBestMove=${fmtMove(oracleBest?.move)} oracleBestScore=${oracleBest?.childOracleScore ?? 'n/a'} ` +
+    `fallbackChosenMove=${fmtMove(fallback.best)} fallbackOracleScore=${fallbackRow?.childOracleScore ?? 'n/a'} ` +
+    `scoreDropVsOracle=${scoreDropVsOracle ?? 'n/a'} ` +
+    `fallbackMatchesOracle=${fallbackMatchesOracle ? 'yes' : 'no'}`,
+  );
 
-  for (const move of legal) {
-    const child = applyMove(pos, move);
-    const childHistory = [hashPosition(pos), hashPosition(child)];
-    const childProbe = probeSmallEndgame(child, childHistory, ORACLE_TABLEBASE_MS);
-    const childOracleScore = await scoreMoveWithOracle(pos, move);
+  for (const { move, childProbe, childOracleScore } of childRows) {
     console.log(
       `  move ${fmtMove(move)} | childProbe best=${fmtMove(childProbe?.best)} ` +
       `score=${childProbe?.score ?? 'undefined'} dtm=${childProbe?.dtm ?? 'n/a'} ` +

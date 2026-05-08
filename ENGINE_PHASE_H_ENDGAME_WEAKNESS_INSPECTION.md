@@ -578,6 +578,7 @@ Specifically:
 Status:
 
 - implemented as `scripts/endgameProbeDebug.ts`
+- Phase I root-vs-child summary now recorded for `small-piece-king-vs-men`
 
 What the script reports:
 
@@ -586,8 +587,15 @@ What the script reports:
 3. legal root move count
 4. child probe result for each legal root move
 5. fallback root search result when the root probe returns `undefined`
-6. whether child exact scores disagree with the root fallback choice
-7. whether the mirrored position shows the same pattern
+6. derived oracle-best child move / score from the existing child oracle scoring pass
+7. explicit fallback-vs-oracle summary:
+   - `oracleBestMove`
+   - `oracleBestScore`
+   - `fallbackChosenMove`
+   - `fallbackOracleScore`
+   - `scoreDropVsOracle`
+   - `fallbackMatchesOracle`
+8. whether the mirrored position shows the same pattern
 
 Why this is useful:
 
@@ -604,6 +612,42 @@ Recommended workflow:
 2. run the probe debug script on `small-piece-king-vs-men`
 3. compare original vs mirror
 4. only then consider any deeper search/oracle instrumentation or tuning discussion
+
+### H.5 Phase I Root-Vs-Oracle Readout For `small-piece-king-vs-men`
+
+Current recorded Phase I result from the debug-only probe script:
+
+- root `probeSmallEndgame(...)` is still `undefined` on both the original fixture and its mirror
+- the fallback-selected move differs from the first listed `oracleBestMove`
+  - original:
+    - fallback `22->25`
+    - first listed oracle-best `22->15`
+  - mirror:
+    - fallback `11->4`
+    - first listed oracle-best `11->8`
+- however, `fallbackOracleScore` equals `oracleBestScore` in both orientations
+  - original:
+    - `oracleBestScore=499984`
+    - `fallbackOracleScore=499984`
+  - mirror:
+    - `oracleBestScore=499984`
+    - `fallbackOracleScore=499984`
+- `scoreDropVsOracle=0` in both the original and mirrored positions
+- `fallbackMatchesOracle=yes` in both the original and mirrored positions
+
+Interpretation:
+
+- this is currently **not** evidence of a real fallback failure at the root
+- it is also **not** evidence of a pure eval failure
+- the current readout is more consistent with:
+  - multiple tied oracle-best moves
+  - root fallback choosing one tied winning move while the debug summary lists another tied winning move first
+
+Current policy conclusion:
+
+- keep `small-piece-king-vs-men` as a warning-only case in the regression harness
+- do not treat the present Phase I result as justification for changing regression classification
+- do not treat this case, in its current diagnosed state, as proof of a real fallback/eval failure
 
 ### H.3 Tiny Endgame-Specific Eval Experiment
 
