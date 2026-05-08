@@ -3,11 +3,20 @@ import { applyMove, generateMoves, type Move } from '../src/coreClaude/movegen';
 import type { Position } from '../src/coreClaude/position';
 import { iterativeDeepening } from '../src/coreClaude/search/alphabeta';
 import { probeSmallEndgame } from '../src/coreClaude/search/endgameTablebase';
+import {
+  pickAdaptiveStrictBudgetMs,
+  pickAdaptiveStrictDepth,
+  selectStrictLevelMove,
+  STRICT_LEVELS,
+  type StrictDifficulty,
+} from '../src/coreClaude/search/levelPolicy';
 import { TT } from '../src/coreClaude/search/tt';
 import { hashPosition } from '../src/coreClaude/search/zobrist';
 import { getEndgameWeaknessFixture, type EndgameWeaknessFixtureId } from './endgameWeaknessFixtures';
 
 const DEFAULT_FIXTURE_ID: EndgameWeaknessFixtureId = 'small-piece-king-vs-men';
+const BENCHMARK_MODE = 'quick';
+const BENCHMARK_TIME_SCALE = 0.08;
 const ORACLE_MS = 1500;
 const ORACLE_DEPTH = 11;
 const ORACLE_TABLEBASE_MS = 1500;
@@ -79,6 +88,41 @@ async function scoreMoveWithOracle(pos: Position, move: Move): Promise<number> {
   return -result.score;
 }
 
+function scaledBenchmarkBudget(level: StrictDifficulty, pos: Position): number {
+  return Math.max(BENCHMARK_MODE === 'full' ? 400 : 60, Math.round(pickAdaptiveStrictBudgetMs(level, pos) * BENCHMARK_TIME_SCALE));
+}
+
+async function inspectBenchmarkLevels(pos: Position, oracleMove: Move | undefined, oracleScore: number | undefined): Promise<void> {
+  console.log(`benchmarkLikeChosen (matches benchmark chosenMove path, mode=${BENCHMARK_MODE})`);
+  for (const level of STRICT_LEVELS) {
+    const budget = scaledBenchmarkBudget(level, pos);
+    const depthLimit = pickAdaptiveStrictDepth(level, pos);
+    const result = await iterativeDeepening(
+      pos,
+      budget,
+      new TT(),
+      undefined,
+      [hashPosition(pos)],
+      { cancelled: false },
+      depthLimit,
+    );
+    const chosen = selectStrictLevelMove(level, pos, result);
+    const chosenMatchesOracleMove = moveEquals(chosen, oracleMove);
+    const chosenOracleScore = chosen && oracleMove && !chosenMatchesOracleMove
+      ? await scoreMoveWithOracle(pos, chosen)
+      : oracleScore;
+    const scoreDrop = oracleScore !== undefined && chosenOracleScore !== undefined
+      ? Math.max(0, oracleScore - chosenOracleScore)
+      : undefined;
+
+    console.log(
+      `  ${level} chosenMove=${fmtMove(chosen)} oracleMove=${fmtMove(oracleMove)} ` +
+      `scoreDrop=${scoreDrop ?? 'n/a'} nodes=${result.nodes} depth=${result.depth} ` +
+      `budgetMs=${budget} depthLimit=${depthLimit}`,
+    );
+  }
+}
+
 async function inspectRoot(label: string, pos: Position): Promise<void> {
   const legal = generateMoves(pos);
   const rootProbe = probeSmallEndgame(pos, [hashPosition(pos)], ORACLE_TABLEBASE_MS);
@@ -113,12 +157,14 @@ async function inspectRoot(label: string, pos: Position): Promise<void> {
     `fallback best=${fmtMove(fallback.best)} score=${fallback.score} depth=${fallback.depth} ` +
     `nodes=${fallback.nodes} qnodes=${fallback.qnodes} override=${fallback.overrideReason ?? '(none)'}`,
   );
+  console.log(`comparisonHint=this oracle fallback view corresponds to benchmark oracleMove`);
   console.log(
     `oracleBestMove=${fmtMove(oracleBest?.move)} oracleBestScore=${oracleBest?.childOracleScore ?? 'n/a'} ` +
     `fallbackChosenMove=${fmtMove(fallback.best)} fallbackOracleScore=${fallbackRow?.childOracleScore ?? 'n/a'} ` +
     `scoreDropVsOracle=${scoreDropVsOracle ?? 'n/a'} ` +
     `fallbackMatchesOracle=${fallbackMatchesOracle ? 'yes' : 'no'}`,
   );
+  await inspectBenchmarkLevels(pos, fallback.best, fallbackRow?.childOracleScore);
 
   for (const { move, childProbe, childOracleScore } of childRows) {
     console.log(

@@ -596,11 +596,18 @@ What the script reports:
    - `scoreDropVsOracle`
    - `fallbackMatchesOracle`
 8. whether the mirrored position shows the same pattern
+9. benchmark-like per-level chosen-move view using the same path as `scripts/aiBenchmark.ts`:
+   - `scaledBudget(level, pos)`
+   - `pickAdaptiveStrictDepth(level, pos)`
+   - `selectStrictLevelMove(...)`
 
 Why this is useful:
 
 - it isolates `probeSmallEndgame(...)` behavior without touching benchmark logic
 - it makes the root-vs-child special-path split visible directly
+- it now separates:
+  - oracle fallback output, which corresponds to benchmark `oracleMove`
+  - benchmark-like per-level chosen output, which corresponds to benchmark `chosenMove`
 - it helps distinguish:
   - root probe timeout / fallback behavior
   - exact child endgame outcomes
@@ -648,6 +655,28 @@ Current policy conclusion:
 - keep `small-piece-king-vs-men` as a warning-only case in the regression harness
 - do not treat the present Phase I result as justification for changing regression classification
 - do not treat this case, in its current diagnosed state, as proof of a real fallback/eval failure
+
+### H.6 Oracle-Fallback Vs Benchmark-Chosen Split
+
+Current debug-tool interpretation:
+
+- the oracle fallback view in `scripts/endgameProbeDebug.ts` corresponds to benchmark `oracleMove`
+- the benchmark-like chosen view in `scripts/endgameProbeDebug.ts` corresponds to benchmark `chosenMove`
+
+Current recorded readout:
+
+- in the current debug run, `scoreDrop=0` for both the original and mirrored `small-piece-king-vs-men` fixtures in the benchmark-like chosen view
+- in the same debug run, the oracle fallback view also shows zero effective drop against the child-derived oracle summary
+- move identity can still vary between:
+  - the oracle fallback move
+  - the first listed oracle-best tied move
+  - the benchmark-like chosen move
+- current best reading is that this move-identity variation is part of the existing probe/oracle instability on the case, not clean evidence of a hard tactical failure
+
+Current policy conclusion remains:
+
+- keep `small-piece-king-vs-men` warning-only
+- do not promote it to a hard-fail regression signature based on the present diagnostics
 
 ### H.3 Tiny Endgame-Specific Eval Experiment
 
