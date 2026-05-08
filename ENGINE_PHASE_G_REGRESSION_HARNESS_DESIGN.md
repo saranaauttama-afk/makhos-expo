@@ -355,6 +355,33 @@ This split is intentional:
 - fatal = clear tactical safety break
 - warning = real concern, but not yet strong enough to halt all local experimentation
 
+## Recommended Workflow
+
+Phase G.3 adds lightweight npm scripts so the harness is easier to run consistently.
+
+Recommended commands:
+
+- `npm run regression:harness`
+  - parse the latest quick benchmark JSON report
+- `npm run gate:ai:report`
+  - alias for the parser-only report path
+- `npm run gate:ai:quick`
+  - run the quick tactical benchmark with a fresh checkpoint
+  - then parse the latest report with the regression harness
+
+Safest day-to-day workflow:
+
+1. `npm run test:perft`
+2. `npm run gate:ai:report`
+3. if a fresh quick run is needed:
+   - `npm run gate:ai:quick`
+
+Useful manual override:
+
+- `npm run regression:harness -- .tmp/benchmarks/ai-benchmark-quick-latest.json`
+
+That keeps the path configurable without adding extra engine hooks or benchmark format changes.
+
 ## Known Limitations
 
 Current scaffold limitations:
@@ -365,6 +392,8 @@ Current scaffold limitations:
 - it does not yet distinguish "expected weak at easy" from "unexpected weak at easy" beyond simple heuristics
 - it does not yet export machine-readable pass/warn/fail metadata beyond console output
 - it does not yet integrate with `bench:ai:analyze`
+- `gate:ai:quick` still depends on the existing quick benchmark runtime, so it is not a zero-cost command
+- the npm scripts are local convenience helpers only and are not wired to CI or git hooks
 
 These limitations are intentional for the first implementation because they keep the harness:
 
