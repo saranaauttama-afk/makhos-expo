@@ -276,6 +276,120 @@ Do not add in the first implementation:
 - automatic rerun loops
 - heavy statistical baselining
 
+## Parser Scaffold Status
+
+Phase G.1 adds a standalone parser scaffold:
+
+- `scripts/regressionHarness.ts`
+
+Current scaffold behavior:
+
+- reads an existing benchmark JSON report offline
+- extracts level table fields:
+  - `solve`
+  - `blunder`
+  - `avgMs`
+  - `avgDepth`
+- scans case-level `scoreDrop`
+- detects catastrophic drops around the current hard-stop range
+- groups repeated tactical failures across levels
+- prints a compact non-blocking classification:
+  - `PASS`
+  - `WARN`
+  - `FAIL`
+- prints a compact tactical-miss summary
+
+Important scope limit:
+
+- this parser does not block anything yet
+- it is a reporting helper only
+- it does not modify benchmark output format
+- it does not add runtime benchmark overhead
+
+Phase G.2 refines the parser thresholds so the scaffold is useful without being too flaky.
+
+Current parser output now prints:
+
+- `classification`
+- `fatalReasons`
+- `warnings`
+
+## Fatal Cases
+
+Current fatal signatures in the parser scaffold:
+
+- catastrophic `sac-two-win-three-p1` drop
+- catastrophic `sac-two-win-three-p2` drop
+- catastrophic `low-mobility-squeeze` drop
+- catastrophic `low-mobility-squeeze-p2` drop
+- repeated `999k`-style catastrophic failures across levels
+- `openingBookBypassed=no`
+
+Why `sac-two-win-three` remains `FAIL`:
+
+- prior phases repeatedly showed it as a high-signal tactical safety canary
+- when it fails catastrophically, the regression is usually real and severe
+- it correlates with the kind of tactical drift we want the harness to catch immediately
+
+## Known Warning Cases
+
+Current warning-only special case:
+
+- `small-piece-king-vs-men`
+
+Why `small-piece-king-vs-men` is `WARN` for now:
+
+- it already appears as a known weak/noisy case in otherwise stable quick benchmark runs
+- treating it as fatal right now would make the harness too noisy for everyday experiment use
+- it is still surfaced prominently so the weakness is visible, but it does not dominate classification by itself
+
+Other current warnings:
+
+- repeated non-fatal miss cases
+- non-catastrophic misses under roughly `1000` cp
+- elevated `hard` blunder rate
+- elevated `expert` blunder rate
+
+This split is intentional:
+
+- fatal = clear tactical safety break
+- warning = real concern, but not yet strong enough to halt all local experimentation
+
+## Known Limitations
+
+Current scaffold limitations:
+
+- it parses the JSON benchmark artifact, not raw console text
+- it uses simple heuristic thresholds, not a historical baseline database
+- it does not yet compare one report against another report directly
+- it does not yet distinguish "expected weak at easy" from "unexpected weak at easy" beyond simple heuristics
+- it does not yet export machine-readable pass/warn/fail metadata beyond console output
+- it does not yet integrate with `bench:ai:analyze`
+
+These limitations are intentional for the first implementation because they keep the harness:
+
+- offline
+- fast
+- easy to inspect
+- easy to revert
+
+## Next Implementation Ideas
+
+Safest next steps after the parser scaffold:
+
+1. add optional baseline-file comparison
+   - compare current report against one frozen stable report
+
+2. add explicit named-case rules table
+   - mark known catastrophic cases separately from softer warnings
+
+3. add machine-readable output mode
+   - JSON summary for future tooling, still offline
+
+4. only after that, consider optional nonzero exit on clear fail classification
+   - still local only
+   - still no CI by default
+
 ## Summary
 
 The regression harness should be built around the current quick tactical benchmark, not beside it.
