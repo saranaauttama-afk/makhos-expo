@@ -435,6 +435,144 @@ Specifically:
    - a real search weakness
    - or an endgame eval weakness worth a tiny experiment
 
+## 11. H.3 Focused Special-Path Findings
+
+Targeted offline inspection of `small-piece-king-vs-men` showed:
+
+### Root probe behavior
+
+For both the original and mirrored fixture:
+
+- `probeSmallEndgame(...)` at the root returned `undefined`
+- so the root did **not** get an exact small-endgame shortcut
+- oracle generation therefore fell back to ordinary `iterativeDeepening(...)`
+
+This is important because the fixture is only `3` pieces total, so it does qualify for `canProbe(...)`.
+
+Interpretation:
+
+- the root special-path is eligible
+- but it does not finish inside the current probe budget on this case
+- therefore the benchmark oracle is not always based on an exact endgame answer here
+
+### Child move scoring behavior
+
+When scoring individual child moves from the same root:
+
+- several child positions received exact tablebase-style scores such as:
+  - `499984`
+  - `-499999`
+  - `0`
+
+Interpretation:
+
+- the endgame probe itself is not broadly broken
+- it can solve many immediate child states exactly
+- the instability is concentrated at the root position, where the probe falls through to normal search
+
+### Original vs mirrored root search
+
+Observed offline:
+
+- original root:
+  - `iterativeDeepening(...)` chose `22->25`
+  - score `297`
+  - `nodes=40494`
+  - `depth=3`
+- mirrored root:
+  - `iterativeDeepening(...)` chose `11->4`
+  - score `999985`
+  - `nodes=9337`
+  - `depth=1`
+
+Interpretation:
+
+- this is a strong asymmetry signal
+- but the asymmetry is happening in the fallback search/oracle path, not in a clean exact-tablebase path
+
+## 12. Likely Root Cause Candidates
+
+Most likely candidates now:
+
+1. root special-path budget / fallback interaction
+   - `probeSmallEndgame(...)` is eligible but returns `undefined` at the root
+   - oracle then falls back to normal search
+   - child scoring still uses exact probe where available
+
+2. oracle generation inconsistency
+   - `oracleRoot(...)` can use fallback iterative search at the root
+   - `scoreMoveWithOracle(...)` can use exact child probing
+   - this means root move ranking and child move scoring are not always coming from the same strength/source
+
+3. sparse endgame search instability
+   - after the root probe misses, `iterativeDeepening(...)` appears sensitive to orientation / geometry in this 3-piece position
+
+## 13. Ruled-Out Or Lower-Confidence Causes
+
+Lower-confidence or partially ruled-out causes:
+
+- simple mirror-transform bug
+  - legal move counts match (`11` vs `11`)
+  - side-to-move handling matches expectations
+  - king value matches exactly
+
+- root override interference
+  - no override reason was present in the focused offline root search
+
+- obvious repetition bookkeeping bug at the starting node
+  - inspection path used only the root hash history in the normal expected way
+  - no direct evidence points to repetition as the primary divergence source here
+
+- pure eval-only explanation
+  - eval asymmetry exists, but the strongest suspicious behavior is in the root probe / oracle fallback split
+
+## 14. Suspicious Code Paths
+
+Highest-interest code paths:
+
+- `probeSmallEndgame(...)` in `src/coreClaude/search/endgameTablebase.ts`
+  - especially the budgeted root solve path
+
+- `solveNodeBudgeted(...)` in `src/coreClaude/search/endgameTablebase.ts`
+  - root timeout / fallthrough behavior
+
+- `oracleRoot(...)` in `scripts/aiBenchmark.ts`
+  - fallback from exact probe to ordinary iterative search
+
+- `scoreMoveWithOracle(...)` in `scripts/aiBenchmark.ts`
+  - child-level exact probe usage
+
+- `iterativeDeepening(...)` root shortcut in `src/coreClaude/search/alphabeta.ts`
+  - exact probe shortcut vs normal search fallback
+
+## 15. Current Best Classification For `small-piece-king-vs-men`
+
+Best current classification:
+
+- primarily a special-path / oracle consistency issue candidate
+- with possible sparse-search instability layered on top
+- not yet well-supported as a pure eval weakness
+
+More specifically, it looks like:
+
+- **not** a clean exact-tablebase disagreement
+- **not** mainly a root-override issue
+- **not** obviously a simple fixture/mirror bug
+- **more likely** a root-probe timeout + fallback-search asymmetry problem
+
+## 16. Safest Next Action Recommendation
+
+Safest next action:
+
+- inspect `probeSmallEndgame(...)` behavior on the root of `small-piece-king-vs-men` and its mirror
+
+Specifically:
+
+1. confirm whether the root probe is timing out rather than proving `unknown`
+2. inspect whether the current root probe budget is too low or too unstable for this 3-piece king-vs-men class
+3. compare root fallback-search output against child exact scores in a dedicated debug script
+4. only after that decide whether benchmark/oracle handling should be adjusted before any eval experiment is attempted
+
 ### H.3 Tiny Endgame-Specific Eval Experiment
 
 Only after fixture/oracle inspection:
