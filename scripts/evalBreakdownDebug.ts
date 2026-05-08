@@ -13,6 +13,7 @@ function sumBreakdownTerms(b: EvalBreakdown): number {
     b.material +
     b.psqt +
     b.mobility +
+    b.lowMobilityResearch +
     b.promotionThreat +
     b.hangingPieces +
     b.backRankGuard +
@@ -53,6 +54,7 @@ function compactBreakdown(b: EvalBreakdown): string {
     `mat=${b.material}`,
     `psqt=${b.psqt}`,
     `mob=${b.mobility}`,
+    `lowMob=${b.lowMobilityResearch}`,
     `promo=${b.promotionThreat}`,
     `hang=${b.hangingPieces}`,
     `back=${Math.round(b.backRankGuard)}`,

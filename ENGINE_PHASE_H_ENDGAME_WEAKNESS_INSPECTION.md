@@ -700,6 +700,54 @@ Only if H.1-H.3 show that:
 
 This should remain the last option, not the first one.
 
+### H.7 Phase Q Low-Mobility Experiment Result
+
+Phase Q added a tiny low-mobility research signal behind an explicit eval experiment flag only.
+
+Current policy:
+
+- keep it experiment-only
+- keep it OFF by default
+- do not promote it into normal runtime behavior
+
+Default-off safety check:
+
+- default gate behavior remained unchanged
+- `npm run gate:ai:report` with the default OFF path still reported:
+  - `classification=WARN`
+  - `fatalReasons=(none)`
+
+Experiment-on quick benchmark result:
+
+- experiment run used:
+  - `MAKHOS_ENABLE_EVAL_EXPERIMENTS=1`
+  - `MAKHOS_ENABLE_LOW_MOBILITY_RESEARCH=1`
+- experiment quick report still reported:
+  - `classification=WARN`
+  - `fatalReasons=(none)`
+
+Named-case comparison:
+
+- `low-mobility-squeeze`
+  - expert improved from `drop=1094` to `drop=807`
+  - still misses
+- `low-mobility-squeeze-p2`
+  - slightly worsened from `76/76/60/76`
+  - to `80/80/80/80`
+- `sac-two-win-three-p1`
+  - stayed `drop=0`
+- `sac-two-win-three-p2`
+  - stayed `drop=0`
+- `small-piece-king-vs-men`
+  - improved to `drop=0` in this artifact
+  - do **not** treat that as trustworthy success because this case remains probe/oracle-unstable
+
+Current conclusion:
+
+- the research signal appears safe enough to keep behind the explicit experiment flag
+- it is **not** safe enough to promote
+- keep the signal isolated, disabled by default, and research-only for now
+
 ## Summary
 
 Current status of the focus set:
@@ -710,6 +758,7 @@ Current status of the focus set:
 - `low-mobility-squeeze`
   - active expert weakness
   - currently masked at lower levels by a root override
+  - Phase Q experiment helped a little on the expert miss, but not enough to justify promotion
 - `small-endgame`
   - currently passing
   - still looks structurally under-explained by eval

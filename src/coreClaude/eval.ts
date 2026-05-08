@@ -13,13 +13,15 @@ import { Position } from './position';
 const START_TOTAL = 16;
 const VAL_MAN     = 100;
 const VAL_KING    = 280;
-const ENABLE_EVAL_EXPERIMENTS = false;
+const ENABLE_EVAL_EXPERIMENTS = process.env.MAKHOS_ENABLE_EVAL_EXPERIMENTS === '1';
 
 interface EvalExperimentConfig {
   mobilityScalePct: number;
   promotionThreatScalePct: number;
   hangingPiecesScalePct: number;
   backRankGuardScalePct: number;
+  enableLowMobilityResearch: boolean;
+  lowMobilityResearchScalePct: number;
 }
 
 // Infrastructure only: keep experiment scales neutral while disabled so the
@@ -29,12 +31,15 @@ const EVAL_EXPERIMENTS: EvalExperimentConfig = {
   promotionThreatScalePct: 100,
   hangingPiecesScalePct: 100,
   backRankGuardScalePct: 100,
+  enableLowMobilityResearch: process.env.MAKHOS_ENABLE_LOW_MOBILITY_RESEARCH === '1',
+  lowMobilityResearchScalePct: Number(process.env.MAKHOS_LOW_MOBILITY_RESEARCH_SCALE_PCT ?? '100'),
 };
 
 export interface EvalBreakdown {
   material: number;
   psqt: number;
   mobility: number;
+  lowMobilityResearch: number;
   promotionThreat: number;
   hangingPieces: number;
   backRankGuard: number;
@@ -154,6 +159,35 @@ function mobilityScore(p: Position): number {
     op += kingRayMobility(sq);
 
   return 1 * (my - op); // Texel-tuned: 5→1
+}
+
+function lowMobilityResearchSignal(p: Position): number {
+  const total = bitCount(p.p1Men | p.p1Kings | p.p2Men | p.p2Kings);
+  if (total > 8 || p.p1Kings !== 0 || p.p2Kings !== 0) return 0;
+
+  const occ = (p.p1Men | p.p1Kings | p.p2Men | p.p2Kings) >>> 0;
+  const side = p.side;
+  const opp = (side === 1 ? -1 : 1) as 1 | -1;
+
+  const scoreMen = (men: BB, menSide: 1 | -1): number => {
+    let blocked = 0;
+    let cramped = 0;
+    for (const sq of bits(men)) {
+      let forwardSteps = 0;
+      for (const st of STEPS[sq]) {
+        if (menSide === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue;
+        if (menSide === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
+        if (!(occ & B1(st.to))) forwardSteps++;
+      }
+      if (forwardSteps === 0) blocked++;
+      else if (forwardSteps === 1) cramped++;
+    }
+    return blocked * 2 + cramped;
+  };
+
+  const myMen = side === 1 ? p.p1Men : p.p2Men;
+  const opMen = side === 1 ? p.p2Men : p.p1Men;
+  return 4 * (scoreMen(opMen, opp) - scoreMen(myMen, side));
 }
 
 // ── Back rank guard ───────────────────────────────────────────────────────────
@@ -388,6 +422,12 @@ export function handEvaluate(p: Position): number {
   score += materialScore(p, kingVal);
   score += psqtScore(p);
   score += applyEvalExperimentScale(mobilityScore(p), EVAL_EXPERIMENTS.mobilityScalePct);
+  if (ENABLE_EVAL_EXPERIMENTS && EVAL_EXPERIMENTS.enableLowMobilityResearch) {
+    score += applyEvalExperimentScale(
+      lowMobilityResearchSignal(p),
+      EVAL_EXPERIMENTS.lowMobilityResearchScalePct,
+    );
+  }
   score += applyEvalExperimentScale(promotionThreatScore(p), EVAL_EXPERIMENTS.promotionThreatScalePct);
   score += applyEvalExperimentScale(hangingPiecesPenalty(p), EVAL_EXPERIMENTS.hangingPiecesScalePct); // NEW: detect undefended pieces
   // protectedMenBonus: Texel tuning found weight 0 — omitted
@@ -408,6 +448,7 @@ export function createEmptyEvalBreakdown(): EvalBreakdown {
     material: 0,
     psqt: 0,
     mobility: 0,
+    lowMobilityResearch: 0,
     promotionThreat: 0,
     hangingPieces: 0,
     backRankGuard: 0,
@@ -435,6 +476,13 @@ export function fillEvalBreakdown(p: Position, out: EvalBreakdown): number {
   out.material = materialScore(p, kingVal);
   out.psqt = psqtScore(p);
   out.mobility = applyEvalExperimentScale(mobilityScore(p), EVAL_EXPERIMENTS.mobilityScalePct);
+  out.lowMobilityResearch =
+    ENABLE_EVAL_EXPERIMENTS && EVAL_EXPERIMENTS.enableLowMobilityResearch
+      ? applyEvalExperimentScale(
+          lowMobilityResearchSignal(p),
+          EVAL_EXPERIMENTS.lowMobilityResearchScalePct,
+        )
+      : 0;
   out.promotionThreat = applyEvalExperimentScale(promotionThreatScore(p), EVAL_EXPERIMENTS.promotionThreatScalePct);
   out.hangingPieces = applyEvalExperimentScale(hangingPiecesPenalty(p), EVAL_EXPERIMENTS.hangingPiecesScalePct);
   out.backRankGuard = applyEvalExperimentScale(backRankGuard(p) * (1 - eg), EVAL_EXPERIMENTS.backRankGuardScalePct);
@@ -446,6 +494,7 @@ export function fillEvalBreakdown(p: Position, out: EvalBreakdown): number {
     out.material +
     out.psqt +
     out.mobility +
+    out.lowMobilityResearch +
     out.promotionThreat +
     out.hangingPieces +
     out.backRankGuard +
