@@ -308,6 +308,133 @@ Goal:
 - inspect why current latest JSON shows `nodes=0` on that case across all levels
 - separate "engine weak" from "oracle/special-path mismatch"
 
+Status:
+
+- minimally extended in `scripts/evalBreakdownDebug.ts`
+
+Current debug checks now include:
+
+- original vs mirrored score
+- original vs mirrored breakdown
+- original vs mirrored legal move counts
+- side-to-move transition after mirroring
+- king value comparison
+- oracle move / oracle score on original and mirrored positions
+- mapped-oracle match check under 180-degree rotation
+
+## 7. Symmetry Findings
+
+From the current debug tooling run:
+
+### `quiet-hanging-piece-p1`
+
+- score symmetry: exact
+- legal move count symmetry: exact (`3` vs `3`)
+- king value symmetry: exact (`305` vs `305`)
+- oracle scores: exact (`0` vs `0`)
+- mapped oracle move: mismatch
+
+Interpretation:
+
+- likely not suspicious by itself
+- equal oracle scores plus equal eval suggest the mismatch is probably multiple equivalent oracle choices, not a broken fixture
+
+### `low-mobility-squeeze`
+
+- score symmetry: moderate delta (`3` vs `-7`)
+- legal move count symmetry: exact (`3` vs `3`)
+- king value symmetry: exact (`305` vs `305`)
+- oracle scores: exact (`0` vs `0`)
+- mapped oracle move: `PASS`
+
+Interpretation:
+
+- asymmetry looks partly expected from current geometry-sensitive eval terms
+- the real weakness is still that the base eval has `mob=0` while the practical solution at lower levels depends on the low-mobility root override
+
+### `small-endgame`
+
+- score symmetry: small delta (`3` vs `-5`)
+- legal move count symmetry: exact (`10` vs `10`)
+- king value symmetry: exact (`330` vs `330`)
+- oracle scores: exact (`0` vs `0`)
+- mapped oracle move: `PASS`
+
+Interpretation:
+
+- this looks more like acceptable directional / geometric asymmetry than a broken mirror transform
+- current concern remains weak eval discrimination, not obvious oracle unreliability
+
+### `small-piece-king-vs-men`
+
+- score symmetry: large delta (`72` vs `98`)
+- legal move count symmetry: exact (`11` vs `11`)
+- king value symmetry: exact (`342` vs `342`)
+- oracle scores: not equal (`186` vs `142`)
+- mapped oracle move: `WARN`
+
+Interpretation:
+
+- this is the strongest suspicious asymmetry in the current focus set
+- because legal counts and king value match, the divergence is unlikely to come from a simple side-to-move or fixture-construction error
+- the mismatch could still be caused by:
+  - real endgame eval asymmetry
+  - search/oracle sensitivity in sparse winning positions
+  - multiple non-identical winning lines being valued differently
+
+## 8. Oracle Reliability Observations
+
+Current confidence by case:
+
+- `quiet-hanging-piece-p1`
+  - oracle reliability looks acceptable
+  - equal scores and a passing benchmark case make fixture/oracle problems unlikely
+
+- `low-mobility-squeeze`
+  - oracle reliability looks acceptable
+  - mirrored oracle move matches the rotated original oracle move exactly
+
+- `small-endgame`
+  - oracle reliability looks acceptable
+  - mirrored oracle move also matches exactly
+
+- `small-piece-king-vs-men`
+  - oracle reliability is not disproven, but it is the case that most needs deeper inspection
+  - the mirrored oracle mismatch and score delta mean this is not just a clean "engine weak, oracle perfect" story yet
+  - the latest quick benchmark also showed `nodes=0` for this case across all levels, which strengthens the case for inspecting special-path / oracle handling before any eval tuning
+
+## 9. Current Best Diagnosis For `small-piece-king-vs-men`
+
+Best current classification:
+
+- not a simple fixture error
+- not obviously an expected asymmetry
+- likely a mixed problem involving:
+  - endgame weakness in sparse king-vs-men handling
+  - plus suspicious oracle / special-path asymmetry that should be inspected before tuning eval
+
+Current best reading:
+
+- `small-endgame` and `low-mobility-squeeze` look much more consistent under mirrored oracle checks
+- `small-piece-king-vs-men` is the outlier
+- so the next step should prioritize oracle/special-path inspection there before treating it as a pure eval problem
+
+## 10. Recommended Next Step
+
+Safest next step:
+
+- inspect the oracle / endgame-special-path behavior for `small-piece-king-vs-men`
+
+Specifically:
+
+1. trace whether `probeSmallEndgame(...)` is deciding this case
+2. confirm why quick benchmark samples record `nodes=0`
+3. compare the original and mirrored case through the same special path
+4. only after that decide whether the issue is:
+   - a special-path/oracle issue
+   - a real search weakness
+   - or an endgame eval weakness worth a tiny experiment
+
 ### H.3 Tiny Endgame-Specific Eval Experiment
 
 Only after fixture/oracle inspection:
