@@ -76,6 +76,9 @@ const FATAL_CATASTROPHIC_CASES = new Set([
 const KNOWN_WARNING_CASES = new Set([
   'small-piece-king-vs-men',
 ]);
+const WARNING_CASE_REASONS: Partial<Record<string, string>> = {
+  'small-piece-king-vs-men': 'probe-suspect known case',
+};
 
 function pct(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
@@ -132,8 +135,11 @@ function classify(report: BenchmarkReport): ClassificationResult {
   const repeatedFailures = summarizeRepeatedFailures(report.tacticalSamples);
   const warningCatastrophic = catastrophic.filter(sample => KNOWN_WARNING_CASES.has(sample.caseId));
   if (warningCatastrophic.length) {
+    const warningCaseSummary = [...new Set(warningCatastrophic.map(row => row.caseId))]
+      .map(caseId => `${caseId} (${WARNING_CASE_REASONS[caseId] ?? 'known warning case'})`)
+      .join(', ');
     warnings.push(
-      `known warning case catastrophic drop(s): ${[...new Set(warningCatastrophic.map(row => row.caseId))].join(', ')}`,
+      `known warning case catastrophic drop(s): ${warningCaseSummary}`,
     );
   }
 

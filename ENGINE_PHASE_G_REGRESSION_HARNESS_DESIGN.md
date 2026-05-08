@@ -340,8 +340,14 @@ Current warning-only special case:
 Why `small-piece-king-vs-men` is `WARN` for now:
 
 - it already appears as a known weak/noisy case in otherwise stable quick benchmark runs
+- Phase H.4 found it is a probe-suspect case: root `probeSmallEndgame(...)` returns `undefined` while many child positions receive exact probe scores
+- that root/child split can create fallback-oracle inconsistency, so the current regression signal is not clean enough to treat as an unconditional engine failure yet
 - treating it as fatal right now would make the harness too noisy for everyday experiment use
 - it is still surfaced prominently so the weakness is visible, but it does not dominate classification by itself
+
+Cross-reference:
+
+- see [ENGINE_PHASE_H_ENDGAME_WEAKNESS_INSPECTION.md](ENGINE_PHASE_H_ENDGAME_WEAKNESS_INSPECTION.md) H.4 for the current `small-piece-king-vs-men` probe diagnostics
 
 Other current warnings:
 
