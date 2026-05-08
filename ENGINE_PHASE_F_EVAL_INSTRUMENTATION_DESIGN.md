@@ -149,6 +149,7 @@ Current scaffold status:
 - this API shape now exists
 - there is still no benchmark integration
 - there is still no search-path usage
+- a standalone debug script can now consume the breakdown path without touching normal search
 
 Optional later:
 
@@ -247,7 +248,8 @@ Inputs could be:
 Current scaffold status:
 
 - no miss-case helper script exists yet
-- this remains intentionally disabled until the breakdown API is reviewed
+- a lightweight debug script now inspects a few hardcoded known positions
+- benchmark integration remains intentionally disabled
 
 ## 8. Recommended First Tiny Eval Experiment After Instrumentation
 
@@ -303,6 +305,12 @@ The current scaffold intentionally does not include:
 - any new eval terms
 - any symmetry/determinism test script yet
 
+Current F.3 note:
+
+- a debug inspection script exists
+- it is standalone and not wired into benchmark output
+- it uses hardcoded positions only
+
 ## Known Risks
 
 1. Breakdown drift risk.
@@ -316,6 +324,9 @@ The current scaffold intentionally does not include:
 
 4. Interpretation risk.
    - breakdown values remain side-relative, just like the evaluator itself
+
+5. Symmetry expectation nuance.
+   - mirrored-equivalent checks are useful, but they validate evaluator consistency more than tactical correctness
 
 ## Summary
 
