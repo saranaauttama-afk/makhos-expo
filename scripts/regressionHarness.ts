@@ -88,6 +88,15 @@ function parseReport(path: string): BenchmarkReport {
   return JSON.parse(readFileSync(path, 'utf8')) as BenchmarkReport;
 }
 
+function sampleTags(sample: TacticalSample): string[] {
+  const tags: string[] = [];
+  if (KNOWN_WARNING_CASES.has(sample.caseId)) tags.push('probe-unstable');
+  if (sample.chosenMove !== sample.oracleMove && sample.scoreDrop === 0) {
+    tags.push('oracle-tied-or-equivalent');
+  }
+  return tags;
+}
+
 function summarizeRepeatedFailures(samples: TacticalSample[]): CaseFailureSummary[] {
   const grouped = new Map<string, TacticalSample[]>();
   for (const sample of samples) {
@@ -183,13 +192,13 @@ function printTacticalSummary(rows: TacticalSummary[]): void {
   }
 }
 
-function printCatastrophic(samples: TacticalSample[]): void {
+function printHardFailCatastrophic(samples: TacticalSample[]): void {
   const rows = samples
-    .filter(sample => sample.scoreDrop >= CATASTROPHIC_DROP)
+    .filter(sample => sample.scoreDrop >= CATASTROPHIC_DROP && !KNOWN_WARNING_CASES.has(sample.caseId))
     .sort((a, b) => b.scoreDrop - a.scoreDrop || a.caseId.localeCompare(b.caseId));
   if (!rows.length) return;
 
-  console.log('\nCatastrophic signatures');
+  console.log('\nHard-fail catastrophic failures');
   for (const row of rows) {
     console.log(
       `${row.level} ${row.caseId}: drop=${row.scoreDrop}, chose ${row.chosenMove}, oracle ${row.oracleMove}`,
@@ -197,12 +206,31 @@ function printCatastrophic(samples: TacticalSample[]): void {
   }
 }
 
+function printWarningOnlyInstability(samples: TacticalSample[]): void {
+  const rows = samples
+    .filter(sample => KNOWN_WARNING_CASES.has(sample.caseId))
+    .filter(sample => !sample.solved || sample.severeBlunder || sample.scoreDrop >= CATASTROPHIC_DROP)
+    .sort((a, b) => b.scoreDrop - a.scoreDrop || a.caseId.localeCompare(b.caseId) || a.level.localeCompare(b.level));
+  if (!rows.length) return;
+
+  console.log('\nWarning-only known instability');
+  for (const row of rows) {
+    const tags = sampleTags(row);
+    console.log(
+      `${row.level} ${row.caseId}: drop=${row.scoreDrop}, chose ${row.chosenMove}, oracle ${row.oracleMove}` +
+      `, note=${WARNING_CASE_REASONS[row.caseId] ?? 'known warning case'}` +
+      `${tags.length ? `, tags=${tags.join(',')}` : ''}`,
+    );
+  }
+}
+
 function printRepeatedFailures(samples: TacticalSample[]): void {
   const repeated = summarizeRepeatedFailures(samples);
-  if (!repeated.length) return;
+  const medium = repeated.filter(row => row.maxDrop < CATASTROPHIC_DROP);
+  if (!medium.length) return;
 
-  console.log('\nRepeated tactical failures');
-  for (const row of repeated) {
+  console.log('\nRepeated medium misses');
+  for (const row of medium) {
     console.log(
       `${row.caseId}: levels=${row.levels.join(',')}, maxDrop=${row.maxDrop}, severeBlunders=${row.severeBlunders}`,
     );
@@ -211,15 +239,17 @@ function printRepeatedFailures(samples: TacticalSample[]): void {
 
 function printMisses(samples: TacticalSample[]): void {
   const misses = samples
-    .filter(sample => !sample.solved || sample.severeBlunder)
+    .filter(sample => (!sample.solved || sample.severeBlunder) && !KNOWN_WARNING_CASES.has(sample.caseId))
     .sort((a, b) => b.scoreDrop - a.scoreDrop || a.caseId.localeCompare(b.caseId) || a.level.localeCompare(b.level));
   if (!misses.length) return;
 
-  console.log('\nTactical misses');
+  console.log('\nOther tactical misses');
   for (const miss of misses.slice(0, 12)) {
+    const tags = sampleTags(miss);
     console.log(
       `${miss.level} ${miss.caseId}: drop=${miss.scoreDrop}, chose ${miss.chosenMove}, oracle ${miss.oracleMove}` +
-      `${miss.overrideReason ? `, override=${miss.overrideReason}` : ''}`,
+      `${miss.overrideReason ? `, override=${miss.overrideReason}` : ''}` +
+      `${tags.length ? `, tags=${tags.join(',')}` : ''}`,
     );
   }
   if (misses.length > 12) {
@@ -248,7 +278,8 @@ function main(): void {
   console.log('');
 
   printTacticalSummary(report.tacticalSummary);
-  printCatastrophic(report.tacticalSamples);
+  printHardFailCatastrophic(report.tacticalSamples);
+  printWarningOnlyInstability(report.tacticalSamples);
   printRepeatedFailures(report.tacticalSamples);
   printMisses(report.tacticalSamples);
 }
