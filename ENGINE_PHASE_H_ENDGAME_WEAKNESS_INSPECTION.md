@@ -810,6 +810,33 @@ Current conclusion:
 - single quick artifacts are not sufficient evidence for promotion or rollback decisions
 - require repeated clean OFF baselines before judging future experiments
 
+### H.10 Phase AG Exact-Tie Root Tiebreak Rejection
+
+Phase AG tested a root-only exact-tie experiment behind:
+
+- `MAKHOS_ENABLE_LOW_MOBILITY_EXACT_TIEBREAK=1`
+
+Experiment design:
+
+- exact-score ties only
+- tiny quiet men-only low-mobility roots only
+- secondary discriminator used cheap child static eval
+- lower child static eval won for the root side
+
+Observed result:
+
+- `low-mobility-squeeze-p2` did **not** improve
+  - repeated-run output stayed `76/76/76/76`
+- `sac-two-win-three-p1` showed a catastrophic run under the experiment-on repeated benchmark
+- therefore the experiment did not deliver the intended narrow benefit and introduced unacceptable tactical risk
+
+Current conclusion:
+
+- do **not** promote this exact-tie experiment
+- do **not** keep it as an active recommended experiment path
+- keep it OFF by default
+- avoid this path in future tuning unless a much stronger safety case appears
+
 ## Summary
 
 Current status of the focus set:

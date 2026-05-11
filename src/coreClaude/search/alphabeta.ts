@@ -69,6 +69,8 @@ export function resetEvalFn(): void { _eval = evaluate; }
 const INF        = 1_000_000;
 const MAX_PLY    = 64;
 const TC_MASK    = 511; // check time every 512 nodes
+const ENABLE_LOW_MOBILITY_EXACT_TIEBREAK =
+  process.env.MAKHOS_ENABLE_LOW_MOBILITY_EXACT_TIEBREAK === '1';
 
 // Shared stop flag — set when deadline fires; cleared before each iterativeDeepening.
 // All levels check this at the top of negamax so the search unwinds immediately
@@ -382,6 +384,18 @@ function pickLowMobilityRecaptureCandidate(
     .filter(candidate => candidate.score >= bestScore - 220)
     .filter(candidate => hasForcedRecaptureReply(root, candidate.move))
     .sort((a, b) => b.score - a.score)[0];
+}
+
+function allowLowMobilityExactTiebreak(root: Position, legalMoves: Move[]): boolean {
+  const total = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
+  return (
+    ENABLE_LOW_MOBILITY_EXACT_TIEBREAK &&
+    total <= 6 &&
+    root.p1Kings === 0 &&
+    root.p2Kings === 0 &&
+    legalMoves.length <= 3 &&
+    legalMoves[0]?.captured.length === 0
+  );
 }
 
 function pickEndgamePromotionCandidate(
@@ -831,8 +845,10 @@ export async function iterativeDeepening(
       const rootLowMobilityExtension = rootLowMobility && depth >= 4
         ? (totalRootPieces <= 6 ? 4 : 2)
         : 0;
+      const exactTieTiebreak = allowLowMobilityExactTiebreak(root, moves);
 
       let rootBest = -INF, rootMove: Move | undefined;
+      let rootTieChildStatic: number | undefined;
       const rootCandidates: RootCandidate[] = [];
       acc.n = 0;
       acc.q = 0;
@@ -877,7 +893,20 @@ export async function iterativeDeepening(
         acc.n++;
 
         rootCandidates.push({ move: m, score });
-        if (score > rootBest) { rootBest = score; rootMove = m; }
+        if (score > rootBest) {
+          rootBest = score;
+          rootMove = m;
+          rootTieChildStatic = exactTieTiebreak ? _eval(child) : undefined;
+        } else if (exactTieTiebreak && score === rootBest && rootMove) {
+          const challengerChildStatic = _eval(child);
+          const incumbentChildStatic = rootTieChildStatic ?? _eval(applyMove(root, rootMove));
+          rootTieChildStatic = incumbentChildStatic;
+          // Child eval is from the child side to move, so lower is better for the root side.
+          if (challengerChildStatic < incumbentChildStatic) {
+            rootMove = m;
+            rootTieChildStatic = challengerChildStatic;
+          }
+        }
         if (score > alpha) alpha = score;
         if (alpha >= beta) break;
       }

@@ -33,11 +33,18 @@ interface RunRecord {
   artifactPath: string;
 }
 
-function clearedEnv(): NodeJS.ProcessEnv {
+function activeMakhosFlags(env: NodeJS.ProcessEnv = process.env): string[] {
+  return Object.entries(env)
+    .filter(([key, value]) => key.startsWith('MAKHOS_') && !!value)
+    .map(([key, value]) => `${key}=${value}`);
+}
+
+function benchmarkEnv(activeFlags: string[]): NodeJS.ProcessEnv {
+  if (activeFlags.length) return { ...process.env };
   const env = { ...process.env };
-  delete env.MAKHOS_ENABLE_EVAL_EXPERIMENTS;
-  delete env.MAKHOS_ENABLE_LOW_MOBILITY_RESEARCH;
-  delete env.MAKHOS_LOW_MOBILITY_RESEARCH_SCALE_PCT;
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('MAKHOS_')) delete env[key];
+  }
   return env;
 }
 
@@ -168,9 +175,10 @@ function classifyCase(records: RunRecord[], caseId: CaseId): { label: string; in
 
 function runFreshBenchmark(index: number): RunRecord {
   mkdirSync(BENCHMARK_DIR, { recursive: true });
+  const flags = activeMakhosFlags();
   execSync('npm run bench:ai:fresh', {
     cwd: process.cwd(),
-    env: clearedEnv(),
+    env: benchmarkEnv(flags),
     stdio: 'ignore',
   });
   const report = parseReport(DEFAULT_REPORT_PATH);
@@ -230,8 +238,13 @@ function printCaseInterpretation(records: RunRecord[]): void {
 
 function main(): void {
   const records: RunRecord[] = [];
+  const flags = activeMakhosFlags();
   console.log('Repeated-run quick benchmark summary');
-  console.log('mode=clean OFF, runs=3');
+  console.log(
+    flags.length
+      ? `mode=experiment, runs=3, activeFlags=${flags.join(',')}`
+      : 'mode=clean OFF, runs=3',
+  );
   for (let i = 1; i <= RUN_COUNT; i++) {
     const record = runFreshBenchmark(i);
     records.push(record);
