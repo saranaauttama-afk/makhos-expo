@@ -20,6 +20,7 @@ const CASE_IDS = [
   'quiet-hanging-piece-p1',
   'small-piece-king-vs-men',
 ] as const;
+type CaseId = (typeof CASE_IDS)[number];
 const LEVELS: Level[] = ['easy', 'normal', 'hard', 'expert'];
 const CATASTROPHIC_DROP = 500_000;
 const KNOWN_WARNING_CASES = new Set(['small-piece-king-vs-men']);
@@ -54,6 +55,15 @@ function dropVector(samples: TacticalSample[]): string {
   return LEVELS.map(level => samples.find(sample => sample.level === level)?.scoreDrop ?? 'n/a').join('/');
 }
 
+function allSamples(records: RunRecord[], caseId: CaseId): TacticalSample[] {
+  return records.flatMap(record => samplesForCase(record.report, caseId));
+}
+
+function stableCleanCase(records: RunRecord[], caseId: CaseId): boolean {
+  if (!vectorStable(records, caseId)) return false;
+  return samplesForCase(records[0].report, caseId).every(sample => sample.scoreDrop === 0);
+}
+
 function vectorStable(records: RunRecord[], caseId: string): boolean {
   const vectors = records.map(record => dropVector(samplesForCase(record.report, caseId)));
   return new Set(vectors).size <= 1;
@@ -71,6 +81,89 @@ function repeatedFailCase(records: RunRecord[], caseId: string): boolean {
     samplesForCase(record.report, caseId).some(sample => sample.scoreDrop >= CATASTROPHIC_DROP),
   );
   return catastrophicRuns.length >= 2;
+}
+
+function hasOverridePattern(records: RunRecord[], caseId: CaseId): boolean {
+  const samples = allSamples(records, caseId);
+  return samples.some(sample => !!sample.overrideReason) && samples.some(sample => !sample.overrideReason && sample.scoreDrop > 0);
+}
+
+function classifyCase(records: RunRecord[], caseId: CaseId): { label: string; interpretation: string } {
+  const unstable = !vectorStable(records, caseId);
+  const stableWeak = stableWeakCase(records, caseId);
+  const stableClean = stableCleanCase(records, caseId);
+  const repeatedFail = repeatedFailCase(records, caseId);
+
+  if (caseId === 'small-piece-king-vs-men') {
+    return {
+      label: 'unstable-oracle-probe',
+      interpretation: 'Known warning-only case; repeated-run variance should be interpreted through oracle/probe instability first.',
+    };
+  }
+
+  if (caseId === 'low-mobility-squeeze-p2' && stableWeak) {
+    return {
+      label: 'stable-weakness',
+      interpretation: 'Consistent non-cat weakness across runs; useful as a stable measurement case.',
+    };
+  }
+
+  if (caseId === 'sac-two-win-three-p1' && (unstable || repeatedFail)) {
+    return {
+      label: 'unstable-search-benchmark',
+      interpretation: 'High-value tactical case with repeated-run volatility; treat single quick artifacts cautiously.',
+    };
+  }
+
+  if (caseId === 'low-mobility-squeeze' && (hasOverridePattern(records, caseId) || unstable)) {
+    return {
+      label: 'override-sensitive / unstable-search-benchmark',
+      interpretation: 'Result depends on root override behavior and can swing between clean and severe expert misses across runs.',
+    };
+  }
+
+  if (caseId === 'quiet-hanging-piece-p1') {
+    if (stableClean) {
+      return {
+        label: 'currently-clean',
+        interpretation: 'Currently stable and solved in repeat output; any future movement likely needs separate oracle-noise checking.',
+      };
+    }
+    return {
+      label: 'currently-clean-or-oracle-noisy',
+      interpretation: 'Case is not reliably weak in repeat output; interpret drift cautiously before treating it as a tuning target.',
+    };
+  }
+
+  if (caseId === 'sac-two-win-three-p2') {
+    if (stableClean) {
+      return {
+        label: 'clean-stable',
+        interpretation: 'Stable clean tactical guardrail in repeat output.',
+      };
+    }
+    return {
+      label: 'unstable-search-benchmark',
+      interpretation: 'Unexpected drift on a guardrail case; investigate benchmark/search instability before tuning.',
+    };
+  }
+
+  if (stableWeak) {
+    return {
+      label: 'stable-weakness',
+      interpretation: 'Consistent weakness across runs.',
+    };
+  }
+  if (stableClean) {
+    return {
+      label: 'clean-stable',
+      interpretation: 'Stable clean case across runs.',
+    };
+  }
+  return {
+    label: 'unstable-search-benchmark',
+    interpretation: 'Run-to-run variance suggests benchmark/search instability rather than a settled weakness classification.',
+  };
 }
 
 function runFreshBenchmark(index: number): RunRecord {
@@ -122,6 +215,19 @@ function printCaseBuckets(records: RunRecord[]): void {
   else for (const caseId of stableWeak) console.log(caseId);
 }
 
+function printCaseInterpretation(records: RunRecord[]): void {
+  console.log('\nCase classification');
+  for (const caseId of CASE_IDS) {
+    const runs = records
+      .map(record => `run${record.index}=${dropVector(samplesForCase(record.report, caseId))}`)
+      .join(' ');
+    const classification = classifyCase(records, caseId);
+    console.log(`${caseId}: ${runs}`);
+    console.log(`  label=${classification.label}`);
+    console.log(`  interpretation=${classification.interpretation}`);
+  }
+}
+
 function main(): void {
   const records: RunRecord[] = [];
   console.log('Repeated-run quick benchmark summary');
@@ -137,6 +243,7 @@ function main(): void {
   }
   printNamedCases(records);
   printCaseBuckets(records);
+  printCaseInterpretation(records);
 }
 
 main();
