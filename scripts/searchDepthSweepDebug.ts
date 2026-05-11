@@ -1,4 +1,6 @@
-import { generateMoves, type Move } from '../src/coreClaude/movegen';
+import { evaluateWithBreakdown } from '../src/coreClaude/eval';
+import { applyMove, generateMoves, type Move } from '../src/coreClaude/movegen';
+import type { Position } from '../src/coreClaude/position';
 import { getEndgameWeaknessFixture, type EndgameWeaknessFixtureId } from './endgameWeaknessFixtures';
 import { iterativeDeepening, moveKey } from '../src/coreClaude/search/alphabeta';
 import { TT } from '../src/coreClaude/search/tt';
@@ -15,6 +17,17 @@ function fmtMove(move: Move | undefined): string {
   return `${move.from + 1}->${move.to + 1}${caps}${promo}`;
 }
 
+function fmtBreakdown(root: Position, move: Move): string {
+  const child = applyMove(root, move);
+  const breakdown = evaluateWithBreakdown(child);
+  return (
+    `childStatic=${breakdown.finalScore} ` +
+    `mat=${breakdown.material} psqt=${breakdown.psqt} mob=${breakdown.mobility} ` +
+    `lowMob=${breakdown.lowMobilityResearch} hang=${breakdown.hangingPieces} ` +
+    `promo=${breakdown.promotionThreat}`
+  );
+}
+
 async function main(): Promise<void> {
   const fixtureId = (process.argv[2] as EndgameWeaknessFixtureId | undefined) ?? DEFAULT_FIXTURE_ID;
   const maxDepth = Number(process.argv[3] ?? DEFAULT_MAX_DEPTH);
@@ -23,6 +36,7 @@ async function main(): Promise<void> {
   const pos = fixture.pos;
 
   console.log('Search depth sweep debug');
+  console.log('mode=debug-only');
   console.log(`fixture=${fixture.id}`);
   console.log(`bucket=${fixture.bucket}`);
   console.log(`note=${fixture.note}`);
@@ -57,6 +71,22 @@ async function main(): Promise<void> {
         `  cand ${fmtMove(candidate.move)} score=${candidate.score}` +
         `${result.best && moveKey(candidate.move) === moveKey(result.best) ? ' <-best' : ''}`,
       );
+    }
+
+    const exactTies = (result.rootCandidates ?? []).filter(candidate => candidate.score === result.score);
+    if (exactTies.length > 1) {
+      const incumbent = exactTies[0];
+      console.log(
+        `  exactTie topScore=${result.score} incumbent=${fmtMove(incumbent.move)} ` +
+        `reason=incumbent survives because root best only updates on strictly greater score`,
+      );
+      console.log(`    incumbent ${fmtBreakdown(pos, incumbent.move)}`);
+      for (const challenger of exactTies.slice(1)) {
+        console.log(
+          `    challenger ${fmtMove(challenger.move)} ` +
+          `${fmtBreakdown(pos, challenger.move)}`,
+        );
+      }
     }
   }
 }
