@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from 'fs';
+declare const require: any;
+declare const module: any;
 
-type Level = 'easy' | 'normal' | 'hard' | 'expert';
-type Classification = 'PASS' | 'WARN' | 'FAIL';
+export type Level = 'easy' | 'normal' | 'hard' | 'expert';
+export type Classification = 'PASS' | 'WARN' | 'FAIL';
 
 interface TacticalSummary {
   level: Level;
@@ -17,7 +19,7 @@ interface TacticalSummary {
   overrides: number;
 }
 
-interface TacticalSample {
+export interface TacticalSample {
   caseId: string;
   bucket: string;
   level: Level;
@@ -31,7 +33,7 @@ interface TacticalSample {
   overrideReason?: string;
 }
 
-interface BenchmarkReport {
+export interface BenchmarkReport {
   mode: string;
   generatedAt: string;
   config: {
@@ -55,7 +57,7 @@ interface CaseFailureSummary {
   severeBlunders: number;
 }
 
-interface ClassificationResult {
+export interface ClassificationResult {
   classification: Classification;
   fatalReasons: string[];
   warnings: string[];
@@ -84,7 +86,7 @@ function pct(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
 }
 
-function parseReport(path: string): BenchmarkReport {
+export function parseReport(path: string): BenchmarkReport {
   return JSON.parse(readFileSync(path, 'utf8')) as BenchmarkReport;
 }
 
@@ -117,7 +119,7 @@ function summarizeRepeatedFailures(samples: TacticalSample[]): CaseFailureSummar
     .sort((a, b) => b.maxDrop - a.maxDrop || b.levels.length - a.levels.length || a.caseId.localeCompare(b.caseId));
 }
 
-function classify(report: BenchmarkReport): ClassificationResult {
+export function classify(report: BenchmarkReport): ClassificationResult {
   const fatalReasons: string[] = [];
   const warnings: string[] = [];
   if (!report.config.openingBookBypassed) {
@@ -284,4 +286,6 @@ function main(): void {
   printMisses(report.tacticalSamples);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
