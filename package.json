@@ -22,6 +22,7 @@
     "gate:ai:report": "npm run regression:harness",
     "gate:ai:quick": "npm run bench:ai:fresh && npm run regression:harness",
     "gate:ai:repeat": "npx tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/repeat-benchmark scripts/regressionHarness.ts scripts/repeatedRunBenchmarkSummary.ts && node .tmp/repeat-benchmark/repeatedRunBenchmarkSummary.js",
+    "debug:search-depth-sweep": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/search-depth-sweep scripts/searchDepthSweepDebug.ts && node .tmp/search-depth-sweep/scripts/searchDepthSweepDebug.js",
     "profile:ai": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/profile-ai scripts/profileAiHotspots.ts && node .tmp/profile-ai/scripts/profileAiHotspots.js",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:prod": "eas build --platform android --profile production",
