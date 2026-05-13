@@ -76,24 +76,25 @@ export interface FreshOpeningBookRuntime {
   getStats: () => FreshOpeningBookStats;
 }
 
-// Phase D.4 scaffold only. This stays off until a later integration step
-// explicitly enables the fresh book path.
-export const ENABLE_FRESH_OPENING_BOOK: boolean = false;
+import { generateOpeningBookEntries } from '../openingPatterns';
+
+// TuneClaude Session 2: Enable fresh opening book with Thai patterns
+export const ENABLE_FRESH_OPENING_BOOK: boolean = true;
 
 export const FRESH_OPENING_BOOK: FreshOpeningBookFile = {
   version: 1,
   format: 'makhos-opening-book',
-  generatedAt: 'scaffold',
+  generatedAt: new Date().toISOString(),
   generator: {
-    name: 'phase-d4-scaffold',
+    name: 'tuneClaude-thai-patterns',
     settings: {
-      maxPly: 0,
-      topN: 0,
+      maxPly: 10,
+      topN: 5,
       thinkMs: 0,
       sidePolicy: 'both',
     },
   },
-  entries: [],
+  entries: generateOpeningBookEntries(),
 };
 
 function makeEmptyFreshOpeningBookStats(): FreshOpeningBookStats {
