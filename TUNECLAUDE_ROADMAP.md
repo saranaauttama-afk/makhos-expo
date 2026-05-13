@@ -586,6 +586,56 @@ npm run bench:ai:full:tactical
 3. Or: Add specialized tactical heuristics for specific patterns
 4. Or: Accept that easy/normal levels will have some tactical misses (they're shallow depth)
 
+### 2026-05-13 - Session 2 Continued (Part 2)
+
+**Opening Book Integration** (SUCCESS! ✅)
+- Created `openingPatterns.ts` with 7 Thai opening moves
+- Patterns based on traditional Thai Checkers books
+  - Standard opening (มาตรฐาน): 25->22
+  - Three-in-line (สามตัวเรียง): 26->23
+  - Dragon head: 27->23
+  - Five points (ห้าแต้ม): 24->20
+  - Center control: 25->21
+  - Flank development: 26->22
+  - Solid opening: 24->21
+- Enabled `ENABLE_FRESH_OPENING_BOOK = true`
+- Testing: All moves verified as legal, opening book lookup working ✓
+- Validation: No regression (perft PASS, benchmark WARN maintained)
+- **Committed**: Commit 39ccc7e
+
+**Puzzle Suite Creation** (SUCCESS! ✅)
+- Created 14 tactical puzzles (หมากกล) across 7 categories
+  - Forced capture traps (2)
+  - Promotion races (2)
+  - Sacrifice combinations (2)
+  - King vs men endgames (2)
+  - Escape from trap (2)
+  - Tempo gain (2)
+  - Endgame techniques (2)
+- Implemented automated puzzle solver script
+- Baseline results: 1/14 correct (7%)
+  - Easy: 1/3 (33%)
+  - Medium/Hard/Expert: 0/11 (0%)
+- **Key Insight**: AI strong at full-game play (100/0 expert) but weak at isolated tactics (7%)
+- Value: Establishes tactical weakness profile for future improvements
+- **Committed**: Commit 33771ce
+- **Documentation**: PUZZLE_BASELINE.md
+
+**Session 2 Summary:**
+- ✅ External research completed
+- ✅ Opening book implemented (7 patterns)
+- ✅ Puzzle suite created (14 puzzles)
+- ✅ Baseline measurements documented
+- ❌ Failed trap detection experiment (documented and reverted)
+- Total commits: 6 (on tuneClaude branch)
+
+**Current State:**
+- Expert performance: 100/0 (maintained)
+- Opening book: Enabled and working
+- Puzzle baseline: 7% (documented)
+- Testing infrastructure: Significantly improved
+- Classification: WARN (no FAIL)
+
 ---
 
-**End of Roadmap - Last Updated: 2026-05-13**
+**End of Roadmap - Last Updated: 2026-05-13 (Session 2 Complete)**
