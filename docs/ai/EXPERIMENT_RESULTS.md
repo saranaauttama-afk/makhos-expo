@@ -52,3 +52,69 @@
 - Decision: abort this experiment attempt and stop the autonomous run
 - Revert: reverted only the root tactical move ordering code in `src/coreClaude/search/alphabeta.ts`; `npm.cmd run test:perft` passed after revert
 - Next: do not continue queue execution until the clean-OFF protected baseline is stable enough to compare experiments safely
+
+## Baseline Stability Diagnostics
+
+### 2026-05-13 - Clean-OFF protected-case stability check
+
+- Status: `diagnostic`
+- Scope: clean-OFF repeated gate only, no experiment flags
+- Repeat count: `6` runs total
+- Commands:
+  - `npm.cmd run gate:ai:repeat`
+  - `npm.cmd run gate:ai:repeat`
+
+- Protected-case outcomes by run:
+  - `batch1-run1`
+    - `sac-two-win-three-p1`: clean
+    - `sac-two-win-three-p2`: clean
+  - `batch1-run2`
+    - `sac-two-win-three-p1`: catastrophic
+    - `sac-two-win-three-p2`: clean
+  - `batch1-run3`
+    - `sac-two-win-three-p1`: clean
+    - `sac-two-win-three-p2`: clean
+  - `batch2-run1`
+    - `sac-two-win-three-p1`: clean
+    - `sac-two-win-three-p2`: clean
+  - `batch2-run2`
+    - `sac-two-win-three-p1`: clean
+    - `sac-two-win-three-p2`: clean
+  - `batch2-run3`
+    - `sac-two-win-three-p1`: clean
+    - `sac-two-win-three-p2`: clean
+
+- Ratios:
+  - `sac-two-win-three-p1`: clean `5/6`, catastrophic `1/6`
+  - `sac-two-win-three-p2`: clean `6/6`, catastrophic `0/6`
+
+- Key diagnostic observation:
+  - on the catastrophic `p1` run, the benchmark `oracleMove` itself changed materially versus the clean runs
+  - clean runs saw `oracleMove` variants such as `7->2K` or `8->4K`
+  - the catastrophic run switched to `10->28` with near-`999k` score drops
+
+- Suspected instability cause:
+  - primary: oracle/search time-budget instability in the benchmark path
+  - secondary: nondeterministic search/order behavior inside the oracle/engine interaction
+  - not the main suspect:
+    - stale benchmark artifact reuse
+    - pure `small-piece-king-vs-men`-style oracle noise on the protected case
+
+- Supporting evidence:
+  - all six runs were freshly generated and saved with distinct timestamps
+  - `sac-two-win-three-p2` remained stable across all six runs
+  - `sac-two-win-three-p1` flipped only when the benchmark oracle target changed
+  - `scripts/aiBenchmark.ts` uses a time-limited oracle search (`ORACLE_MS=1500`, `ORACLE_DEPTH=11` in quick mode), so oracle output can vary by run
+
+- Worktree note:
+  - `src/coreClaude/search/alphabeta.ts` still shows modified in `git status`
+  - `git diff -- src/coreClaude/search/alphabeta.ts` is empty
+  - `git ls-files --eol` reports `i/lf` and `w/mixed`
+  - with `core.autocrlf=true`, this strongly suggests line-ending normalization / mixed-EOL worktree state rather than a live content diff
+
+- Decision:
+  - keep the autonomous queue paused
+  - do not resume item 2 yet
+
+- Next:
+  - prefer diagnostics/tooling to stabilize or explain the protected-case benchmark oracle path before resuming autonomous experiments
