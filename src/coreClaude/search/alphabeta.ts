@@ -381,7 +381,7 @@ function pickLowMobilityRecaptureCandidate(
     ? candidates
     : legal.map(move => ({ move, score: bestScore - 180 }));
   return source
-    .filter(candidate => candidate.score >= bestScore - 220)
+    .filter(candidate => candidate.score >= bestScore - 550)
     .filter(candidate => hasForcedRecaptureReply(root, candidate.move))
     .sort((a, b) => b.score - a.score)[0];
 }
