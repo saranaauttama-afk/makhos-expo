@@ -377,11 +377,17 @@ function pickLowMobilityRecaptureCandidate(
   const total = bitCount(root.p1Men | root.p1Kings | root.p2Men | root.p2Kings);
   if (total > 8 || legal.length > 3 || legal[0]?.captured.length > 0) return undefined;
 
+  // Contextual threshold: use mobility as indicator of squeeze severity
+  // - 1-2 legal moves = extreme squeeze → aggressive override (550)
+  // - 3 legal moves = mild squeeze → conservative override (350)
+  // This prevents over-aggressive override in positions with more options
+  const threshold = legal.length <= 2 ? 550 : 350;
+
   const source = candidates?.length
     ? candidates
     : legal.map(move => ({ move, score: bestScore - 180 }));
   return source
-    .filter(candidate => candidate.score >= bestScore - 550)
+    .filter(candidate => candidate.score >= bestScore - threshold)
     .filter(candidate => hasForcedRecaptureReply(root, candidate.move))
     .sort((a, b) => b.score - a.score)[0];
 }
