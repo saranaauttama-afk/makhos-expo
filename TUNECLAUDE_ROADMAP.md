@@ -560,6 +560,32 @@ npm run bench:ai:full:tactical
 - Conducted external research on Thai Checkers strategy
 - Created this roadmap document
 
+### 2026-05-13 - Session 2 (Continued)
+**Attempted**: Fix forced recapture trap failures (midgame-bait, opening-bait)
+- Modified `isSoundForcedTrap` to lower minGain from 160→80 for opening/midgame
+- Modified `pickSoundForcedTrap` to increase maxConcession from 260→450 for pieces≤12
+- **Result**: SEVERE REGRESSION
+  - `quiet-hanging-piece-p1`: ALL 4 levels failed (was passing)
+  - `low-mobility-squeeze` expert: failed (was passing)
+  - Expert blunder: 0%→5%
+- **Reverted**: Changes were too aggressive and caused false positive trap detection
+
+**Lessons Learned**:
+1. Trap override is high-risk and affects many cases
+2. Cannot solve shallow-depth evaluation problems with override tuning
+3. Need different approach: improve evaluation or tactical heuristics, not trap detection
+
+**Current Status After Revert**:
+- Expert: 100/0 (maintained)
+- Protected cases: Stable
+- Trap cases still failing: midgame-bait (easy), opening-bait (easy/normal)
+
+**Next Steps** (revised priorities):
+1. **NOT** trap override tuning (too risky)
+2. Instead: Improve evaluation function to see tactical patterns better
+3. Or: Add specialized tactical heuristics for specific patterns
+4. Or: Accept that easy/normal levels will have some tactical misses (they're shallow depth)
+
 ---
 
 **End of Roadmap - Last Updated: 2026-05-13**
