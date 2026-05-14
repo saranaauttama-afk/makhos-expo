@@ -396,14 +396,14 @@ function hangingPiecesPenalty(p: Position): number {
   // Check our men for hanging
   for (const sq of bits(myMen)) {
     if (isThreatened(sq) && !isDefended(sq)) {
-      penalty += 80; // hanging man
+      penalty += 200; // hanging man (was 80, increased for better tactical awareness)
     }
   }
 
   // Check our kings for hanging (more valuable, bigger penalty)
   for (const sq of bits(myKings)) {
     if (isThreatened(sq) && !isDefended(sq)) {
-      penalty += 150; // hanging king
+      penalty += 350; // hanging king (was 150, increased proportionally)
     }
   }
 

@@ -74,7 +74,8 @@ function scoreFromSolve(result: SolveResult): number {
 function canProbe(pos: Position): boolean {
   const totalPieces = bitCount(pos.p1Men | pos.p1Kings | pos.p2Men | pos.p2Kings);
   const totalMen = bitCount(pos.p1Men | pos.p2Men);
-  return (totalPieces <= 4 && totalMen === 0) || totalPieces <= 3;
+  // Extended: solve 4-piece endgames with ≤2 men (covers KMvKM, KKvMM, etc.)
+  return (totalPieces <= 4 && totalMen <= 2) || totalPieces <= 3;
 }
 
 // Max recursion depth for the endgame solver.  Flying-king positions can have
