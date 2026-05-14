@@ -273,6 +273,167 @@ export const THAI_OPENING_PATTERNS: FreshOpeningBookEntry[] = [
       { from: 4, to: 8, weight: 70, note: 'Solid' },
     ],
   },
+
+  // === PLY 6: After 25-22, 7-11, 22-18, 4-8, 29-25, 11-15 (Standard line PLY 6) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 25, to: 22 },
+      { from: 7, to: 11 },
+      { from: 22, to: 18 },
+      { from: 4, to: 8 },
+      { from: 29, to: 25 },
+      { from: 11, to: 15 },
+    ])),
+    ply: 6,
+    side: 1,
+    moves: [
+      { from: 26, to: 22, weight: 100, note: 'Develop flank' },
+      { from: 27, to: 23, weight: 85, note: 'Dragon head development' },
+      { from: 24, to: 20, weight: 75, note: 'Five points approach' },
+    ],
+  },
+
+  // === PLY 4: After 26-23, 7-10, 23-19, 10-14 (Three-in-line P2 counter) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 26, to: 23 },
+      { from: 7, to: 10 },
+      { from: 23, to: 19 },
+      { from: 10, to: 14 },
+    ])),
+    ply: 4,
+    side: 1,
+    moves: [
+      { from: 19, to: 15, weight: 100, note: 'Continue advance' },
+      { from: 25, to: 22, weight: 85, note: 'Develop standard' },
+      { from: 29, to: 25, weight: 75, note: 'Reinforce' },
+    ],
+  },
+
+  // === PLY 5: After 26-23, 7-10, 23-19, 10-14, 19-15 (Three-in-line deep) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 26, to: 23 },
+      { from: 7, to: 10 },
+      { from: 23, to: 19 },
+      { from: 10, to: 14 },
+      { from: 19, to: 15 },
+    ])),
+    ply: 5,
+    side: -1,
+    moves: [
+      { from: 10, to: 19, weight: 100, note: 'Capture advance' },
+      { from: 6, to: 10, weight: 80, note: 'Develop side' },
+      { from: 4, to: 8, weight: 70, note: 'Solid development' },
+    ],
+  },
+
+  // === PLY 4: After 24-20, 4-8, 20-16, 8-12 (Five points P2 counter) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 24, to: 20 },
+      { from: 4, to: 8 },
+      { from: 20, to: 16 },
+      { from: 8, to: 12 },
+    ])),
+    ply: 4,
+    side: 1,
+    moves: [
+      { from: 16, to: 11, weight: 100, note: 'Five points deep push' },
+      { from: 25, to: 22, weight: 85, note: 'Standard development' },
+      { from: 29, to: 25, weight: 75, note: 'Flexible' },
+    ],
+  },
+
+  // === PLY 5: After 24-20, 4-8, 20-16, 8-12, 16-11 (Five points deep) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 24, to: 20 },
+      { from: 4, to: 8 },
+      { from: 20, to: 16 },
+      { from: 8, to: 12 },
+      { from: 16, to: 11 },
+    ])),
+    ply: 5,
+    side: -1,
+    moves: [
+      { from: 7, to: 16, weight: 100, note: 'Capture five points' },
+      { from: 6, to: 10, weight: 80, note: 'Develop before capture' },
+      { from: 12, to: 16, weight: 70, note: 'Push before capture' },
+    ],
+  },
+
+  // === PLY 4: After 27-23, 7-10, 23-19, 10-14 (Dragon head P2 counter) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 27, to: 23 },
+      { from: 7, to: 10 },
+      { from: 23, to: 19 },
+      { from: 10, to: 14 },
+    ])),
+    ply: 4,
+    side: 1,
+    moves: [
+      { from: 19, to: 15, weight: 100, note: 'Dragon deep advance' },
+      { from: 25, to: 22, weight: 85, note: 'Standard development' },
+      { from: 29, to: 25, weight: 75, note: 'Flexible approach' },
+    ],
+  },
+
+  // === PLY 3: After 25-22, 6-10, 22-18 (Alternative P2 - P1 continues) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 25, to: 22 },
+      { from: 6, to: 10 },
+      { from: 22, to: 18 },
+    ])),
+    ply: 3,
+    side: -1,
+    moves: [
+      { from: 7, to: 11, weight: 100, note: 'Central development' },
+      { from: 4, to: 8, weight: 85, note: 'Solid approach' },
+      { from: 10, to: 14, weight: 70, note: 'Push flank' },
+    ],
+  },
+
+  // === PLY 2: After 25-21, 6-10 (Center control main response) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 25, to: 21 },
+      { from: 6, to: 10 },
+    ])),
+    ply: 2,
+    side: 1,
+    moves: [
+      { from: 21, to: 17, weight: 100, note: 'Center control advance' },
+      { from: 26, to: 23, weight: 85, note: 'Three-in-line development' },
+      { from: 29, to: 25, weight: 75, note: 'Standard development' },
+    ],
+  },
+
+  // === PLY 1: After 26-22 (Flank development) - P2 responses ===
+  {
+    key: hashPosition(positionAfterMoves([{ from: 26, to: 22 }])),
+    ply: 1,
+    side: -1,
+    moves: [
+      { from: 6, to: 10, weight: 100, note: 'Standard flank response' },
+      { from: 7, to: 11, weight: 85, note: 'Central response' },
+      { from: 4, to: 8, weight: 70, note: 'Solid response' },
+    ],
+  },
+
+  // === PLY 1: After 24-21 (Solid opening) - P2 responses ===
+  {
+    key: hashPosition(positionAfterMoves([{ from: 24, to: 21 }])),
+    ply: 1,
+    side: -1,
+    moves: [
+      { from: 4, to: 8, weight: 100, note: 'Meet solid with solid' },
+      { from: 7, to: 11, weight: 85, note: 'Central approach' },
+      { from: 6, to: 10, weight: 70, note: 'Flank development' },
+    ],
+  },
 ];
 
 export function generateOpeningBookEntries(): FreshOpeningBookEntry[] {
