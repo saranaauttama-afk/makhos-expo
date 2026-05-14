@@ -434,6 +434,91 @@ export const THAI_OPENING_PATTERNS: FreshOpeningBookEntry[] = [
       { from: 6, to: 10, weight: 70, note: 'Flank development' },
     ],
   },
+
+  // === PLY 2: After 26-22, 6-10 (Flank development main) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 26, to: 22 },
+      { from: 6, to: 10 },
+    ])),
+    ply: 2,
+    side: 1,
+    moves: [
+      { from: 25, to: 22, weight: 100, note: 'Standard development' },
+      { from: 29, to: 25, weight: 85, note: 'Flexible approach' },
+      { from: 27, to: 23, weight: 70, note: 'Dragon head mix' },
+    ],
+  },
+
+  // === PLY 2: After 24-21, 4-8 (Solid opening main) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 24, to: 21 },
+      { from: 4, to: 8 },
+    ])),
+    ply: 2,
+    side: 1,
+    moves: [
+      { from: 21, to: 17, weight: 100, note: 'Solid advance' },
+      { from: 25, to: 22, weight: 85, note: 'Standard development' },
+      { from: 29, to: 25, weight: 75, note: 'Flexible' },
+    ],
+  },
+
+  // === PLY 3: After 25-21, 6-10, 21-17 (Center control advance) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 25, to: 21 },
+      { from: 6, to: 10 },
+      { from: 21, to: 17 },
+    ])),
+    ply: 3,
+    side: -1,
+    moves: [
+      { from: 7, to: 11, weight: 100, note: 'Central development' },
+      { from: 10, to: 14, weight: 85, note: 'Push flank' },
+      { from: 4, to: 8, weight: 70, note: 'Solid response' },
+    ],
+  },
+
+  // === PLY 7: After 25-22, 7-11, 22-18, 4-8, 29-25, 11-15, 26-22 (Standard line PLY 7) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 25, to: 22 },
+      { from: 7, to: 11 },
+      { from: 22, to: 18 },
+      { from: 4, to: 8 },
+      { from: 29, to: 25 },
+      { from: 11, to: 15 },
+      { from: 26, to: 22 },
+    ])),
+    ply: 7,
+    side: -1,
+    moves: [
+      { from: 6, to: 10, weight: 100, note: 'Complete development' },
+      { from: 8, to: 12, weight: 85, note: 'Push center' },
+      { from: 3, to: 7, weight: 70, note: 'Flexible' },
+    ],
+  },
+
+  // === PLY 6: After 26-23, 7-10, 23-19, 10-14, 19-15, 10-19 (Three-in-line capture) ===
+  {
+    key: hashPosition(positionAfterMoves([
+      { from: 26, to: 23 },
+      { from: 7, to: 10 },
+      { from: 23, to: 19 },
+      { from: 10, to: 14 },
+      { from: 19, to: 15 },
+      { from: 10, to: 19 },
+    ])),
+    ply: 6,
+    side: 1,
+    moves: [
+      { from: 29, to: 25, weight: 100, note: 'Development after capture' },
+      { from: 25, to: 22, weight: 85, note: 'Standard approach' },
+      { from: 27, to: 23, weight: 70, note: 'Flexible' },
+    ],
+  },
 ];
 
 export function generateOpeningBookEntries(): FreshOpeningBookEntry[] {
