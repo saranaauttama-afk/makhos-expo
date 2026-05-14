@@ -53,7 +53,7 @@ PLY 7: 1 entry  (expert-level depth)
 Total: 31 entries
 ```
 
-### Part C: Puzzle Solving Enhancement ✅
+### Part C: Puzzle Solving Enhancement ⚠️
 
 **Baseline Analysis:**
 - Current: 1/14 correct (7%)
@@ -68,7 +68,25 @@ Total: 31 entries
   Hard:   depth=20, time=60s
   Expert: depth=24, time=120s
   ```
-- Running in background (results pending)
+
+**Results:**
+- **1/14 correct (7%) - NO IMPROVEMENT** ⚠️
+- Average depth improved: 3.4→6.4 (+88%)
+- Average time: 29.2 seconds per puzzle
+- All 13 failed puzzles still fail
+
+**Analysis:**
+The problem is **NOT** search depth but **evaluation quality**:
+- Puzzles require domain knowledge (trap patterns, sacrifices)
+- Current evaluation doesn't understand positional sacrifices
+- Many puzzles timeout at depth 1 (evaluation issue, not search)
+
+**Conclusion:**
+Puzzle improvement requires:
+1. Trap pattern recognition
+2. Sacrifice-aware evaluation
+3. Puzzle-specific heuristics
+Not just deeper/longer search.
 
 ### Part D: Test Infrastructure ✅
 
