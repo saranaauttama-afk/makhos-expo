@@ -1,9 +1,8 @@
 # Known Issues
 
-## ~~sac-two-win-three-p1 Catastrophic Failure~~ FIXED ✅
+## sac-two-win-three-p1 Catastrophic Failure
 
-**Status**: ~~Pre-existing known issue (as of 2026-05-13)~~ **FIXED** (2026-05-14)
-**Fixed by**: Opening book expansion to 26 entries (commit 68ceda9)
+**Status**: Pre-existing known issue (as of 2026-05-13)
 
 **Description**: The `sac-two-win-three-p1` tactical benchmark case consistently fails with a catastrophic drop (~998K centipawns). The AI chooses move `7->2K` (promoting to square 2) when the oracle expects `8->4K` (promoting to square 4).
 
