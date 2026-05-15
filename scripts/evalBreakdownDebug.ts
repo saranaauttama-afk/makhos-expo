@@ -55,6 +55,7 @@ function compactBreakdown(b: EvalBreakdown): string {
     `psqt=${b.psqt}`,
     `mob=${b.mobility}`,
     `lowMob=${b.lowMobilityResearch}`,
+    `lle=${b.lowLibertyEdgeLock}`,
     `promo=${b.promotionThreat}`,
     `hang=${b.hangingPieces}`,
     `back=${Math.round(b.backRankGuard)}`,
@@ -70,6 +71,8 @@ function compactBreakdown(b: EvalBreakdown): string {
 const CASE_IDS: EndgameWeaknessFixtureId[] = [
   'quiet-hanging-piece-p1',
   'low-mobility-squeeze',
+  'quiet-hanging-piece-p2',
+  'low-mobility-squeeze-p2',
   'small-endgame',
   'small-piece-king-vs-men',
 ];

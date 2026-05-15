@@ -40,6 +40,7 @@ export interface EvalBreakdown {
   psqt: number;
   mobility: number;
   lowMobilityResearch: number;
+  lowLibertyEdgeLock: number;
   promotionThreat: number;
   hangingPieces: number;
   backRankGuard: number;
@@ -198,6 +199,65 @@ function lowMobilityResearchSignal(p: Position): number {
   const nearTotalExhaustion = my.totalForward <= 3 && op.totalForward <= 3;
   if (!hasBlockedAsymmetry || !bothNoFreeMen || !nearTotalExhaustion) return 0;
   return 4 * ((op.blocked * 2 + op.cramped) - (my.blocked * 2 + my.cramped));
+}
+
+export function lowLibertyEdgeLockSignal(p: Position): number {
+  if (p.p1Kings !== 0 || p.p2Kings !== 0) return 0;
+
+  const total = bitCount(p.p1Men | p.p2Men);
+  if (total > 6) return 0;
+
+  const side = p.side;
+  const myMen = side === 1 ? p.p1Men : p.p2Men;
+  const myMenCount = bitCount(myMen);
+  if (myMenCount !== 3) return 0;
+
+  const occ = (p.p1Men | p.p2Men) >>> 0;
+  let totalForwardSteps = 0;
+  let blockedMen = 0;
+  let crampedMen = 0;
+  let freeMen = 0;
+  let backBandMen = 0;
+  let leftNearEdgeMen = 0;
+  let rightNearEdgeMen = 0;
+  let leftHardEdgeMen = 0;
+  let rightHardEdgeMen = 0;
+
+  for (const sq of bits(myMen)) {
+    const { r, c } = toRC(sq);
+    const inBackBand = side === 1 ? r >= 5 : r <= 2;
+    if (!inBackBand) return 0;
+    backBandMen++;
+
+    if (c <= 2) leftNearEdgeMen++;
+    if (c >= 5) rightNearEdgeMen++;
+    if (c <= 1) leftHardEdgeMen++;
+    if (c >= 6) rightHardEdgeMen++;
+
+    let forwardSteps = 0;
+    for (const st of STEPS[sq]) {
+      if (side === 1 && (st.dir === 'DL' || st.dir === 'DR')) continue;
+      if (side === -1 && (st.dir === 'UL' || st.dir === 'UR')) continue;
+      if (occ & B1(st.to)) continue;
+      forwardSteps++;
+      totalForwardSteps++;
+    }
+    if (forwardSteps === 0) blockedMen++;
+    else if (forwardSteps === 1) crampedMen++;
+    else freeMen++;
+  }
+
+  const sameFlankNearEdgeMen = Math.max(leftNearEdgeMen, rightNearEdgeMen);
+  const sameFlankHardEdgeMen = Math.max(leftHardEdgeMen, rightHardEdgeMen);
+  if (backBandMen !== myMenCount) return 0;
+  if (sameFlankNearEdgeMen < 2) return 0;
+  if (sameFlankHardEdgeMen < 1) return 0;
+  if (blockedMen < 1) return 0;
+  if (crampedMen < 1) return 0;
+  if (freeMen > 1) return 0;
+  if (totalForwardSteps > 3) return 0;
+
+  return 1;
 }
 
 // ── Back rank guard ───────────────────────────────────────────────────────────
@@ -459,6 +519,7 @@ export function createEmptyEvalBreakdown(): EvalBreakdown {
     psqt: 0,
     mobility: 0,
     lowMobilityResearch: 0,
+    lowLibertyEdgeLock: 0,
     promotionThreat: 0,
     hangingPieces: 0,
     backRankGuard: 0,
@@ -493,6 +554,7 @@ export function fillEvalBreakdown(p: Position, out: EvalBreakdown): number {
           EVAL_EXPERIMENTS.lowMobilityResearchScalePct,
         )
       : 0;
+  out.lowLibertyEdgeLock = lowLibertyEdgeLockSignal(p);
   out.promotionThreat = applyEvalExperimentScale(promotionThreatScore(p), EVAL_EXPERIMENTS.promotionThreatScalePct);
   out.hangingPieces = applyEvalExperimentScale(hangingPiecesPenalty(p), EVAL_EXPERIMENTS.hangingPiecesScalePct);
   out.backRankGuard = applyEvalExperimentScale(backRankGuard(p) * (1 - eg), EVAL_EXPERIMENTS.backRankGuardScalePct);

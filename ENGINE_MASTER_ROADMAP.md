@@ -168,6 +168,136 @@ Key findings:
   - the top cluster mostly reached depth `15` without timing out
   - several lower-ranked moves still timed out heavily
 
+### S1 manual root tactical ordering findings
+
+The first manual Phase S search experiment was tested under BD4 protected-case policy and rejected.
+
+Key findings:
+
+- flag: `MAKHOS_ENABLE_S1_ROOT_TACTICAL_ORDERING`
+- protected `sac-two-win-three-p1` stayed inside the BD4 accepted band across repeats
+- protected `sac-two-win-three-p2` stayed fully clean
+- the experiment was rejected because `low-mobility-squeeze` worsened materially:
+  - clean-OFF worst expert miss: `516`
+  - experiment-ON worst expert miss: `1568`
+- the S1 code was reverted
+- `npm.cmd run test:perft` passed after revert
+- do not retry the same root quiet-move ordering formula
+
+### S2 manual quiescence capture-ordering tie-break findings
+
+The second manual Phase S search experiment was tested under BD4 protected-case policy and marked inconclusive.
+
+Key findings:
+
+- flag: `MAKHOS_ENABLE_S2_QUIESCENCE_CAPTURE_ORDERING`
+- scope stayed narrow:
+  - quiescence-only capture-ordering tie-break
+  - no eval tuning
+  - no root ordering change
+  - no broad search rewrite
+- existing quiescence ordering was preserved first:
+  - recapture priority via `lastCapSquare`
+  - larger capture length
+- the added tie-break only applied when those were equal:
+  - lower immediate opponent capture risk
+  - final promotion-capture tie-break
+- protected `sac-two-win-three-p2` stayed clean in all `3/3` experiment-ON repeats
+- `low-mobility-squeeze` improved under the flag
+- `sac-two-win-three-p1` remained volatile, so the experiment did not earn enough confidence
+- `quiet-hanging-piece-p1` picked up collateral noise under the flag:
+  - OFF: clean `3/3`
+  - ON: one noisy run `402/423/425/0`
+- the S2 code was reverted
+- `npm.cmd run test:perft` passed after revert
+- do not promote
+- possible future revisit only with a narrower `quiet-hanging-piece-p1` guard or a better joint `p1` / `quiet-hanging-piece-p1` policy
+
+### G1.1 tactical pattern discovery findings
+
+The first Phase G step was completed as docs-only tactical motif research.
+
+Key findings:
+
+- scope:
+  - research/docs only
+  - no runtime behavior change
+  - no eval tuning
+  - no search rewrite
+- focus cases inspected:
+  - `sac-two-win-three-p1`
+  - `sac-two-win-three-p2`
+  - `low-mobility-squeeze`
+  - `quiet-hanging-piece-p1`
+- recurring motif families identified:
+  - forced recapture trap
+  - fake sacrifice structure
+  - king-entry race
+  - mobility collapse / low-liberty squeeze
+  - edge-lock shape
+  - quiet hanging tactical punishment
+- the cleanest stable exemplar for the trap family is `sac-two-win-three-p2`, not `sac-two-win-three-p1`
+- `sac-two-win-three-p1` remains a real tactical family member, but is too oracle-sensitive to serve as the first direct encoding target
+- the clearest structural signal gap is sparse no-king low-liberty / edge-lock play in `low-mobility-squeeze`
+- the main collateral guardrail for future Phase G work is `quiet-hanging-piece-p1`
+- safest later encoding target:
+  - narrow low-liberty / edge-lock detection in sparse no-king positions
+- motifs too risky to encode first:
+  - protected-case fake-sacrifice / forced-recapture family
+  - broad mobility-collapse scoring
+  - generic quiet-hanging tactical scoring
+  - generic king-entry race bonuses
+- result artifact:
+  - `docs/ai/TACTICAL_PATTERN_CATALOG.md`
+
+### G1.2 low-liberty / edge-lock heuristic planning findings
+
+The second Phase G step was completed as planning-only heuristic design for the sparse low-liberty motif.
+
+Key findings:
+
+- scope:
+  - planning only
+  - no runtime behavior change
+  - no eval tuning
+  - no search rewrite
+- target motif:
+  - sparse no-king low-liberty edge-lock structures
+- narrowest proposed structural signals:
+  - blocked / cramped / free men counts
+  - compressed forward target count
+  - back-band confinement
+  - edge-heavy structure
+  - low escape count
+- strict proposed activation guards:
+  - no kings
+  - total pieces `<= 6`
+  - side-to-move men `<= 3`
+  - all side-to-move men in the back band
+  - strong edge concentration
+  - no free men
+  - compressed forward targets
+- positions expected to trigger later:
+  - `low-mobility-squeeze`
+  - `low-mobility-squeeze-p2`
+- positions explicitly protected from triggering:
+  - `sac-two-win-three-p1`
+  - `sac-two-win-three-p2`
+  - `quiet-hanging-piece-p1`
+  - `quiet-hanging-piece-p2`
+  - opening trap-family cases
+- safest future runtime location:
+  - dedicated helper in `src/coreClaude/eval.ts`
+  - separate from `mobilityScore(...)`
+  - instrumentation first through eval breakdown
+- safest later experiment structure:
+  - `OFF` by default
+  - instrumentation first
+  - tiny scored experiment only after clean trigger / non-trigger confirmation
+- result artifacts:
+  - `docs/ai/TACTICAL_PATTERN_CATALOG.md`
+  - `docs/ai/G12_LOW_LIBERTY_PLAN.md`
+
 ### Autonomous loop findings
 
 The autonomous experiment loop was scaffolded in docs/tooling and attempted its first queued item.
@@ -385,6 +515,9 @@ Stop the autonomous queue when:
     - `7->2K`
   - warning only if quick oracle drift stays inside that band
   - fail if experiments push the final move outside the band repeatedly or clearly increase catastrophic repeats
+- S1 conclusion:
+  - a root-only quiet tactical ordering bonus can keep protected cases safe yet still worsen monitored tactical behavior
+  - do not retry the same S1 formula
 - `src/coreClaude/search/alphabeta.ts` showing `M` with empty textual diff is best explained by line-ending normalization:
   - `git diff -- src/coreClaude/search/alphabeta.ts` is empty
   - `git ls-files --eol` reports `i/lf` and `w/mixed`
@@ -468,8 +601,9 @@ Expected outputs:
 
 Checklist:
 
-- [ ] root tactical move ordering revisit only after BD stabilization
-- [ ] capture-only quiescence ordering research
+- [x] root tactical move ordering revisit only after BD stabilization
+- [ ] do not retry the rejected S1 quiet root-ordering formula
+- [x] test one narrow S2 quiescence capture-ordering tie-break experiment
 - [ ] recapture-priority ordering research
 - [ ] keep experiments isolated and `OFF` by default
 
@@ -496,6 +630,8 @@ Expected outputs:
 
 Checklist:
 
+- [x] G1.1 tactical pattern discovery / motif classification docs
+- [x] G1.2 narrow low-liberty / edge-lock heuristic planning docs
 - [ ] test practical move-quality ideas after BD stabilization
 - [ ] compare against tactical regression harness before trusting gameplay wins
 - [ ] avoid hidden depth/budget inflation
@@ -547,12 +683,14 @@ Checklist:
 ### Search ordering experiments
 
 - [ ] keep root tactical move ordering paused until BD1 is complete
-- [ ] evaluate quiescence ordering ideas only after baseline is trustworthy
+- [x] evaluate one narrow quiescence ordering tie-break idea under BD4 manual policy
 - [ ] evaluate recapture-priority ordering only after baseline is trustworthy
 - [ ] require `OFF`-by-default flags for any future search experiment
 
 ### Gameplay testing
 
+- [x] classify recurring tactical motifs from protected / unstable benchmark cases before encoding heuristics
+- [x] define strict trigger / non-trigger guards for sparse low-liberty edge-lock planning before any heuristic implementation
 - [ ] preserve tactical harness checks before trusting gameplay improvements
 - [ ] avoid using gameplay improvements to excuse protected tactical regressions
 - [ ] compare practical move choices only after protected baseline is stable
@@ -608,14 +746,19 @@ Conditions required before resuming:
 
 Current recommended next task is:
 
-- **manual Phase S search experiments under BD4 policy, or harness-policy tooling**
+- **Phase G docs-first follow-up or manual Phase S work under BD4 policy**
 
-BD4 is now defined.
+BD4 is now defined, and G1.1 tactical motif cataloging is complete.
+G1.2 low-liberty planning is also complete.
 
 The safest next options are:
 
 - keep `p1` protected but repeat-required
+- keep tactical motif work docs/instrumentation-first
+- if Phase G continues, start from narrow sparse low-liberty / edge-lock instrumentation rather than broad tactical heuristics
+- keep the future trigger set strict: `low-mobility-squeeze` / `low-mobility-squeeze-p2` only until proven broader safely
 - resume manual isolated search experiments only with band-aware repeated-run review
+- avoid retrying the rejected S1 quiet root-ordering formula
 - or encode the new `p1` band-aware policy into benchmark tooling before resuming autonomous mode
 
 ---
@@ -683,6 +826,8 @@ Known current/recent flags:
   - rejected experiment history only; do not retry on current architecture
 - `MAKHOS_ENABLE_ROOT_TACTICAL_MOVE_ORDERING`
   - aborted attempt history only; do not resume until BD stabilization work is complete
+- `MAKHOS_ENABLE_S2_QUIESCENCE_CAPTURE_ORDERING`
+  - inconclusive / reverted experiment history only; do not promote
 
 ### Docs references
 

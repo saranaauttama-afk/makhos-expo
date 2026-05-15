@@ -395,3 +395,122 @@
   - either:
     - resume manual isolated search experiments under BD4 policy
     - or encode `p1` accepted-band logic into harness/tooling before any autonomous restart
+
+### 2026-05-13 - S1 manual root tactical ordering
+
+- Status: `rejected`
+- Scope:
+  - narrow root-only move ordering experiment
+  - no eval tuning
+  - no depth/budget change
+- Flag:
+  - `MAKHOS_ENABLE_S1_ROOT_TACTICAL_ORDERING`
+
+- Implemented rule:
+  - root-only quiet-move ordering bias using existing one-ply tactical signals
+  - formula combined:
+    - negative immediate capture risk
+    - promotion bonus
+    - sound forced-trap bonus
+    - forced-recapture bonus
+
+- Baseline gates:
+  - `npm.cmd run test:perft` passed
+  - clean-OFF `gate:ai:report` = `WARN`, no fatal reasons
+  - clean-OFF `gate:ai:repeat`:
+    - `p1`: `0/0/157/0`, `0/0/0/0`, `0/0/0/0`
+    - `p2`: clean in all `3/3` runs
+    - `low-mobility-squeeze`: worst expert miss `516`
+
+- Experiment-on gates:
+  - `npm.cmd run test:perft` passed
+  - experiment-ON `gate:ai:report` = `WARN`, no fatal reasons
+  - experiment-ON `gate:ai:repeat`:
+    - `p1`: `0/0/0/0`, `0/0/0/0`, `0/357/0/0`
+    - `p2`: clean in all `3/3` runs
+    - `low-mobility-squeeze`: worst expert miss `1568`
+    - `quiet-hanging-piece-p1`: clean in all `3/3` runs
+
+- Protected-case review:
+  - `p1` stayed inside the BD4 accepted band across repeats
+  - `p2` stayed clean
+
+- Decision:
+  - reject
+  - reason:
+    - protected cases were acceptable
+    - but `low-mobility-squeeze` worsened materially under the flag
+    - OFF worst expert miss: `516`
+    - ON worst expert miss: `1568`
+
+- Revert:
+  - reverted only the S1 code in `src/coreClaude/search/alphabeta.ts`
+  - `npm.cmd run test:perft` passed after revert
+
+- Next:
+  - do not retry the same root quiet-move ordering formula
+  - if Phase S continues, choose a different isolated search idea
+
+### 2026-05-13 - S2 quiescence capture-ordering tie-break
+
+- Status: `inconclusive`
+- Scope:
+  - narrow quiescence-only capture-ordering tie-break experiment
+  - no eval tuning
+  - no root ordering change
+  - no broad search rewrite
+- Flag:
+  - `MAKHOS_ENABLE_S2_QUIESCENCE_CAPTURE_ORDERING`
+
+- Implemented rule:
+  - preserve existing quiescence capture ordering first:
+    - recapture priority via `lastCapSquare`
+    - larger capture length
+  - add tie-break only when those are equal:
+    - prefer child position with lower immediate opponent capture risk
+    - optional final tie-break: promotion capture
+
+- Baseline gates:
+  - `npm.cmd run test:perft` passed
+  - clean-OFF `gate:ai:repeat`:
+    - `p1`: `0/0/0/0`, `998897/999642/998896/999196`, `998896/998895/998896/998896`
+    - `p2`: clean in all `3/3` runs
+    - `low-mobility-squeeze`: worst expert miss `956`
+    - `quiet-hanging-piece-p1`: clean in all `3/3` runs
+
+- Experiment-on gates:
+  - `npm.cmd run test:perft` passed
+  - experiment-ON `gate:ai:repeat`:
+    - `p1`: `998897/998898/998898/999480`, `0/0/0/28`, `0/0/0/0`
+    - `p2`: clean in all `3/3` runs
+    - `low-mobility-squeeze`: clean in all `3/3` runs
+    - `quiet-hanging-piece-p1`: `402/423/425/0`, `0/0/0/0`, `0/0/0/0`
+
+- Protected-case review:
+  - `p2` stayed clean `3/3`
+  - `p1` remained volatile under both OFF and ON runs
+  - `p1` did not provide enough confidence to treat the experiment as safe/promising
+
+- Monitored-case review:
+  - `low-mobility-squeeze` improved under the flag
+  - `quiet-hanging-piece-p1` picked up collateral noise:
+    - OFF clean `3/3`
+    - ON one noisy run `402/423/425/0`
+
+- Decision:
+  - inconclusive
+  - reason:
+    - `p2` stayed clean
+    - `low-mobility-squeeze` improved
+    - but `p1` remained too volatile for confidence
+    - and `quiet-hanging-piece-p1` showed collateral noise under the flag
+
+- Revert:
+  - reverted only the S2 code in `src/coreClaude/search/alphabeta.ts`
+  - `npm.cmd run test:perft` passed after revert
+  - no runtime change remains active
+
+- Next:
+  - do not promote
+  - possible future revisit only with a narrower `quiet-hanging-piece-p1` guard
+  - or with a better joint policy for `p1` and `quiet-hanging-piece-p1`
