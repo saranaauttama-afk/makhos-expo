@@ -14,6 +14,21 @@ export const EMPTY: Position = { side: 1, p1Men: 0, p1Kings: 0, p2Men: 0, p2King
 
 export function clone(p: Position): Position { return { ...p }; }
 
+/**
+ * Normalize position from JSON (may have BigInt as numbers) to runtime format
+ * Handles positions loaded from JSON where BigInt values were serialized as numbers
+ */
+export function normalizePosition(p: any): Position {
+  return {
+    side: p.side,
+    p1Men: typeof p.p1Men === 'number' && p.p1Men > 0xFFFFFFFF ? p.p1Men : (typeof p.p1Men === 'bigint' ? Number(p.p1Men & 0xFFFFFFFFn) : (p.p1Men >>> 0)),
+    p1Kings: typeof p.p1Kings === 'number' && p.p1Kings > 0xFFFFFFFF ? p.p1Kings : (typeof p.p1Kings === 'bigint' ? Number(p.p1Kings & 0xFFFFFFFFn) : (p.p1Kings >>> 0)),
+    p2Men: typeof p.p2Men === 'number' && p.p2Men > 0xFFFFFFFF ? p.p2Men : (typeof p.p2Men === 'bigint' ? Number(p.p2Men & 0xFFFFFFFFn) : (p.p2Men >>> 0)),
+    p2Kings: typeof p.p2Kings === 'number' && p.p2Kings > 0xFFFFFFFF ? p.p2Kings : (typeof p.p2Kings === 'bigint' ? Number(p.p2Kings & 0xFFFFFFFFn) : (p.p2Kings >>> 0)),
+    halfmoveClock: p.halfmoveClock || 0,
+  };
+}
+
 /** เริ่มเกมแบบ 8 ตัว/ฝั่ง: P2 = สองแถวบน (index 0..7), P1 = สองแถวล่าง (index 24..31) */
 export function initialPosition(): Position {
   let p1Men = 0, p2Men = 0;

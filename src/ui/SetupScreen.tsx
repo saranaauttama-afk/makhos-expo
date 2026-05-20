@@ -30,6 +30,7 @@ const LEVELS: Array<{ id: SelectableDifficulty; tint: string }> = [
   { id: 'normal', tint: CYAN },
   { id: 'hard', tint: GOLD },
   { id: 'expert', tint: PINK },
+  { id: 'alpha', tint: '#ff6b9d' }, // Hot pink for NN-powered Alpha
 ];
 
 function clampSelectableDifficulty(value: Difficulty): SelectableDifficulty {
@@ -64,6 +65,7 @@ const COPY = {
       hard: 'ระดับ 3',
       expert: 'ระดับ 4',
       master: 'ระดับ 5',
+      alpha: 'Alpha NN',
     },
     levelHints: {
       easy: 'สบายๆ',
@@ -71,6 +73,7 @@ const COPY = {
       hard: 'วางแผน',
       expert: 'เข้มข้น',
       master: 'ค้นหานำทาง',
+      alpha: 'โมเดล Neural Network',
     },
   },
   en: {
@@ -100,6 +103,7 @@ const COPY = {
       hard: 'Level 3',
       expert: 'Level 4',
       master: 'Level 5',
+      alpha: 'Alpha NN',
     },
     levelHints: {
       easy: 'Friendly',
@@ -107,6 +111,7 @@ const COPY = {
       hard: 'Tactical',
       expert: 'Sharp',
       master: 'Guided search',
+      alpha: 'Neural Network Model',
     },
   },
 } as const;

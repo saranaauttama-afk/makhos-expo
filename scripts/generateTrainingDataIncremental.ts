@@ -41,16 +41,33 @@ interface Progress {
 
 const OUTPUT_DIR = '.tmp/training_data';
 const PROGRESS_FILE = path.join(OUTPUT_DIR, 'progress.json');
-const CHUNK_SIZE = 1000; // Generate 1000 at a time
-const MINIMAX_DEPTH = 12;
-const MINIMAX_TIME_MS = 2000;
+const CHUNK_SIZE = 10000; // Generate 10000 at a time
 
-// Target distribution
-const TARGET_SELFPLAY = 40000;
-const TARGET_OPENING = 30000;
-const TARGET_TACTICAL = 20000;
-const TARGET_ENDGAME = 10000;
-const TARGET_TOTAL = 100000;
+// Search config for each category
+const DEPTH_CONFIG = {
+  selfplay: 12,
+  opening: 3,     // Low depth (already done)
+  tactical: 8,    // Higher depth for tactical accuracy
+  endgame: 14,    // Very high depth for endgame precision
+};
+const TIME_CONFIG = {
+  selfplay: 2000,
+  opening: 1000,
+  tactical: 5000,  // More time for tactical positions
+  endgame: 10000,  // Most time for endgame
+};
+
+// Generate unique ID for parallel processing
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+}
+
+// Target distribution - Gen selfplay only for consistent training
+const TARGET_SELFPLAY = 60000;   // Gen 20K more selfplay (depth 12 consistent)
+const TARGET_OPENING = 40000;    // Skip (depth 3 too shallow)
+const TARGET_TACTICAL = 10000;   // Skip (depth 8 mismatch with selfplay)
+const TARGET_ENDGAME = 0;        // Skip for now
+const TARGET_TOTAL = 110000;
 
 // Ensure output directory exists
 if (!fs.existsSync(OUTPUT_DIR)) {
@@ -87,9 +104,15 @@ function getInitialPosition(): Position {
   };
 }
 
-async function labelPosition(pos: Position): Promise<TrainingExample | null> {
+async function labelPosition(
+  pos: Position,
+  category: 'selfplay' | 'opening' | 'tactical' | 'endgame'
+): Promise<TrainingExample | null> {
   const tt = new TT();
-  const result = await iterativeDeepening(pos, MINIMAX_TIME_MS, tt, undefined, [], undefined, MINIMAX_DEPTH);
+  const depth = DEPTH_CONFIG[category];
+  const timeMs = TIME_CONFIG[category];
+
+  const result = await iterativeDeepening(pos, timeMs, tt, undefined, [], undefined, depth);
 
   if (!result.best) return null;
 
@@ -101,7 +124,7 @@ async function labelPosition(pos: Position): Promise<TrainingExample | null> {
     positionValue: normalizedValue,
     depth: result.depth,
     nodes: result.nodes || 0,
-    category: 'selfplay', // Will be overridden
+    category,
   };
 }
 
@@ -162,9 +185,8 @@ async function generateChunk(
       if (totalPieces > 8 || totalPieces < 4) continue; // Skip if not endgame
     }
 
-    const example = await labelPosition(pos);
+    const example = await labelPosition(pos, category);
     if (example) {
-      example.category = category;
       examples.push(example);
       process.stdout.write(`\r  ${category}: ${i + 1}/${count} generated`);
     }
@@ -218,14 +240,15 @@ async function main() {
   const toGenerate = Math.min(CHUNK_SIZE, remaining);
 
   console.log(`Generating ${toGenerate} ${category} positions...`);
-  console.log(`Estimated time: ${(toGenerate * MINIMAX_TIME_MS / 1000 / 60).toFixed(1)} minutes`);
+  console.log(`Estimated time: ${(toGenerate * TIME_CONFIG[category] / 1000 / 60).toFixed(1)} minutes`);
   console.log('');
 
   const chunkStartTime = Date.now();
   const examples = await generateChunk(category, toGenerate);
 
-  // Save chunk
-  const chunkFile = `chunk_${category}_${progress[`${category}Count`]}.json`;
+  // Save chunk with unique ID to avoid race conditions in parallel processing
+  const uniqueId = generateId();
+  const chunkFile = `chunk_${category}_${uniqueId}.json`;
   const chunkPath = path.join(OUTPUT_DIR, chunkFile);
   fs.writeFileSync(chunkPath, JSON.stringify(examples, null, 2));
 
@@ -247,7 +270,6 @@ async function main() {
   console.log('Overall progress:');
   console.log(`  Total: ${progress.totalGenerated} / ${TARGET_TOTAL} (${(progress.totalGenerated / TARGET_TOTAL * 100).toFixed(1)}%)`);
   console.log(`  Total time: ${totalTime.toFixed(1)} hours`);
-  console.log(`  Estimated remaining: ${((TARGET_TOTAL - progress.totalGenerated) * MINIMAX_TIME_MS / 1000 / 60 / 60).toFixed(1)} hours`);
   console.log('');
   console.log('To continue, run this script again:');
   console.log('  npx tsx scripts/generateTrainingDataIncremental.ts');

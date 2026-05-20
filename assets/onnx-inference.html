@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONNX Inference</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+</head>
+<body>
+    <script>
+        let session = null;
+
+        // Send message to React Native
+        function sendMessage(data) {
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify(data));
+            } else {
+                console.log('Message:', data);
+            }
+        }
+
+        // Load ONNX model
+        window.loadONNXModel = async function() {
+            try {
+                console.log('Loading ONNX model...');
+                sendMessage({ type: 'status', message: 'Loading model...' });
+
+                // NOTE: Model URL will need to be provided by React Native
+                // For now, we'll just initialize ONNX Runtime
+
+                console.log('ONNX Runtime ready');
+                sendMessage({ type: 'onnx_ready', success: true });
+
+            } catch (error) {
+                console.error('Error loading model:', error);
+                sendMessage({
+                    type: 'onnx_error',
+                    error: error.message
+                });
+            }
+        };
+
+        // Run inference
+        window.runInference = async function(features) {
+            try {
+                if (!session) {
+                    throw new Error('Model not loaded');
+                }
+
+                console.log('Running inference with features:', features.length);
+                sendMessage({ type: 'status', message: 'Running inference...' });
+
+                // Create input tensor
+                const inputTensor = new ort.Tensor(
+                    'float32',
+                    new Float32Array(features),
+                    [1, 320]
+                );
+
+                // Run inference
+                const results = await session.run({ features: inputTensor });
+
+                // Extract outputs
+                const policyLogits = Array.from(results.policy_logits.data);
+                const value = results.value.data[0];
+
+                console.log('Inference complete');
+                sendMessage({
+                    type: 'inference_result',
+                    policy_logits: policyLogits,
+                    value: value
+                });
+
+            } catch (error) {
+                console.error('Inference error:', error);
+                sendMessage({
+                    type: 'inference_error',
+                    error: error.message
+                });
+            }
+        };
+
+        // Load model from base64 (called from React Native)
+        window.loadModelFromBase64 = async function(base64Data) {
+            try {
+                console.log('Loading model from base64...');
+                sendMessage({ type: 'status', message: 'Loading model from data...' });
+
+                // Convert base64 to ArrayBuffer
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                // Create ONNX session
+                session = await ort.InferenceSession.create(bytes.buffer);
+
+                console.log('Model loaded successfully');
+                console.log('Inputs:', session.inputNames);
+                console.log('Outputs:', session.outputNames);
+
+                sendMessage({
+                    type: 'model_loaded',
+                    inputs: session.inputNames,
+                    outputs: session.outputNames
+                });
+
+            } catch (error) {
+                console.error('Error loading model:', error);
+                sendMessage({
+                    type: 'onnx_error',
+                    error: error.message
+                });
+            }
+        };
+
+        // Initialize
+        console.log('ONNX Inference WebView ready');
+        sendMessage({ type: 'webview_ready' });
+    </script>
+</body>
+</html>

@@ -24,8 +24,8 @@ export const STRICT_LEVEL_POLICY: Record<StrictDifficulty, StrictLevelPolicy> = 
   expert: { baseDepth: 11, depthCap: 14, baseBudgetMs: 6000, budgetCapMs: 8500 },
 };
 
-export function isStrictDifficulty(difficulty: EngineDifficulty): difficulty is StrictDifficulty {
-  return difficulty !== 'master';
+export function isStrictDifficulty(difficulty: string): difficulty is StrictDifficulty {
+  return difficulty !== 'master' && difficulty !== 'alpha';
 }
 
 export function countTotalPieces(pos: Position): number {

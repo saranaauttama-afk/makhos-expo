@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONNX Runtime Web Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+</head>
+<body>
+    <h1>ONNX Runtime Web Test</h1>
+    <div id="status">Initializing...</div>
+    <div id="result"></div>
+
+    <script>
+        async function testONNX() {
+            const statusEl = document.getElementById('status');
+            const resultEl = document.getElementById('result');
+
+            try {
+                statusEl.textContent = 'Loading ONNX Runtime...';
+                console.log('ONNX Runtime version:', ort.env.versions);
+
+                // Test with dummy data
+                statusEl.textContent = 'Creating test tensor...';
+                const inputData = new Float32Array(320).fill(0.5);
+                const tensor = new ort.Tensor('float32', inputData, [1, 320]);
+
+                statusEl.textContent = 'Test successful!';
+                resultEl.innerHTML = `
+                    <p>✅ ONNX Runtime Web is working!</p>
+                    <p>Version: ${ort.env.versions.web}</p>
+                    <p>Tensor shape: [${tensor.dims.join(', ')}]</p>
+                    <p>Ready to load model.</p>
+                `;
+
+                // Send message to React Native
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'onnx_ready',
+                        success: true
+                    }));
+                }
+
+            } catch (error) {
+                statusEl.textContent = 'Error!';
+                resultEl.innerHTML = `
+                    <p>❌ Error: ${error.message}</p>
+                    <pre>${error.stack}</pre>
+                `;
+
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'onnx_error',
+                        error: error.message
+                    }));
+                }
+            }
+        }
+
+        // Run test when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', testONNX);
+        } else {
+            testONNX();
+        }
+    </script>
+</body>
+</html>

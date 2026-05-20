@@ -73,7 +73,8 @@ export function bitCount(x: BB): number {
 }
 
 export function *bits(bb: BB): Iterable<number> {
-  let x = bb >>> 0;
+  // Handle both number and BigInt
+  let x = typeof bb === 'bigint' ? Number(bb & 0xFFFFFFFFn) : (bb >>> 0);
   while (x) {
     const lsb = x & -x;                 // lowest set bit
     const i = 31 - Math.clz32(lsb);     // <-- ที่ถูกต้อง (เดิมใช้ ^ 31)

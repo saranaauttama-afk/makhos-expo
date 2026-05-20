@@ -19,6 +19,7 @@ const ARENA_LEVELS: { id: ArenaLevel; label: string }[] = [
   { id: 'hard', label: 'Level 3' },
   { id: 'expert', label: 'Level 4' },
   { id: 'master', label: 'Level 5' },
+  { id: 'alpha', label: 'Alpha NN' },
 ];
 const THINK_MS: Record<ArenaLevel, number> = {
   easy: 0,
@@ -26,6 +27,7 @@ const THINK_MS: Record<ArenaLevel, number> = {
   hard: 0,
   expert: 0,
   master: 4500,
+  alpha: 100, // NN is very fast
 };
 const LEVEL_LABEL: Record<ArenaLevel, string> = {
   easy: 'Level 1',
@@ -33,6 +35,7 @@ const LEVEL_LABEL: Record<ArenaLevel, string> = {
   hard: 'Level 3',
   expert: 'Level 4',
   master: 'Level 5',
+  alpha: 'Alpha NN',
 };
 const LEVEL_MODE_TAG: Record<ArenaLevel, string> = {
   easy: 'STRICT',
@@ -40,6 +43,7 @@ const LEVEL_MODE_TAG: Record<ArenaLevel, string> = {
   hard: 'STRICT',
   expert: 'STRICT',
   master: 'GUIDED',
+  alpha: 'NEURAL',
 };
 
 interface LogEntry {
@@ -164,8 +168,8 @@ export default function ArenaScreen({ language, onBack }: Props) {
 
     steppingRef.current = true;
 
-    const move = agent === 'master'
-      ? await think(curPos, THINK_MS[agent], curHistory, undefined, 'master')
+    const move = agent === 'master' || agent === 'alpha'
+      ? await think(curPos, THINK_MS[agent], curHistory, undefined, agent === 'master' ? 'master' : undefined)
       : await thinkStrict(curPos, THINK_MS[agent], curHistory, STRICT_LEVEL_POLICY[agent].baseDepth, undefined, agent);
     steppingRef.current = false;
 

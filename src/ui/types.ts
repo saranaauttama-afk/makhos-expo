@@ -1,5 +1,5 @@
 export type GameMode = 'vs-ai' | 'vs-human';
-export type Difficulty = 'easy' | 'normal' | 'hard' | 'expert' | 'master';
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'expert' | 'master' | 'alpha';
 export type AdConsentStatus = 'unknown' | 'granted' | 'denied';
 
 export interface GameConfig {

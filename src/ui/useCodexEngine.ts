@@ -4,6 +4,7 @@
 //   opening -> book
 //   tactical / endgame -> alpha-beta
 //   midgame -> AlphaZero MCTS
+//   alpha -> Neural Network
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TT } from '../coreClaude/search/tt';
@@ -12,8 +13,9 @@ import { lookupOpeningBookCandidates } from '../coreClaude/search/openingBook';
 import { precomputeEndgameTablebase } from '../coreClaude/search/endgameTablebase';
 import { selectStrictLevelMove, StrictDifficulty } from '../coreClaude/search/levelPolicy';
 import { Position } from '../coreClaude/position';
-import { Move } from '../coreClaude/movegen';
+import { Move, generateMoves } from '../coreClaude/movegen';
 import { Difficulty } from './types';
+import { evaluateNN, selectBestNNMove, initNNInference } from '../coreClaude/nnInference';
 
 // Production profile: keep turns responsive on mobile while giving higher
 // levels enough budget to avoid shallow tactical blunders.
@@ -57,6 +59,20 @@ type PendingWorkerSearch = {
   resolve: (move: Move | undefined) => void;
 };
 
+// Initialize NN model once at startup
+let nnInitialized = false;
+async function ensureNNInitialized() {
+  if (!nnInitialized) {
+    try {
+      await initNNInference();
+      nnInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize NN model:', error);
+      throw error;
+    }
+  }
+}
+
 export function useCodexEngine() {
   const [thinking, setThinking] = useState(false);
   const [lastInfo, setLastInfo] = useState<SearchInfo | null>(null);
@@ -76,6 +92,75 @@ export function useCodexEngine() {
       precomputeEndgameTablebase().catch(() => {});
     }, 0);
   }
+
+  const runNeuralNetwork = useCallback(async (
+    pos: Position,
+    token: CancelToken,
+    onInfo?: (info: SearchInfo) => void,
+    historyHashes: number[] = [],
+  ): Promise<Move | undefined> => {
+    try {
+      // Ensure NN is initialized
+      await ensureNNInitialized();
+
+      if (token.cancelled) {
+        setThinking(false);
+        return undefined;
+      }
+
+      // Get legal moves
+      const legalMoves = generateMoves(pos);
+      if (legalMoves.length === 0) {
+        setThinking(false);
+        return undefined;
+      }
+
+      // Evaluate position with NN
+      const { policyLogits, value } = await evaluateNN(pos);
+
+      if (token.cancelled) {
+        setThinking(false);
+        return undefined;
+      }
+
+      // Select best move
+      const bestMove = selectBestNNMove(policyLogits, legalMoves, pos);
+
+      // Create info for display
+      const info: SearchInfo = {
+        depth: 0, // NN doesn't use depth
+        score: Math.round(value * 100), // Convert to centipawn-like scale
+        nodes: 1, // Single NN evaluation
+        pv: bestMove ? [bestMove] : [],
+      };
+
+      setLastInfo(info);
+      setThinking(false);
+      if (onInfo) onInfo(info);
+
+      return bestMove;
+    } catch (error) {
+      console.error('NN inference error, falling back to minimax:', error);
+
+      // Show error to user
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      setTimeout(() => {
+        alert(`NN Error: ${errorMsg}\n\nFalling back to Expert Minimax (depth 12)`);
+      }, 100);
+
+      // Fallback to expert-level minimax (depth 12)
+      return runStrictOnMainThread(
+        pos,
+        5000,
+        historyHashes,
+        12,
+        token,
+        onInfo,
+        false,
+        'expert',
+      );
+    }
+  }, [runStrictOnMainThread]);
 
   const handleStrictResult = useCallback((
     best: Move | undefined,
@@ -232,9 +317,17 @@ export function useCodexEngine() {
     cancelRef.current = token;
     setThinking(true);
 
+    // Alpha NN mode: use neural network for move selection
+    if (difficulty === 'alpha') {
+      return runNeuralNetwork(pos, token, onInfo, historyHashes);
+    }
+
     const noTimeLimit = !Number.isFinite(ms) || ms <= 0;
     // Hybrid mode removed - fall back to strict mode
-    const maxDepth = difficulty === 'easy' ? 4 : difficulty === 'normal' ? 6 : difficulty === 'hard' ? 9 : 12;
+    const maxDepth = difficulty === 'easy' ? 4
+      : difficulty === 'normal' ? 6
+      : difficulty === 'hard' ? 9
+      : 12;
     const budgetMs = noTimeLimit ? 0 : Math.max(350, ms);
 
     return runStrictOnMainThread(
@@ -247,7 +340,7 @@ export function useCodexEngine() {
       noTimeLimit,
       difficulty as StrictDifficulty,
     );
-  }, [cancel]);
+  }, [cancel, runNeuralNetwork, runStrictOnMainThread]);
 
   const thinkStrict = useCallback((
     pos: Position,

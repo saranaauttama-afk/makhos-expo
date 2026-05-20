@@ -34,7 +34,12 @@
       }
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "onnxruntime-react-native"
+    ],
+    "assetBundlePatterns": [
+      "assets/**/*",
+      "models/**/*"
     ]
   }
 }
