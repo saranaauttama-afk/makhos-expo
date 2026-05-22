@@ -4,6 +4,14 @@ React Native app for Thai Checkers (หมากฮอส) with two AI agents: h
 
 ---
 
+## Swift rewrite foundation
+
+- Native Swift rewrite scaffolding now lives in `/tmp/workspace/saranaauttama-afk/makhos-expo/swift-native`
+- Core Thai checkers rules are being ported there first as `MakhosCore`
+- Run the Swift validation suite with `cd /tmp/workspace/saranaauttama-afk/makhos-expo/swift-native && swift test`
+
+---
+
 ## Native iOS workflow
 
 - The Expo app now checks in a generated native iOS project under `/ios`.
