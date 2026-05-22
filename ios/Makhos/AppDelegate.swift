@@ -13,11 +13,11 @@ public class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    let delegate = ReactNativeDelegate()
-    let factory = ExpoReactNativeFactory(delegate: delegate)
-    delegate.dependencyProvider = RCTAppDependencyProvider()
+    let reactDelegate = ReactNativeDelegate()
+    let factory = ExpoReactNativeFactory(delegate: reactDelegate)
+    reactDelegate.dependencyProvider = RCTAppDependencyProvider()
 
-    reactNativeDelegate = delegate
+    reactNativeDelegate = reactDelegate
     reactNativeFactory = factory
     bindReactNativeFactory(factory)
 
