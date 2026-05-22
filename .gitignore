@@ -41,7 +41,6 @@ yarn-error.*
 .claude/
 
 # generated native folders
-/ios
 /android
 makhos/
 
