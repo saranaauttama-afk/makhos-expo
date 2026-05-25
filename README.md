@@ -4,6 +4,24 @@ React Native app for Thai Checkers (หมากฮอส) with two AI agents: h
 
 ---
 
+## Swift rewrite foundation
+
+- Native Swift rewrite scaffolding now lives in `/tmp/workspace/saranaauttama-afk/makhos-expo/swift-native`
+- Core Thai checkers rules are being ported there first as `MakhosCore`
+- Run the Swift validation suite with `cd /tmp/workspace/saranaauttama-afk/makhos-expo/swift-native && swift test`
+
+---
+
+## Native iOS workflow
+
+- The Expo app now checks in a generated native iOS project under `/ios`.
+- Refresh the native project after Expo config changes with `npm run prebuild:ios`.
+- Run the native app on macOS with `npm run ios`.
+- Trigger cloud builds with `npm run build:ios:preview` or `npm run build:ios:prod`.
+- Submit a production build with `npm run submit:ios:prod`.
+
+---
+
 ## Game Rules
 
 Thai Checkers on an 8×8 board, dark squares only (32 playable squares).

@@ -27,8 +27,12 @@
     "profile:ai": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/profile-ai scripts/profileAiHotspots.ts && node .tmp/profile-ai/scripts/profileAiHotspots.js",
     "bench:nn": "npx tsx scripts/benchmarkNNvsMinimax.ts",
     "bench:nn:speed": "npx tsx scripts/benchmarkNNvsMinimax.ts --speed",
+    "prebuild:ios": "expo prebuild --platform ios --no-install",
+    "build:ios:preview": "eas build --platform ios --profile preview",
+    "build:ios:prod": "eas build --platform ios --profile production",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:prod": "eas build --platform android --profile production",
+    "submit:ios:prod": "eas submit --platform ios --profile production",
     "submit:android:prod": "eas submit --platform android --profile production"
   },
   "dependencies": {

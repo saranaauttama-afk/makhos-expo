@@ -160,7 +160,7 @@ export function useCodexEngine() {
         'expert',
       );
     }
-  }, [runStrictOnMainThread]);
+  }, []);
 
   const handleStrictResult = useCallback((
     best: Move | undefined,
