@@ -1,4 +1,5 @@
 import { B1 } from '../src/coreClaude/bitboards';
+import { createHash } from 'crypto';
 import { applyMove, generateMoves, Move } from '../src/coreClaude/movegen';
 import { initialPosition, Position } from '../src/coreClaude/position';
 import { hashPosition } from '../src/coreClaude/search/zobrist';
@@ -7,6 +8,8 @@ import { TOURNAMENT_START_SUITE } from './tournamentStartSuite';
 
 export const POSITION_CASE_SCHEMA_VERSION = 'makhos-position-case-schema-v1' as const;
 export const POSITION_SUITE_VERSION = 'makhos-position-suite-v1' as const;
+/** Updated only together with a new reviewed suite version/content freeze. */
+export const POSITION_SUITE_V1_FINGERPRINT = 'f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30';
 export const CANONICAL_POSITION_NODE_BUDGET = 5_000;
 export const DIAGNOSTIC_POSITION_DEPTH = 4;
 
@@ -20,7 +23,7 @@ export type ExpectedResult =
   | { type: 'wdl'; outcome: 'win' | 'draw' | 'loss'; expectedPv?: ExpectedMove[] }
   | { type: 'forced-legal-only'; move: ExpectedMove; expectedPv?: ExpectedMove[] }
   | { type: 'unlabeled' };
-export interface ExpectedMove { from: number; to: number; captured?: number[] }
+export interface ExpectedMove { from: number; to: number; captured?: number[]; path?: number[]; promote?: boolean }
 export interface Provenance {
   kind: 'rule-derived' | 'deterministic-trace' | 'legacy-handcrafted' | 'external';
   reference: string;
@@ -98,7 +101,9 @@ function positionStructurallyLegal(p: Position): boolean {
 }
 function moveMatches(move: Move, expected: ExpectedMove): boolean {
   return move.from === expected.from && move.to === expected.to &&
-    (expected.captured === undefined || expected.captured.join(',') === move.captured.join(','));
+    (expected.captured === undefined || expected.captured.join(',') === move.captured.join(',')) &&
+    (expected.path === undefined || expected.path.join(',') === (move.path ?? []).join(',')) &&
+    (expected.promote === undefined || expected.promote === move.promote);
 }
 function legacyMotifs(type: string): Motif[] {
   if (type.includes('promotion')) return ['promotion race'];
@@ -149,6 +154,26 @@ function strategicCases(): PositionCase[] {
 export const POSITION_SUITE: readonly PositionCase[] = Object.freeze([
   ...exactCases, ...LEGACY_PUZZLE_AUDIT, ...strategicCases(),
 ]);
+
+/** Canonical frozen content deliberately excludes descriptive provenance/motifs,
+ * but includes every field whose mutation could leak or alter a scored label. */
+export function suiteContentManifest(cases: readonly PositionCase[] = POSITION_SUITE): unknown[] {
+  return cases.map(c => ({
+    id: c.id,
+    split: c.split,
+    position: {
+      side: c.position.side, p1Men: c.position.p1Men >>> 0, p1Kings: c.position.p1Kings >>> 0,
+      p2Men: c.position.p2Men >>> 0, p2Kings: c.position.p2Kings >>> 0,
+      halfmoveClock: c.position.halfmoveClock,
+    },
+    historyHashes: [...c.historyHashes],
+    validation: c.validation,
+    expected: c.expected,
+  }));
+}
+export function suiteContentFingerprint(cases: readonly PositionCase[] = POSITION_SUITE): string {
+  return createHash('sha256').update(JSON.stringify(suiteContentManifest(cases))).digest('hex');
+}
 
 export function canonicalStateKey(c: PositionCase): string {
   const p = c.position;

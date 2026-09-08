@@ -71,7 +71,7 @@ Goal: make “stronger” statistically defensible.
 
 ## Position suites
 
-- [x] Freeze evidence-gated **development** and immutable **holdout** v1 sets; exact state/history leakage is tested. The 14 provenance-poor historical puzzles remain diagnostic rather than truth.
+- [x] Freeze evidence-gated **development** and immutable **holdout** v1 sets with a canonical content fingerprint; exact state/history leakage and default case-level holdout blinding are tested. The 14 provenance-poor historical puzzles remain diagnostic rather than truth.
 - [x] Add the Phase 2B motif taxonomy without forcing uncertain tags.
 - [x] Add unlabeled strategic positions from replayable deterministic legal traces, explicitly separated from verified tactical truth.
 - [x] Report verified development/holdout and per-motif denominators separately from legacy/provisional diagnostics.
@@ -79,7 +79,8 @@ Goal: make “stronger” statistically defensible.
 **Exit gate:** any future engine patch can be A/B tested without manually modifying source between opponents.
 
 **Phase 2 status:** **READY TO CLOSE.** Phase 2A supplies paired A/B testing and
-Phase 2B supplies reproducible, leakage-checked position measurement. The
+Phase 2B supplies reproducible, leakage-checked position measurement with
+evidence-only W/D/L adjudication and full capture-path artifact identity. The
 verified v1 corpus is intentionally small and is not a strength claim.
 Sequential/SPRT and distributed execution remain later optional scale work.
 

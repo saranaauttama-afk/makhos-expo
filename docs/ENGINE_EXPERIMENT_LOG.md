@@ -454,6 +454,29 @@ gates make future position measurements reproducible without calling engine
 labels truth. The baseline does not demonstrate or claim a strength improvement,
 and it is not Teacher v1. SPRT/distributed testing remains optional later work.
 
+### Review correction — measurement semantics and holdout freeze
+
+Review found that the initial runner compared generic search-score sign with
+W/D/L, serialized only the numeric from/to move key, and froze v1 only by its
+version string. These were measurement-correctness defects, not engine defects.
+
+- W/D/L now requires direct repetition/inactivity or terminal-rule evidence,
+  or an actually resolved deterministic exact-oracle result. Ordinary positive,
+  zero, and negative heuristic scores cannot adjudicate W/D/L; unresolved W/D/L
+  rows are unscored.
+- JSON retains the complete chosen move and CSV uses a signature containing
+  from/to, captured sequence, path, and promotion.
+- V1 freezes scored/leakage-relevant content with SHA-256
+  `f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30`.
+- Default artifacts omit all holdout case rows while retaining aggregate
+  accuracy. Detailed rows require `--reveal-holdout`; the canonical initial
+  baseline invokes that evaluation-only option explicitly.
+
+Regression tests include positive/negative heuristic-score non-proof, direct
+threefold adjudication, same-endpoint capture identity, fingerprint mutation,
+and default holdout redaction. Corpus membership and baseline scores remain
+unchanged. No engine defaults or strength parameters changed.
+
 ---
 
 # Experiment template
