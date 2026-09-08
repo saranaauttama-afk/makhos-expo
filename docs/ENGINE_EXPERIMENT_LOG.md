@@ -286,6 +286,58 @@ Phase 1 is **not ready to close**. The broader Thai-rules/state re-audit remains
 
 ---
 
+## EXP-2026-004 — Phase 1C final correctness audit
+
+**Status:** KEEP (correctness only; no playing-strength claim)
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `cd840ed1802d29776d362e13c8968da96f1c45c5` (merge PR #5)
+
+**Candidate commit:** recorded by the Phase 1C pull request
+
+### Scope and rule evidence
+
+The audit started at the requested PR #5 merge commit. This checkout has no configured Git remote, so upstream freshness beyond that exact commit could not be queried; the commit is nevertheless the documented `engine-mainline` merge baseline. Source, executable perft fixtures, and existing regression history were treated as project-rule evidence over generic draughts assumptions.
+
+The new focused suite covers mandatory capture; preservation of multiple equal maximum captures; complete multi-capture moves; forward-only movement/capture for men; crowning only after a complete move; flying-king quiet rays; the project-specific first-empty-square landing after a flying-king capture; no-move and elimination terminals; threefold repetition; 32-ply inactivity; 16-ply kings-only inactivity; capture reset and quiet increment of `halfmoveClock`; and draw/history interactions with capture and promotion. No move-generation or state-transition bug was found. The potentially variant rules (maximum capture, forward-only man capture, delayed crowning, and immediate king landing) are explicitly locked to current source plus pre-existing perft/rule behavior rather than claimed as universal Thai-checkers rules.
+
+### Production small-endgame correctness bug and fix
+
+The production solver could publish `exact: true` without a proof:
+
+1. its shared memo key contained only the current board repetition count, so the same board could reuse a result across different prior histories;
+2. DFS back-edges and the 60-ply horizon became draws;
+3. completed descendants survived a timed-out call in shared cache, so wall-clock scheduling/cache warmth could change a later exact answer.
+
+A full-history production memo had already demonstrated state explosion in Phase 1A. Phase 1C therefore chooses the conservative design rather than a large tablebase rewrite: production probing now returns exact results only for explicit repetition/inactivity draws, terminal losses, and directly verified mate-in-one moves. Every other eligible endgame returns incomplete (`undefined`) and safely falls through to regular search. Cache warmth and deadlines can no longer create a production exact claim. The full-history, fixed-node deterministic solver remains the bounded regression oracle.
+
+The cross-check set contains an exact king-vs-man win, a terminal loss, repetition and inactivity draws, the same winning board under threefold history, and an unresolved king-vs-men position. Whenever production returns exact, outcome and best-move semantics agree with the deterministic oracle; unresolved production calls are explicitly accepted as fall-through.
+
+### Search correctness verification
+
+The Phase 1B TT suite continues to cover bound semantics, mate-distance normalization, collision/occupancy behavior, interrupted-store protection, warmed-TT reuse, and all eight pruning feature flags with production-equivalent `true` defaults. Fixed-depth/fixed-node runs remain repeatable, and qsearch continues through mandatory captures rather than standing pat. No evaluation weight, pruning threshold, search margin, benchmark answer, or feature default changed.
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run test:rules` | PASS — 3,501 checks |
+| `npm run test:perft` | PASS — 8/8; initial 7/49/392 |
+| `npm run test:tactical` | PASS — 8 checks |
+| `npm run test:search-determinism` | PASS — 14 assertions; both modes 5/5 identical |
+| `npm run test:tt-correctness` | PASS — 36 assertions |
+| `npm run test:tablebase-determinism` | PASS — 4 assertions and 20 repeated runs |
+| `npm run test:phase1c` | PASS — 20 focused assertions |
+| `npm run regression:harness` | WARN — no fatal reasons; one repeated 137-point miss at all levels |
+| `npx tsc --noEmit` | ENVIRONMENT LIMITATION — installed tree lacks `@expo-google-fonts/kanit` and `expo-av`; not recorded as PASS |
+
+### Decision
+
+**Phase 1 READY TO CLOSE.** The audit leaves no known correctness bug. Opportunistic production endgame coverage is intentionally narrower, which is a performance/strength opportunity rather than a correctness blocker. The engine is ready for Phase 2 measurement and A/B infrastructure; Phase 2 work is deliberately not started here. Puzzle quality, Elo evidence, and pruning-strength uncertainty are not Phase 1 blockers.
+
+---
+
 # Experiment template
 
 Copy this section for each experiment.

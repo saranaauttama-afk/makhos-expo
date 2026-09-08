@@ -187,25 +187,34 @@ export function probeSmallEndgame(
     repetitionCounts.set(hash, 1);
   }
 
-  // Fast path: if precompute already cached this exact state, return instantly
-  const repCount = Math.min(3, getRepetitionCount(repetitionCounts, hash));
-  const fastKey = stateKey(pos, repCount);
-  const cached = sharedMemo.get(fastKey);
-  if (cached) {
-    return { score: scoreFromSolve(cached), best: findBestMove(pos, cached.bestMoveKey), dtm: cached.dtm, exact: true };
+  // Phase 1C safety boundary: the legacy recursive/shared-cache solver does
+  // not encode the complete repetition history in its memo key. Its depth cap
+  // and DFS back-edge handling also used to turn incomplete work into a draw.
+  // Consequently neither a cache hit nor finishing before a wall-clock
+  // deadline is sufficient evidence for an exact game-theoretic result.
+  //
+  // Keep production probing deliberately small and prove only rule-terminal
+  // states and mate-in-one captures. Everything else falls through to normal
+  // search. `maxMs` remains in the API for compatibility, but correctness no
+  // longer depends on scheduling or cache warmth.
+  void maxMs;
+  if (isDrawByInactivity(pos) || isThreefoldRepetition(repetitionCounts, hash)) {
+    return { score: 0, dtm: 0, exact: true };
   }
 
-  // Slow path: compute with time budget so we never hang mid-game
-  const deadline = Date.now() + maxMs;
-  const result = solveNodeBudgeted(pos, repetitionCounts, new Set<string>(), 0, deadline);
-  if (!result) return undefined; // budget exceeded
+  const moves = generateMoves(pos);
+  if (!moves.length) {
+    return { score: -TABLEBASE_WIN, dtm: 0, exact: true };
+  }
 
-  return {
-    score: scoreFromSolve(result),
-    best: findBestMove(pos, result.bestMoveKey),
-    dtm: result.dtm,
-    exact: true,
-  };
+  for (const move of moves) {
+    const child = applyMove(pos, move);
+    if (generateMoves(child).length === 0) {
+      return { score: TABLEBASE_WIN - 1, best: move, dtm: 1, exact: true };
+    }
+  }
+
+  return undefined;
 }
 
 /** Fixed-work, history-complete oracle intended for regression fixtures. */
