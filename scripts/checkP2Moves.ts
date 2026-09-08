@@ -11,8 +11,7 @@ console.log(p1Moves.slice(0, 7).map(m => `${m.from}->${m.to}`).join(', '));
 // Apply P1: 25->22
 const move25_22 = p1Moves.find(m => m.from === 25 && m.to === 22);
 if (!move25_22) {
-  console.log('ERROR: 25->22 not legal!');
-  process.exit(1);
+  throw new Error('25->22 not legal!');
 }
 
 const afterP1 = applyMove(pos, move25_22);

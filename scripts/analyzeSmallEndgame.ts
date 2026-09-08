@@ -99,7 +99,7 @@ async function main() {
   console.log('');
   console.log('Static Evaluation:');
   const breakdown = evaluateWithBreakdown(position);
-  console.log(`  Total: ${breakdown.score}`);
+  console.log(`  Total: ${breakdown.finalScore}`);
   console.log(`  Material: ${breakdown.material}`);
   console.log(`  PSQT: ${breakdown.psqt}`);
   console.log(`  Mobility: ${breakdown.mobility}`);
