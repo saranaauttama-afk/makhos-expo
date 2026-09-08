@@ -656,10 +656,11 @@ function negamax(
   const hit = tt.get(ttKey, ttVerifyKey);
   let ttMove = hit?.move ?? -1; // let — may be updated by IID below
   if (hit && hit.depth >= depth && getRepetitionCount(rep, h) <= 1) {
-    if (hit.bound === Bound.EXACT) return hit.score;
-    if (hit.bound === Bound.LOWER) alpha = Math.max(alpha, hit.score);
-    else                           beta  = Math.min(beta,  hit.score);
-    if (alpha >= beta) return hit.score;
+    const ttScore = scoreFromTT(hit.score, ply);
+    if (hit.bound === Bound.EXACT) return ttScore;
+    if (hit.bound === Bound.LOWER) alpha = Math.max(alpha, ttScore);
+    else                           beta  = Math.min(beta,  ttScore);
+    if (alpha >= beta) return ttScore;
   }
 
   const moves = generateMoves(pos);
@@ -678,12 +679,12 @@ function negamax(
       // Reverse Futility Pruning (Static Null Move):
       // If static eval is way above beta even after subtracting a depth-scaled
       // margin, our position is so good the opponent will avoid this line.
-      if (depth <= 4 && se - 120 * depth >= beta) return se;
+      if (activeFeatures.reverseFutility && depth <= 4 && se - 120 * depth >= beta) return se;
 
       // Razoring:
       // If static eval is way below alpha even after adding a generous margin,
       // drop to quiescence — the position is likely a dead loss for us.
-      if (depth <= 2) {
+      if (activeFeatures.razoring && depth <= 2) {
         const margin = depth === 1 ? 350 : 550;
         if (se + margin < alpha) {
           const q = quiesce(pos, alpha - 1, alpha, deadline, acc, ply, rep);
@@ -695,7 +696,9 @@ function negamax(
       // Skip our turn and let the opponent move twice. If the position is still
       // >= beta, we can prune — our position is too good to refute.
       // Only in quiet nodes (can't pass on forced captures), not near mate.
-      if (nullOk && depth >= 3 && beta < INF - MAX_PLY && se >= beta) {
+      const inactivityLimit = pos.p1Men === 0 && pos.p2Men === 0 ? 16 : 32;
+      const nullMoveDrawSafe = pos.halfmoveClock + 2 < inactivityLimit;
+      if (activeFeatures.nullMove && nullMoveDrawSafe && nullOk && depth >= 3 && beta < INF - MAX_PLY && se >= beta) {
         const R = depth >= 6 ? 3 : 2;
         const nullPos: Position = { ...pos, side: (-pos.side) as 1 | -1 };
         // Don't push nullPos to rep — it's a synthetic position, not a real game state
@@ -708,7 +711,7 @@ function negamax(
     // At deep nodes with forced captures, try the top-3 captures at a much
     // shallower depth with a wide beta.  If any scores >= pcBeta, we can
     // safely apply a full beta cutoff without searching deeper.
-    if (!isQuiet && depth >= 5) {
+    if (activeFeatures.probCut && !isQuiet && depth >= 5) {
       const pcBeta  = Math.min(INF - ply, beta + 200);
       const pcDepth = depth - 4;
       // Linear top-3 scan — no allocation, no sort
@@ -744,7 +747,7 @@ function negamax(
   // so IID cost is not worth it.  Cap at depth 4 to keep the sub-search cheap.
   // iidOk=false on the sub-search prevents cascading IID.
   const isPV = beta > alpha + 1;
-  if (ttMove === -1 && depth >= 5 && ply > 0 && isPV && iidOk && Date.now() <= deadline) {
+  if (activeFeatures.iid && ttMove === -1 && depth >= 5 && ply > 0 && isPV && iidOk && Date.now() <= deadline) {
     negamax(pos, Math.min(depth - 2, 4), alpha, beta, tt, deadline, acc, ply, rep, false, prevMoveKey, false);
     const iidHit = tt.get(ttKey, ttVerifyKey);
     if (iidHit?.move != null) ttMove = iidHit.move;
@@ -766,21 +769,21 @@ function negamax(
 
     // Extensions
     let d = depth - 1;
-    if (single) d = Math.min(depth, d+1);       // our only move — extend
-    if (total <= 5) d = Math.min(depth, d+1);   // endgame ext
+    if (activeFeatures.extensions && single) d = Math.min(depth, d+1);       // our only move — extend
+    if (activeFeatures.extensions && total <= 5) d = Math.min(depth, d+1);   // endgame ext
 
     // LMR — skip if opponent will have forced captures (sacrifice/tactic position).
     // hasCapturesAvailable is O(pieces) vs full generateMoves, avoiding double movegen.
     const opHasCaptures = isQ && hasCapturesAvailable(child);
-    d = extendTacticalDepth(depth, d, m, opHasCaptures, ply);
+    if (activeFeatures.extensions) d = extendTacticalDepth(depth, d, m, opHasCaptures, ply);
     const fullD = d;
-    if (i >= 3 && d >= 2 && isQ && !single && !opHasCaptures) {
+    if (activeFeatures.lmr && i >= 3 && d >= 2 && isQ && !single && !opHasCaptures) {
       d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
     }
 
     // Late Move Pruning (LMP): at very shallow depth, stop searching quiet
     // moves beyond a threshold — they're very unlikely to raise alpha.
-    if (isQ && !single && depth <= 2 && i >= (depth === 1 ? 6 : 10) && alpha > -INF + MAX_PLY) break;
+    if (activeFeatures.lmp && isQ && !single && depth <= 2 && i >= (depth === 1 ? 6 : 10) && alpha > -INF + MAX_PLY) break;
 
     pushRepetition(rep, ch);
     const mk = moveKey(m); // move key — passed as prevMoveKey to child nodes
@@ -921,15 +924,15 @@ export async function iterativeDeepening(
         const isQ    = m.captured.length === 0;
 
         let d = depth - 1;
-        if (single) d = Math.min(depth, d+1);
-        if (total <= 5) d = Math.min(depth, d+1);
+        if (activeFeatures.extensions && single) d = Math.min(depth, d+1);
+        if (activeFeatures.extensions && total <= 5) d = Math.min(depth, d+1);
         // LMR at root — skip on tactical positions (opponent has forced captures)
         const opCapRoot = isQ && hasCapturesAvailable(child);
-        d = extendTacticalDepth(depth, d, m, opCapRoot, 0);
-        if (rootLowMobilityExtension > 0) d = Math.min(depth + rootLowMobilityExtension, d + rootLowMobilityExtension);
-        if (isSoundForcedTrap(root, m)) d = Math.min(depth + 2, d + 2);
+        if (activeFeatures.extensions) d = extendTacticalDepth(depth, d, m, opCapRoot, 0);
+        if (activeFeatures.extensions && rootLowMobilityExtension > 0) d = Math.min(depth + rootLowMobilityExtension, d + rootLowMobilityExtension);
+        if (activeFeatures.extensions && isSoundForcedTrap(root, m)) d = Math.min(depth + 2, d + 2);
         const fullD = d;
-        if (i >= 3 && d >= 2 && isQ && !single && !opCapRoot) {
+        if (activeFeatures.lmr && i >= 3 && d >= 2 && isQ && !single && !opCapRoot) {
           d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
         }
 
@@ -1009,10 +1012,10 @@ export async function iterativeDeepening(
         const isQ = candidate.move.captured.length === 0;
         let d = Math.max(1, reached - 1);
         const total = bitCount(child.p1Men | child.p1Kings | child.p2Men | child.p2Kings);
-        if (total <= 5) d = Math.min(reached, d + 1);
-        d = extendTacticalDepth(reached, d, candidate.move, isQ && hasCapturesAvailable(child), 0);
-        if (isSoundForcedTrap(root, candidate.move)) d = Math.min(reached + 2, d + 2);
-        if (candidate.move.captured.length >= 2) d = Math.min(reached + 1, d + 1);
+        if (activeFeatures.extensions && total <= 5) d = Math.min(reached, d + 1);
+        if (activeFeatures.extensions) d = extendTacticalDepth(reached, d, candidate.move, isQ && hasCapturesAvailable(child), 0);
+        if (activeFeatures.extensions && isSoundForcedTrap(root, candidate.move)) d = Math.min(reached + 2, d + 2);
+        if (activeFeatures.extensions && candidate.move.captured.length >= 2) d = Math.min(reached + 1, d + 1);
 
         pushRepetition(rep, ch);
         const score = -negamax(child, d, -INF, INF, tt, deadline, verifyAcc, 1, rep, true, moveKey(candidate.move));
