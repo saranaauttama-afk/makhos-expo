@@ -38,7 +38,9 @@
     "profile:ai": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/profile-ai scripts/profileAiHotspots.ts && node .tmp/profile-ai/scripts/profileAiHotspots.js",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:prod": "eas build --platform android --profile production",
-    "submit:android:prod": "eas submit --platform android --profile production"
+    "submit:android:prod": "eas submit --platform android --profile production",
+    "test:phase3b": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3b scripts/phase3bExtensionTest.ts && node .tmp/phase3b/scripts/phase3bExtensionTest.js",
+    "experiment:extension-ablation": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/extension-ablation-build scripts/extensionAblationRunner.ts && node .tmp/extension-ablation-build/scripts/extensionAblationRunner.js"
   },
   "dependencies": {
     "@expo-google-fonts/kanit": "^0.4.1",
