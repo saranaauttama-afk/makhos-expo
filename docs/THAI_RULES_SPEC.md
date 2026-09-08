@@ -23,8 +23,17 @@ capture paths. Network access to retrieve archival copies was unavailable in
 the audit environment; these references and that access limitation are
 recorded rather than replacing them with inference from source code.
 
-Reference locator: FMJD, *A Guide to Checkers Families and Rules*, Thai
-(Makhos) rules, `https://www.fmjd.org/downloads/variants/Checkers_families_and_rules.pdf`.
+External rule-page references used by this audit:
+
+- FMJD, *A Guide to Checkers Families and Rules*, “Thai draughts (Makhos)”
+  entry, capture-priority table and Thai-rules section:
+  `https://www.fmjd.org/downloads/variants/Checkers_families_and_rules.pdf`.
+- Thai Sports Association, *กติกาการเล่นหมากฮอสไทย* (“Thai Checkers
+  Rules”), rule-page section **การกิน** (“Capturing”), including the hos/king
+  multiple-capture free-choice paragraph. This is the exact Thai rule-page
+  reference identified in the Phase 1C review; the audit environment could not
+  retrieve the external page to verify a stable public URL, so no guessed URL
+  is recorded.
 
 ## Board, pieces, and movement
 
@@ -80,4 +89,3 @@ alter game-theoretic results and requires a separate evidence-backed rules PR.
   alternatives mean uniqueness must not be inferred from old move generation.
 - Search orders captures by length as a heuristic. Ordering does not remove
   shorter legal captures and therefore is not capture priority.
-
