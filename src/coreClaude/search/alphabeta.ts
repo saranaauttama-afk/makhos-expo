@@ -16,7 +16,9 @@ import {
   buildRepetitionCounts, getRepetitionCount, isThreefoldRepetition,
   popRepetition, pushRepetition, RepetitionCounts,
 } from './repetition';
-import { hashPosition, verifyHashPosition } from './zobrist';
+import {
+  hashPosition, hashSearchState, verifyHashSearchState,
+} from './zobrist';
 
 export interface SearchInfo  { depth: number; score: number; nodes: number; pv: Move[]; }
 export interface RootSearchCandidate { move: Move; score: number; }
@@ -28,10 +30,18 @@ export interface SearchResult {
   depth: number;
   elapsedMs: number;
   timedOut: boolean;
+  pv: Move[];
+  limitReached?: 'nodes';
   overrideReason?: string;
   rootCandidates?: RootSearchCandidate[];
 }
 export interface CancelToken  { cancelled: boolean; }
+export interface DeterministicSearchOptions {
+  /** Exact completed iterative-deepening depth; wall clock is ignored. */
+  depth?: number;
+  /** Maximum combined main-search and qsearch nodes; wall clock is ignored. */
+  nodes?: number;
+}
 export type RootMoveScores = ReadonlyMap<number, number>;
 type OnInfo = (info: SearchInfo) => void;
 type RootCandidate = RootSearchCandidate;
@@ -76,6 +86,19 @@ const ENABLE_LOW_MOBILITY_EXACT_TIEBREAK =
 // All levels check this at the top of negamax so the search unwinds immediately
 // once time is up, rather than waiting for each level's own TC_MASK checkpoint.
 const stop = { flag: false };
+let activeNodeLimit: number | undefined;
+let activeNodeCount = 0;
+
+function enterNode(acc: {n:number; q:number}, kind: 'main' | 'q'): boolean {
+  if (activeNodeLimit !== undefined && activeNodeCount >= activeNodeLimit) {
+    stop.flag = true;
+    return false;
+  }
+  activeNodeCount++;
+  if (kind === 'main') acc.n++;
+  else acc.q++;
+  return true;
+}
 
 const killers0    = new Int32Array(MAX_PLY).fill(-1);
 const killers1    = new Int32Array(MAX_PLY).fill(-1);
@@ -519,25 +542,37 @@ function updateKillers(m: Move, ply: number) {
   if (killers0[ply] !== k) { killers1[ply] = killers0[ply]; killers0[ply] = k; }
 }
 
-function getPV(pos: Position, tt: TT, max = 10): Move[] {
+function getPV(pos: Position, tt: TT, repetitions: RepetitionCounts, max = 64): Move[] {
   const pv: Move[] = []; let cur = pos;
+  const pvRepetitions = new Map(repetitions);
   for (let i = 0; i < max; i++) {
-    const hit = tt.get(hashPosition(cur), verifyHashPosition(cur)); if (!hit || hit.move == null) break;
+    const hit = tt.get(hashSearchState(cur, pvRepetitions), verifyHashSearchState(cur, pvRepetitions));
+    if (!hit || hit.move == null) break;
     const mv = generateMoves(cur).find(m => moveKey(m) === hit.move!); if (!mv) break;
     pv.push(mv); cur = applyMove(cur, mv);
+    pushRepetition(pvRepetitions, hashPosition(cur));
   }
   return pv;
+}
+
+function getRootPV(root: Position, best: Move | undefined, tt: TT, repetitions: RepetitionCounts): Move[] {
+  if (!best) return [];
+  const child = applyMove(root, best);
+  const childRepetitions = new Map(repetitions);
+  pushRepetition(childRepetitions, hashPosition(child));
+  return [best, ...getPV(child, tt, childRepetitions, 63)];
 }
 
 // ── Quiescence ───────────────────────────────────────────────────────────────
 function quiesce(
   pos: Position, alpha: number, beta: number,
   deadline: number, acc: {n:number; q:number}, ply: number,
-  lastCapSquare = -1
+  rep: RepetitionCounts, lastCapSquare = -1
 ): number {
-  acc.q++;
+  if (!enterNode(acc, 'q')) return _eval(pos);
   if (stop.flag) return _eval(pos);
-  if (isDrawByInactivity(pos)) return 0;
+  const h = hashPosition(pos);
+  if (isDrawByInactivity(pos) || isThreefoldRepetition(rep, h)) return 0;
   if (ply >= MAX_PLY) return _eval(pos);
 
   const moves = generateMoves(pos);
@@ -582,11 +617,13 @@ function quiesce(
   for (const m of caps) {
     if (stop.flag) break;
     if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) { stop.flag = true; break; }
-    acc.n++;
-
     // Pass the captured square to detect recaptures in the next level
     const nextLastCapSquare = m.captured.length > 0 ? m.from : -1;
-    const score = -quiesce(applyMove(pos, m), -beta, -alpha, deadline, acc, ply+1, nextLastCapSquare);
+    const child = applyMove(pos, m);
+    const childHash = hashPosition(child);
+    pushRepetition(rep, childHash);
+    const score = -quiesce(child, -beta, -alpha, deadline, acc, ply+1, rep, nextLastCapSquare);
+    popRepetition(rep, childHash);
     if (score >= beta) return beta;
     if (score > alpha) alpha = score;
   }
@@ -599,8 +636,10 @@ function negamax(
   deadline: number, acc: {n:number; q:number}, ply: number, rep: RepetitionCounts,
   nullOk = true, prevMoveKey = -1, iidOk = true,
 ): number {
+  if (!enterNode(acc, 'main')) return _eval(pos);
   const h = hashPosition(pos);
-  const hv = verifyHashPosition(pos);
+  const ttKey = hashSearchState(pos, rep);
+  const ttVerifyKey = verifyHashSearchState(pos, rep);
   if (isDrawByInactivity(pos) || isThreefoldRepetition(rep, h)) return 0;
 
   // NOTE: endgame tablebase probe intentionally removed from hot path —
@@ -611,10 +650,10 @@ function negamax(
   if (ply >= MAX_PLY) return _eval(pos);
   if (stop.flag) return _eval(pos);
   if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) { stop.flag = true; return _eval(pos); }
-  if (depth <= 0) return quiesce(pos, alpha, beta, deadline, acc, ply);
+  if (depth <= 0) return quiesce(pos, alpha, beta, deadline, acc, ply, rep);
 
   // TT probe
-  const hit = tt.get(h, hv);
+  const hit = tt.get(ttKey, ttVerifyKey);
   let ttMove = hit?.move ?? -1; // let — may be updated by IID below
   if (hit && hit.depth >= depth && getRepetitionCount(rep, h) <= 1) {
     if (hit.bound === Bound.EXACT) return hit.score;
@@ -647,7 +686,7 @@ function negamax(
       if (depth <= 2) {
         const margin = depth === 1 ? 350 : 550;
         if (se + margin < alpha) {
-          const q = quiesce(pos, alpha - 1, alpha, deadline, acc, ply);
+          const q = quiesce(pos, alpha - 1, alpha, deadline, acc, ply, rep);
           if (q < alpha) return q;
         }
       }
@@ -689,7 +728,6 @@ function negamax(
         const child = applyMove(pos, m);
         const ch    = hashPosition(child);
         pushRepetition(rep, ch);
-        acc.n++;
         tried++;
         const s = -negamax(child, pcDepth, -pcBeta, -(pcBeta - 1), tt, deadline, acc, ply + 1, rep, true, moveKey(m));
         popRepetition(rep, ch);
@@ -708,7 +746,7 @@ function negamax(
   const isPV = beta > alpha + 1;
   if (ttMove === -1 && depth >= 5 && ply > 0 && isPV && iidOk && Date.now() <= deadline) {
     negamax(pos, Math.min(depth - 2, 4), alpha, beta, tt, deadline, acc, ply, rep, false, prevMoveKey, false);
-    const iidHit = tt.get(h, hv);
+    const iidHit = tt.get(ttKey, ttVerifyKey);
     if (iidHit?.move != null) ttMove = iidHit.move;
   }
 
@@ -756,8 +794,6 @@ function negamax(
       }
     }
     popRepetition(rep, ch);
-    acc.n++;
-
     if (score > best) { best = score; bestKey = mk; }
     if (score > alpha) { alpha = score; }
     if (alpha >= beta) {
@@ -773,7 +809,7 @@ function negamax(
 
   const bound: Bound = best <= a0 ? Bound.UPPER : best >= b0 ? Bound.LOWER : Bound.EXACT;
   if (getRepetitionCount(rep, h) <= 1)
-    tt.put({ key: h, verifyKey: hv, depth, score: best, move: bestKey >= 0 ? bestKey : undefined, bound });
+    tt.put({ key: ttKey, verifyKey: ttVerifyKey, depth, score: best, move: bestKey >= 0 ? bestKey : undefined, bound });
   return best;
 }
 
@@ -784,9 +820,14 @@ export async function iterativeDeepening(
   maxDepth = 24,
   rootMoveScores?: RootMoveScores,
   diversifyRoot = false,
+  deterministic?: DeterministicSearchOptions,
 ): Promise<SearchResult> {
   rootOverrideStats.searches++;
-  const deadline  = Date.now() + timeMs;
+  if (deterministic?.depth !== undefined && deterministic.nodes !== undefined)
+    throw new Error('fixed-depth and fixed-node limits are mutually exclusive');
+  const isDeterministic = deterministic?.depth !== undefined || deterministic?.nodes !== undefined;
+  const effectiveMaxDepth = deterministic?.depth ?? maxDepth;
+  const deadline  = isDeterministic ? Number.POSITIVE_INFINITY : Date.now() + timeMs;
   const startTime = Date.now();
   const rootHash  = hashPosition(root);
   const normHist  = historyHashes.length ? historyHashes : [rootHash];
@@ -794,11 +835,16 @@ export async function iterativeDeepening(
 
   killers0.fill(-1); killers1.fill(-1);
   counterMove.fill(-1);                                       // reset per-search
-  for (let i = 0; i < history.length; i++) history[i] >>= 1; // age history
+  if (isDeterministic) history.fill(0);
+  else for (let i = 0; i < history.length; i++) history[i] >>= 1; // age history
   stop.flag = false;                                          // clear stop flag
+  activeNodeLimit = deterministic?.nodes === undefined
+    ? undefined
+    : Math.max(1, Math.floor(deterministic.nodes));
+  activeNodeCount = 0;
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [] };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
@@ -809,13 +855,13 @@ export async function iterativeDeepening(
     : allRootKings && totalRootPieces <= 4
       ? Math.min(900, Math.max(350, Math.floor(timeMs * 0.45)))
       : Math.min(500, Math.floor(timeMs * 0.3));
-  const eg = probeSmallEndgame(root, normHist, probeMs);
+  const eg = isDeterministic ? undefined : probeSmallEndgame(root, normHist, probeMs);
   // Only shortcut when we have an actual move — draw positions at the depth
   // limit store bestMoveKey = NO_MOVE_KEY so eg.best would be undefined.
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best] };
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
@@ -828,7 +874,7 @@ export async function iterativeDeepening(
   // Adaptive time: track how many consecutive depths produced the same best move
   let stableDepths = 0, lastBestKey = -1;
 
-  for (let depth = 1; depth <= maxDepth; depth++) {
+  for (let depth = 1; depth <= effectiveMaxDepth; depth++) {
     // Yield to the JS event loop between depth iterations so React Native can
     // process layout/input events and the UI doesn't freeze.
     await new Promise<void>(r => setTimeout(r, 0));
@@ -845,8 +891,9 @@ export async function iterativeDeepening(
       // Run root search (first move full window, rest PVS)
       const moves = generateMoves(root);
       if (!moves.length) break;
-      const rootHashVerify = verifyHashPosition(root);
-      const ordered = orderMoves(root, moves, tt.get(rootHash, rootHashVerify)?.move ?? -1, 0, -1, rootMoveScores);
+      const rootTTKey = hashSearchState(root, rep);
+      const rootTTVerifyKey = verifyHashSearchState(root, rep);
+      const ordered = orderMoves(root, moves, tt.get(rootTTKey, rootTTVerifyKey)?.move ?? -1, 0, -1, rootMoveScores);
       const rootLowMobility = ordered.length <= 3 && totalRootPieces <= 8 && moves[0].captured.length === 0;
       const rootLowMobilityExtension = rootLowMobility && depth >= 4
         ? (totalRootPieces <= 6 ? 4 : 2)
@@ -863,7 +910,7 @@ export async function iterativeDeepening(
         if ((i & 1) === 1) {
           await new Promise<void>(r => setTimeout(r, 0));
         }
-        if (cancel?.cancelled) break;
+        if (cancel?.cancelled || stop.flag) break;
         if ((acc.n & TC_MASK) === 0 && Date.now() > deadline) break;
         const m      = ordered[i];
         const child  = applyMove(root, m);
@@ -896,8 +943,6 @@ export async function iterativeDeepening(
             score = -negamax(child, fullD, -beta, -alpha, tt, deadline, acc, 1, rep, true, mk);
         }
         popRepetition(rep, ch);
-        acc.n++;
-
         rootCandidates.push({ move: m, score });
         if (score > rootBest) {
           rootBest = score;
@@ -921,7 +966,7 @@ export async function iterativeDeepening(
       qnodes += acc.q;
       result = { move: rootMove, score: rootBest, candidates: rootCandidates };
 
-      if (cancel?.cancelled || Date.now() > deadline) break;
+      if (cancel?.cancelled || stop.flag || Date.now() > deadline) break;
       if (rootBest <= (haveLast ? lastScore - winSize : -INF)) {
         winSize = Math.min(INF, winSize * 2); alpha = Math.max(-INF, (haveLast ? lastScore : 0) - winSize); continue;
       }
@@ -931,20 +976,20 @@ export async function iterativeDeepening(
       break;
     }
 
-    if (cancel?.cancelled || Date.now() > deadline) break;
+    if (cancel?.cancelled || stop.flag || Date.now() > deadline) break;
     if (result.move) { best = result.move; bestScore = result.score; reached = depth; }
     if (result.candidates?.length) {
       lastRootCandidates = result.candidates;
       lastRootScore = result.score;
     }
     lastScore = result.score; haveLast = true;
-    onInfo?.({ depth, score: bestScore, nodes, pv: getPV(root, tt) });
+    onInfo?.({ depth, score: bestScore, nodes, pv: getRootPV(root, best, tt, rep) });
 
     // Adaptive time: if the best move hasn't changed for 3+ depths and we've
     // used ≥50% of the time budget, the search has converged — stop early.
     const newBestKey = result.move ? moveKey(result.move) : -1;
     if (newBestKey === lastBestKey) { stableDepths++; } else { stableDepths = 0; lastBestKey = newBestKey; }
-    if (stableDepths >= 3 && Date.now() > startTime + timeMs * 0.5) break;
+    if (!isDeterministic && stableDepths >= 3 && Date.now() > startTime + timeMs * 0.5) break;
   }
 
   // Disabling this override caused tactical regression during Phase B.1 experiment.
@@ -954,7 +999,7 @@ export async function iterativeDeepening(
     // Before adding opening variety, re-check the top root alternatives with a
     // wide window. This catches occasional aspiration / ordering artifacts at
     // the root without paying the cost for every legal move.
-    if (reached >= 5 && Date.now() + 50 < deadline && !cancel?.cancelled) {
+    if (reached >= 5 && activeNodeLimit === undefined && Date.now() + 50 < deadline && !cancel?.cancelled) {
       const verifyAcc = { n: 0, q: 0 };
       const updated = [...lastRootCandidates];
       for (const candidate of candidateWindow(lastRootCandidates, bestScore, 95)) {
@@ -972,8 +1017,6 @@ export async function iterativeDeepening(
         pushRepetition(rep, ch);
         const score = -negamax(child, d, -INF, INF, tt, deadline, verifyAcc, 1, rep, true, moveKey(candidate.move));
         popRepetition(rep, ch);
-        verifyAcc.n++;
-
         const idx = updated.findIndex(c => moveKey(c.move) === moveKey(candidate.move));
         if (idx >= 0) updated[idx] = { move: candidate.move, score };
         if (score > bestScore) {
@@ -1074,8 +1117,33 @@ export async function iterativeDeepening(
     qnodes,
     depth: reached,
     elapsedMs: Date.now() - startTime,
-    timedOut: stop.flag || Date.now() > deadline,
+    timedOut: !isDeterministic && (stop.flag || Date.now() > deadline),
+    pv: getRootPV(root, best, tt, rep),
+    limitReached: activeNodeLimit !== undefined && activeNodeCount >= activeNodeLimit ? 'nodes' : undefined,
     overrideReason,
     rootCandidates: lastRootCandidates,
   };
+}
+
+export function fixedDepthSearch(
+  root: Position,
+  depth: number,
+  tt = new TT(),
+  historyHashes: number[] = [],
+  onInfo?: OnInfo,
+): Promise<SearchResult> {
+  if (!Number.isInteger(depth) || depth < 1) throw new Error(`depth must be a positive integer, got ${depth}`);
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth });
+}
+
+export function fixedNodeSearch(
+  root: Position,
+  nodes: number,
+  tt = new TT(),
+  historyHashes: number[] = [],
+  maxDepth = 64,
+  onInfo?: OnInfo,
+): Promise<SearchResult> {
+  if (!Number.isInteger(nodes) || nodes < 1) throw new Error(`nodes must be a positive integer, got ${nodes}`);
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes });
 }

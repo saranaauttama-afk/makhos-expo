@@ -40,15 +40,15 @@ Goal: remove subtle search bugs before tuning evaluation.
 
 - [ ] Re-audit Thai capture rules, multi-capture, promotion timing, flying king behavior, mandatory capture, no-legal-move result, repetition and inactivity draw.
 - [ ] Add targeted regression fixtures for every discovered rule bug.
-- [ ] Verify position hashing includes every state component that can change the game-theoretic result. In particular, audit draw-related clock/history handling with TT.
+- [x] Verify position hashing includes every state component that can change the game-theoretic result. Phase 1A split board/repetition identity from TT search-state keys and covered inactivity clock plus full repetition context.
 
 ## Search correctness
 
-- [ ] Audit quiescence search under mandatory-capture rules; prove/test whether stand-pat is legal in all reached qsearch states.
+- [x] Audit quiescence search under mandatory-capture rules; Phase 1A proves stand-pat is used only at quiet nodes and adds repetition accounting throughout forced capture continuations.
 - [ ] Audit TT bounds, score normalization, mate/terminal score handling and collision safeguards.
 - [ ] Audit null move, ProbCut, razoring, RFP, LMR, LMP, IID and extensions for Thai-checkers-specific tactical risk.
 - [ ] Add feature flags for major pruning mechanisms so each can be ablated independently.
-- [ ] Add deterministic fixed-depth and fixed-node test modes in addition to wall-clock mode.
+- [x] Add deterministic fixed-depth and fixed-node test modes in addition to wall-clock mode. Phase 1A repeats both modes five times and compares move, score, main/q nodes, depth and PV.
 
 **Exit gate:** no known correctness bug; pruning can be toggled and tested independently; deterministic search modes exist.
 
