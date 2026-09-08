@@ -403,6 +403,84 @@ unchanged.
 
 ---
 
+## EXP-2026-006 — Phase 2B verified position-suite baseline
+
+**Status:** KEEP (measurement infrastructure; no strength claim)
+
+**Date:** 2026-09-08
+
+**Engine commit tested:** `04d0d2f569ef77e411079f25125b0fb1b4e72ef6`
+(merge PR #7; suite code changes no engine evaluation/search parameters)
+
+**Suite/schema:** `makhos-position-suite-v1` /
+`makhos-position-case-schema-v1`
+
+**Canonical budget:** fixed nodes, 5,000 maximum combined main/qsearch nodes per
+case; fresh TT and complete recorded history per case.
+
+### Corpus and audit
+
+- Verified development: 2 rule-exact cases.
+- Verified holdout: 2 disjoint rule-exact cases.
+- Verified diagnostic: 1 explicit history-sensitive threefold draw.
+- Unresolved/unverified: 14 `legacy-unverified` puzzles plus 4 unlabeled
+  deterministic-trace strategic positions.
+- Of the 14 legacy expected moves, 4 are legal and 10 illegal at the current
+  root. None has evidence for bestness or uniqueness. No label was repaired.
+- No legacy root has capture choices of differing lengths; effects of the old
+  maximum-capture assumption deeper in the undocumented claimed lines remain
+  unresolved.
+
+### Post-Phase-1 position-suite baseline
+
+| Measurement | Result |
+|---|---:|
+| Development verified | 2/2 |
+| Holdout verified | 2/2 |
+| Diagnostic verified repetition | 1/1 |
+| Legacy/unverified diagnostic rows | 14 |
+| Unlabeled strategic rows | 4 |
+
+Verified motif results were: forced capture 4/4, king technique 3/3,
+endgame conversion 3/3, low mobility 1/1, and draw/repetition 1/1. Other
+taxonomy motifs have a verified denominator of zero and are not reported as
+accuracy evidence. Wall time/NPS were recorded in the untracked raw artifact,
+not treated as deterministic.
+
+### Decision
+
+**KEEP. Phase 2 READY TO CLOSE.** The schema, split, audit, runner and regression
+gates make future position measurements reproducible without calling engine
+labels truth. The baseline does not demonstrate or claim a strength improvement,
+and it is not Teacher v1. SPRT/distributed testing remains optional later work.
+
+### Review correction — measurement semantics and holdout freeze
+
+Review found that the initial runner compared generic search-score sign with
+W/D/L, serialized only the numeric from/to move key, and froze v1 only by its
+version string. These were measurement-correctness defects, not engine defects.
+
+- W/D/L now requires direct repetition/inactivity or terminal-rule evidence,
+  or an actually resolved deterministic exact-oracle result. Ordinary positive,
+  zero, and negative heuristic scores cannot adjudicate W/D/L; unresolved W/D/L
+  rows are unscored.
+- JSON retains the complete chosen move and CSV uses a signature containing
+  from/to, captured sequence, path, and promotion.
+- V1 freezes scored/leakage-relevant content with SHA-256
+  `f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30`.
+- Default artifacts omit all holdout case rows while retaining aggregate
+  accuracy. Blinded per-motif statistics also exclude holdout cases, preventing
+  singleton motif buckets from disclosing verdicts indirectly. Detailed rows
+  and full motif statistics require `--reveal-holdout`; the canonical initial
+  baseline invokes that evaluation-only option explicitly.
+
+Regression tests include positive/negative heuristic-score non-proof, direct
+threefold adjudication, same-endpoint capture identity, fingerprint mutation,
+and default holdout redaction. Corpus membership and baseline scores remain
+unchanged. No engine defaults or strength parameters changed.
+
+---
+
 # Experiment template
 
 Copy this section for each experiment.
