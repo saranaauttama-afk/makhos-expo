@@ -1,0 +1,22 @@
+import { strict as assert } from 'node:assert';
+import { DEFAULT_SEARCH_FEATURES } from '../src/coreClaude/search/alphabeta';
+import { classifyAblation, frozenStageDefaults, loadSearchAblationConfig, SEARCH_ABLATION_FEATURES } from './searchAblationRunner';
+import { generateSearchAblationStartSuite, searchAblationSuiteFingerprint } from './tournamentStartSuite';
+
+const a=generateSearchAblationStartSuite(), b=generateSearchAblationStartSuite();
+assert.deepEqual(a,b); assert.equal(a.starts.length,64);
+assert.equal(new Set(a.starts.map(s=>JSON.stringify(s.position))).size,64);
+assert.ok(a.starts.every(s=>s.openingMoves.length>=2&&s.openingMoves.length<=17));
+const config=loadSearchAblationConfig();
+const reviewedFingerprint='c85cf600fb83b4c4d36efe22e28b68ef5f879378ec152010eda45df97e50e57e';
+assert.equal(searchAblationSuiteFingerprint(a),reviewedFingerprint,'v1 corpus content changed without a version/fingerprint review');
+assert.equal(config.startSuiteFingerprint,reviewedFingerprint);
+assert.equal(config.startSuite,a.version); assert.equal(config.seed,a.seed);
+assert.deepEqual(config.features,SEARCH_ABLATION_FEATURES);
+assert.deepEqual(frozenStageDefaults(config,'screening'),{pairedStarts:32,nodesPerMove:5000,maxDepth:64,maxPlies:160});
+assert.deepEqual(frozenStageDefaults(config,'confirmation'),{pairedStarts:64,nodesPerMove:5000,maxDepth:64,maxPlies:160});
+assert.deepEqual(SEARCH_ABLATION_FEATURES,Object.keys(DEFAULT_SEARCH_FEATURES));
+assert.equal(classifyAblation([.40,.49]),'likely beneficial');
+assert.equal(classifyAblation([.51,.60]),'likely harmful');
+assert.equal(classifyAblation([.45,.55]),'inconclusive');
+console.log('PASS search ablation infrastructure: frozen 64-start corpus, flags, and verdict boundaries');

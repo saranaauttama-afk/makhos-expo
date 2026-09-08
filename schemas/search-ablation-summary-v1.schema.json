@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "makhos-search-ablation-summary-v1",
+  "type": "object",
+  "required": ["schemaVersion", "protocol", "results"],
+  "properties": {
+    "schemaVersion": { "const": "makhos-search-ablation-summary-v1" },
+    "protocol": { "type": "object" },
+    "results": { "type": "array", "items": { "type": "object", "required": ["featureDisabled", "verdict", "summary", "baselineMetrics", "candidateMetrics"] } }
+  }
+}

@@ -94,6 +94,7 @@ Work one hypothesis at a time and keep only measured wins.
 
 ## Search
 
+- [-] Measure the Phase 3A one-at-a-time search-feature ablation baseline before tuning; reproducible 64-start corpus and fixed-node runner are complete, while conclusions depend on the recorded screening/confirmation evidence.
 - [ ] Move-ordering ablations: TT move, captures, killers, history, countermove, recapture ordering.
 - [ ] Tune LMR based on measured strength, not only speed.
 - [ ] Tune/select pruning thresholds using tournaments and tactical regressions.
