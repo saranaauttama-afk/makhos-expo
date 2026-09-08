@@ -14,13 +14,20 @@ The `makhos-search-ablation-starts-v1` corpus contains 64 deterministic legal
 positions generated with xorshift32 seed `0x3341424c`. Each stores its complete
 legal 2–17-ply replay sequence, is deduplicated by complete position state, and
 is played once with each engine as each color. It is generated experiment data,
-not a Thai opening book and makes no opening-theory claim.
+not a Thai opening book and makes no opening-theory claim. The reviewed v1
+content fingerprint is SHA-256
+`c85cf600fb83b4c4d36efe22e28b68ef5f879378ec152010eda45df97e50e57e`;
+it covers ordered IDs, optional initial states, complete ordered move identities
+(capture sequence, path, and promotion included), and final complete states.
 
 Screen all eight flags on at least 32 paired starts at 5,000 nodes per move.
 Confirm only one or two hypotheses on all 64 paired starts at equal 5,000 or
 10,000 nodes. The runner records actual completed pairs, unresolved games, and
 errors; incomplete pairs are excluded from score statistics rather than treated
-as draws. Raw JSON/CSV goes under ignored `.tmp/search-ablation/`.
+as draws. `config/search-ablation-v1.json` is authoritative: the runner loads
+the selected stage from it, CLI flags are explicit overrides, and summary
+metadata records protocol/config versions plus all effective parameters. Raw
+JSON/CSV goes under ignored `.tmp/search-ablation/`.
 
 ## Feature audit (defaults are all enabled)
 

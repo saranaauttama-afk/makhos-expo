@@ -483,7 +483,7 @@ unchanged. No engine defaults or strength parameters changed.
 
 # Experiment template
 
-## EXP-2026-006 — Phase 3A search-feature ablation baseline
+## EXP-2026-007 — Phase 3A search-feature ablation baseline
 
 **Status:** KEEP infrastructure and evidence; NEEDS MORE DATA before any production change
 
@@ -526,15 +526,16 @@ ProbCut 6,607,999/467,312; IID 6,382,021/517,220; LMR
 3,970,242/2,242,840. NPS is retained in the machine-readable raw summary but
 is diagnostic only because fixed-node strength does not depend on wall clock.
 
-### Confirmation and diagnostic
+### Expanded-corpus evidence and diagnostic
 
-The sole confirmation candidate was `extensions=false`: 64/64 paired starts
+The sole expanded-corpus candidate was `extensions=false`: 64/64 paired starts
 (128 games), equal 5,000 nodes per move, maximum 160 plies; all pairs completed
 with zero unresolved/errors. Candidate W/D/L was **110/5/13**, score **87.89%**,
 estimated Elo **+344.3**, pair-bootstrap 95% CI **[+273.2, +438.4]**. Candidate
 average depth was **12.47**, with 7,779,030 main and 4,441,253 qnodes across
-the run. This repeats the screening direction but does not authorize changing
-the default.
+the run. This expands the same generated v1 screening corpus from its first 32
+starts to all 64 and repeats the direction, but it is **not** an independent
+Phase 3B confirmation and does not authorize changing the default.
 
 A depth-4 diagnostic over eight pairs proved impractical in this environment:
 grouped extensions expand forced/endgame lines beyond nominal depth and the run
@@ -562,8 +563,9 @@ Expo/font modules, not an engine TypeScript error.
 large and directionally repeated, but uncertainty remains about which member of
 the grouped extension switch causes the loss, corpus representativeness, and
 the relationship between equal nodes and mobile wall-clock cost. Phase 3B must
-split extension subtypes and test exactly one controlled hypothesis, repeat all
-gates with that candidate, and confirm it independently. Do **not** disable the
+test exactly one controlled hypothesis, repeat all gates with that candidate,
+and confirm it using an independent corpus/seed or otherwise independent
+evidence. Do **not** disable the
 group in production from Phase 3A, combine it with another ablation, or call the
 result Teacher v1.
 

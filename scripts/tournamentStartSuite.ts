@@ -1,5 +1,6 @@
 import { Move, applyMove, generateMoves } from '../src/coreClaude/movegen';
 import { initialPosition, Position } from '../src/coreClaude/position';
+import { createHash } from 'node:crypto';
 
 export interface TournamentStart {
   id: string;
@@ -93,3 +94,23 @@ export function generateSearchAblationStartSuite(seed = 0x3341424c, count = 64):
 }
 
 export const SEARCH_ABLATION_START_SUITE = generateSearchAblationStartSuite();
+
+/** Canonical content identity includes replay identity rather than merely the
+ * generated final boards. Object field order below is part of fingerprint v1. */
+export function searchAblationSuiteFingerprint(suite: TournamentStartSuite): string {
+  const content = suite.starts.map(start => ({
+    id: start.id,
+    initialPosition: start.initialPosition ? {
+      side:start.initialPosition.side,p1Men:start.initialPosition.p1Men,p1Kings:start.initialPosition.p1Kings,
+      p2Men:start.initialPosition.p2Men,p2Kings:start.initialPosition.p2Kings,halfmoveClock:start.initialPosition.halfmoveClock,
+    } : null,
+    openingMoves: start.openingMoves.map(move => ({ from:move.from,to:move.to,captured:[...move.captured],
+      path:[...(move.path ?? [])],promote:move.promote })),
+    finalPosition: { side:start.position.side,p1Men:start.position.p1Men,p1Kings:start.position.p1Kings,
+      p2Men:start.position.p2Men,p2Kings:start.position.p2Kings,halfmoveClock:start.position.halfmoveClock },
+  }));
+  return createHash('sha256').update(JSON.stringify(content)).digest('hex');
+}
+
+export const SEARCH_ABLATION_START_SUITE_V1_FINGERPRINT =
+  searchAblationSuiteFingerprint(SEARCH_ABLATION_START_SUITE);
