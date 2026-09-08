@@ -1,7 +1,9 @@
-import { initialPosition } from '../src/coreClaude/position';
+import { initialPosition, Position } from '../src/coreClaude/position';
 import {
-  DEFAULT_SEARCH_FEATURES, fixedDepthSearch, fixedNodeSearch, moveKey, scoreFromTT, scoreToTT,
+  DEFAULT_SEARCH_FEATURES, fixedDepthScoreAtPlyForTesting, fixedDepthSearch, fixedNodeSearch,
+  moveKey, scoreFromTT, scoreToTT,
 } from '../src/coreClaude/search/alphabeta';
+import { B1 } from '../src/coreClaude/bitboards';
 import { Bound, TT, TT_CAPACITY } from '../src/coreClaude/search/tt';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -51,6 +53,21 @@ async function main() {
       checks++;
     }
   }
+
+  // Integration regression: this forced capture wins immediately. Warm the
+  // real negamax TT at one ply, then reuse it at another ply and compare with
+  // a fresh search. Raw TT storage would preserve the old mate distance.
+  const forcedWin: Position = {
+    side: 1, p1Men: 0, p1Kings: B1(18), p2Men: B1(14), p2Kings: 0, halfmoveClock: 0,
+  };
+  const mateTT = new TT();
+  const atPly3 = fixedDepthScoreAtPlyForTesting(forcedWin, 2, 3, mateTT);
+  const reusedAtPly9 = fixedDepthScoreAtPlyForTesting(forcedWin, 2, 9, mateTT);
+  const freshAtPly9 = fixedDepthScoreAtPlyForTesting(forcedWin, 2, 9, new TT());
+  assert(atPly3 === 999_996, `unexpected forced-win distance at ply 3: ${atPly3}`);
+  assert(reusedAtPly9 === 999_990 && reusedAtPly9 === freshAtPly9,
+    `cross-ply TT reuse corrupted mate distance: reused=${reusedAtPly9} fresh=${freshAtPly9}`);
+  checks += 2;
 
   const pos = initialPosition();
   const warmTT = new TT();

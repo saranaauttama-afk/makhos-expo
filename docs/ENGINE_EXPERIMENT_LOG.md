@@ -95,6 +95,197 @@ Not applicable until the reproducible candidate-vs-baseline A/B harness is estab
 
 ---
 
+## EXP-2026-001 — Phase 1A deterministic search correctness
+
+**Status:** KEEP (correctness/measurement only; not a strength promotion)
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `e0f6cc3` (Teacher v0 engine checkpoint remains `db28e143`)
+
+**Candidate commit:** `6dc23f1`
+
+### Hypothesis
+
+Fixed-work search and draw-complete TT keys make repeated measurements stable and prevent cached scores from crossing positions with different draw outcomes, without changing evaluation weights or pruning thresholds.
+
+### Bugs found and fixed
+
+1. `hashPosition` correctly served repetition identity but was also used as the TT key, so the TT could reuse a score across different `halfmoveClock` values and different prior repetition histories. Search now uses dual search-state keys containing board, side, inactivity clock, and the complete repetition count multiset; board-only hashes remain unchanged for repetition detection and opening-book identity.
+2. The small-endgame memo key contains only the current board's repetition count, not the complete history. A full-history key was tested but caused state-space explosion and wall-clock oracle timeouts, so that implementation was reverted. This remains a known issue requiring a deterministic solver redesign and dedicated regression oracle.
+3. Quiescence correctly forbade stand-pat when a capture was mandatory, but it neither checked nor updated threefold repetition during capture continuations. Qsearch now carries the same repetition state as main search and pushes/pops every forced capture.
+4. Search exposed only a callback PV capped at ten moves and returned no PV in `SearchResult`. Results now contain a legal root-first PV (up to the search ply cap), and the benchmark records PV length.
+
+### Deterministic guarantees
+
+- `fixedDepthSearch` ignores wall time, disables the budgeted root tablebase probe and adaptive-time early stop, resets history heuristics, and completes exactly the requested nominal iterative-deepening depth.
+- `fixedNodeSearch` applies one exact combined main+qsearch budget over all completed iterations and the final partial iteration. It reports `limitReached: "nodes"`, does not report a timeout, and retains the result of the last completed depth.
+- `npm run test:search-determinism` repeats each mode five times with a fresh TT and requires identical best move, score, main nodes, qnodes, completed depth, PV, and stopping reason. Phase 1A observed:
+
+| Mode | Runs | Best | Score | Main nodes | Qnodes | Completed depth | PV length |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| fixed depth 4 | 5 | 27→23 | 9 | 291 | 185 | 4 | 4 |
+| fixed 5,000 combined nodes | 5 | 27→23 | 21 | 3,165 | 1,835 | 5 | 5 |
+
+### Correctness and benchmark results
+
+| Check | Result |
+|---|---|
+| Rules | PASS — 3,501 checks |
+| Perft | PASS — 8/8; initial 7/49/392 |
+| Tactical core | PASS — 8 checks |
+| Deterministic suite | PASS — 14 assertions |
+| Quick tactical benchmark | gate thresholds pass — Easy/Normal/Expert 97% solved, Hard 100%; 0% blunder at every level |
+| Regression harness over quick report | WARN — no fatal reasons; one repeated medium miss plus three sub-1,000-point misses |
+| Full tactical benchmark | release gate FAIL at Expert; Easy 100/0, Normal–Expert 97/3 solved/blunder |
+
+The full run's `sac-two-win-three-p1` oracle changed its preferred move relative to the quick run: quick treated 7→2 as equal-best, while full treated that same move as a 999,640-point blunder behind 8→4. This is further evidence that the wall-clock oracle/tablebase path is not deterministic; it is recorded as a known measurement failure, not as proof that Phase 1A made the engine stronger or weaker.
+
+### Nodes, qnodes, depth and PV analysis
+
+The Phase 1A full run averaged, from Easy through Expert, main nodes 72,999 / 180,531 / 326,890 / 750,962 and qnodes 777 / 2,023 / 1,851 / 4,387. Expert qnodes were only about 0.58% of its 755,349 combined nodes, so qsearch is not the reason for the near-million-node cost. The primary explanation is that reported nodes accumulate every iterative-deepening iteration, aspiration retry, and optional root verification, while the reported depth is only the last fully completed *nominal* iteration. Extensions can search individual forced/low-material/tactical branches beyond that nominal depth, and a partial next iteration consumes nodes without raising the reported depth. Full-run average completed depths were 2.5 / 2.9 / 3.4 / 3.5.
+
+The benchmark gained `pvLength`, but the full run above preceded that reporting field. The deterministic canonical checks measured PV lengths 4 and 5 for depth 4 and the 5,000-node run respectively; the follow-up quick run is the first wall-clock report that includes average PV length.
+
+### Known issues
+
+- Wall-clock production results and the endgame oracle remain unsuitable as deterministic correctness gates. The small-endgame memo still summarizes only the current-position repetition count; a complete-history prototype exhausted the oracle time budget. Fixed-work oracle fixtures and a scalable history-sensitive solver key are still required.
+- Full repetition context makes TT reuse more conservative and can reduce depth at a fixed time. This is a correctness tradeoff, not a strength claim.
+- The broader Phase 1 audits of TT bound/mate normalization and individual pruning mechanisms remain open; Phase 1A does not complete all of Phase 1.
+- Existing puzzle fixtures still lack provenance and a holdout set.
+
+### Decision
+
+**KEEP** the correctness and deterministic measurement infrastructure. Do not promote Teacher v0 or claim increased playing strength from this change.
+
+---
+
+
+## EXP-2026-002 — Phase 1B TT, oracle and pruning correctness audit
+
+**Status:** KEEP (correctness infrastructure; NEEDS MORE DATA for every strength effect)
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `6dc23f1`
+
+**Implementation commit:** `55df3c1e37aa7af7957655ef2301642a914f25eb`
+
+### Scope and constraints
+
+No evaluation weight, pruning margin, reduction table, or promotion threshold changed. Phase 1B adds correctness guards, deterministic oracle infrastructure and independent feature controls. It is not a Teacher strength promotion.
+
+### TT audit and fixes
+
+- **EXACT/LOWER/UPPER:** probe semantics are correct: EXACT returns directly, LOWER raises alpha, UPPER lowers beta, and cutoff returns the decoded TT score. Entries classify against the original alpha/beta window. All three bounds now have direct round-trip fixtures.
+- **Empty/collision verification bug fixed:** a zero-filled `Int32Array` fabricated a valid EXACT entry for primary key 0 and verification key 0. TT now has an explicit occupancy bitmap. Tests also cover same-index primary collisions, verification mismatch, clearing, and deeper-entry replacement protection.
+- **Mate/terminal normalization fixed:** terminal scores encode distance using the current ply (`±INF ∓ ply`) but were stored raw, so the same TT position retrieved at another ply had the wrong mate distance. `scoreToTT`/`scoreFromTT` now normalize on store/probe; quiet scores remain unchanged.
+- **Interrupted entry bug fixed:** a timeout or fixed-node stop could unwind and publish a provisional bound from a partially searched node. TT stores are now suppressed whenever the shared stop flag is set.
+- **Iterative reuse:** a depth-3-warmed TT and a fresh TT agree on depth-5 root score/best move. A TT retained after a 300-node stopped search agrees with a clean depth-4 root score. Equal-score root move ordering may still differ when a pre-warmed TT supplies a different tie-order; this is not treated as a score correctness failure.
+
+`npm run test:tt-correctness` passes 34 assertions, including eight one-at-a-time feature-disable searches.
+
+### Tablebase/oracle audit
+
+Phase 1B separates three previously conflated sources of nondeterminism:
+
+1. `sac-two-win-three-p1` has 12 pieces and is outside `probeSmallEndgame`; its quick/full disagreement comes from the wall-clock search oracle reaching different completed work, not from a tablebase hit.
+2. Small endgames use a shared memo and a wall-clock deadline. A timed-out first probe can warm exact child entries, allowing a later identical wall-clock probe to complete differently. That API is appropriate as a production opportunistic probe but not as a deterministic gate.
+3. The legacy shared memo key includes `halfmoveClock` and only the current board's repetition count, not the complete repetition-history vector. Replacing it globally with a full-history key caused state-space explosion in Phase 1A, so the production solver still has this known limitation.
+
+`probeSmallEndgameDeterministic` is a new test/oracle path with a local memo, complete sorted repetition-count state, and an exact node limit. It never consults or warms the production shared cache. `npm run test:tablebase-determinism` repeats three fixtures five times each:
+
+| Fixture | Result | Nodes | Repeats |
+|---|---|---:|---:|
+| forced king capture | win, 18→9 captures 14, DTM 1 | 2 | 5/5 identical |
+| same board at threefold root | draw, no move | 1 | 5/5 identical |
+| `small-piece-king-vs-men`, node limit 1 | incomplete, explicit `limitReached` | 1 | 5/5 identical |
+
+This proves outcome/history/limit separation for the fixtures; it does not claim the current on-demand tablebase is complete or near-perfect.
+
+### Pruning and extension audit
+
+All defaults remain byte-for-byte equivalent except the null-move draw guard:
+
+- **Reverse futility and razoring:** restricted to quiet, non-root, non-repeated positions; still heuristic and require fixed-work ablation evidence.
+- **Null move:** already excluded forced-capture nodes. Phase 1B additionally disables it when the synthetic pass could approach/cross the 32-ply inactivity limit or 16-ply all-kings limit. Synthetic null positions remain absent from repetition history by design.
+- **ProbCut:** only runs on mandatory-capture nodes at depth ≥5 and returns a fail-high lower-bound cutoff. It remains tactically risky and independently disableable.
+- **LMR/LMP:** already avoid forced captures; LMR also avoids quiet sacrifices that give the opponent a forced capture. Neither is proven strength-safe, so both remain ablation targets.
+- **IID:** only supplies ordering at PV nodes, prevents recursive IID, and is independently disableable.
+- **Extensions:** single-move, low-material, tactical, trap and root-verification extensions are grouped behind one independent switch. MAX_PLY remains the termination backstop. Splitting extension subtypes can be Phase 2 work if attribution requires it.
+
+`SearchFeatureFlags` independently controls `reverseFutility`, `razoring`, `nullMove`, `probCut`, `iid`, `lmr`, `lmp`, and `extensions`; fixed-depth/fixed-node callers can pass overrides without environment variables or source edits.
+
+### Verification results
+
+| Command | Result |
+|---|---|
+| `npm run test:rules` | PASS — 3,501 checks |
+| `npm run test:perft` | PASS — 8/8; initial 7/49/392 |
+| `npm run test:tactical` | PASS — 8 checks |
+| `npm run test:search-determinism` | PASS — 14 assertions; both modes 5/5 identical |
+| `npm run test:tt-correctness` | PASS — 34 assertions |
+| `npm run test:tablebase-determinism` | PASS — 3 assertions and 15 repeated fixture runs |
+| `npm run bench:ai:fresh` | PASS thresholds — all four levels 100% solved / 0% blunder |
+| `npm run regression:harness` | PASS — no warnings or fatal reasons |
+
+Quick benchmark averages (wall-clock, therefore observational rather than deterministic):
+
+| Level | Avg ms | Avg depth | Main nodes | Qnodes | Avg PV |
+|---|---:|---:|---:|---:|---:|
+| easy | 88 | 1.6 | 3,685 | 68 | 5.6 |
+| normal | 125 | 2.2 | 7,530 | 111 | 5.4 |
+| hard | 158 | 2.9 | 14,436 | 112 | 5.9 |
+| expert | 315 | 3.4 | 41,249 | 281 | 5.7 |
+
+### Decision and remaining issues
+
+**KEEP** the TT occupancy fix, mate-distance normalization, interrupted-store guard, null-move draw guard, deterministic oracle, tests, and feature flags. **NEEDS MORE DATA** applies to playing strength and every future feature ablation.
+
+Remaining issues:
+
+- production `probeSmallEndgame` is still wall-clock/shared-cache dependent and its memo key does not encode complete history;
+- the deterministic solver deliberately returns incomplete at its node limit and is only practical for bounded fixtures;
+- pre-warmed TT root ordering can choose a different move among equal scores;
+- pruning soundness is not proven by smoke tests; Phase 2 must run paired fixed-work ablations before Phase 3 tuning;
+- the puzzle corpus still lacks authoritative solutions and a holdout split.
+
+---
+
+## EXP-2026-003 — Phase 1B correctness follow-up after conflict recovery
+
+**Status:** KEEP (correctness fixes); NEEDS MORE DATA (playing strength)
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `ed00e9afbf5b639f27060741d4a9546d9f6c155c`
+
+**Reference-only stale commit:** `759af1b98a0987ce6f238927cec155c5828e14a4` (not cherry-picked)
+
+**Implementation commit:** `4e2e6e91afd72f5ad9fd6f1053ddadd21955d226`
+
+### Bugs found and fixes retained
+
+- Conflict resolution had dropped the three npm entry points and all eight Phase 1B search-feature controls. The scripts and flags were merged back onto current source. Defaults are all `true`, preserving the production paths and existing thresholds.
+- Negamax decoded mate scores with `scoreFromTT` but stored raw root-relative terminal scores. Every search TT write now uses `scoreToTT(best, ply)`, and stopped/partial searches do not publish a TT bound.
+- The deterministic oracle treated its depth horizon and DFS back-edges as exact draws. Node exhaustion, depth exhaustion and cycle detection now propagate as incomplete with a specific `limitReason`; only explicit inactivity/threefold rules produce draws. A proven winning child may still resolve a node, while loss/draw requires every child to resolve.
+
+### Regression evidence
+
+- TT suite: PASS, 36 assertions. In addition to normalization unit checks, a forced one-move win is searched through real negamax, stored at ply 3, reused at ply 9 and compared with a fresh ply-9 search (`999990` in both cases).
+- Deterministic oracle suite: PASS, 4 assertions and 20 repeated fixture runs. The node-limit fixture returns `nodes`; the new zero-depth fixture returns `depth`; both have no probe and therefore cannot claim `exact: true`. Threefold remains an exact draw and the forced capture remains an exact DTM-1 win.
+- Rules: PASS, 3,501 checks. Perft: PASS, 8/8 with initial counts 7/49/392. Tactical core: PASS, 8 checks. Search determinism: PASS, 14 assertions, five identical runs per mode.
+- Quick benchmark was run only to supply the regression harness input: Easy/Hard/Expert 100% solved, Normal 97%; 0% blunder at all levels. Harness classification was **WARN**, with one non-catastrophic 157-point Normal miss (`opening-bait-double-recapture-p1`) and no fatal reasons.
+- `npx tsc --noEmit` could not be completed after clean dependency installation was blocked by registry HTTP 403 / incomplete npm cache. The resulting partial install lacked React Native/Expo modules. This is an environment limitation, not recorded as a passing typecheck.
+
+### Decision and remaining issues
+
+**KEEP** the recovered infrastructure and correctness fixes. **NEEDS MORE DATA** for any strength effect; this work changes no evaluation weights or pruning thresholds and is not evidence that the engine became stronger.
+
+Phase 1 is **not ready to close**. The broader Thai-rules/state re-audit remains open, production `probeSmallEndgame` remains wall-clock/shared-cache dependent with an incomplete repetition-history memo key, and pruning soundness still needs paired fixed-work ablations. The dependency/lockfile installation warning also remains reproducible in this environment.
+
+---
+
 # Experiment template
 
 Copy this section for each experiment.

@@ -45,9 +45,9 @@ Goal: remove subtle search bugs before tuning evaluation.
 ## Search correctness
 
 - [x] Audit quiescence search under mandatory-capture rules; Phase 1A proves stand-pat is used only at quiet nodes and adds repetition accounting throughout forced capture continuations.
-- [ ] Audit TT bounds, score normalization, mate/terminal score handling and collision safeguards.
-- [ ] Audit null move, ProbCut, razoring, RFP, LMR, LMP, IID and extensions for Thai-checkers-specific tactical risk.
-- [ ] Add feature flags for major pruning mechanisms so each can be ablated independently.
+- [x] Audit TT bounds, score normalization, mate/terminal score handling and collision safeguards. Phase 1B added bound/collision/replacement/reuse fixtures, key-zero occupancy tracking, mate-distance normalization and stopped-search store protection.
+- [x] Audit null move, ProbCut, razoring, RFP, LMR, LMP, IID and extensions for Thai-checkers-specific tactical risk. Phase 1B recorded risks and prevents null move from crossing an imminent inactivity draw; strength/soundness ablations remain Phase 2/3 work.
+- [x] Add feature flags for major pruning mechanisms so each can be ablated independently. Phase 1B exposes independent reverse-futility, razoring, null-move, ProbCut, IID, LMR, LMP and extensions flags without changing default thresholds.
 - [x] Add deterministic fixed-depth and fixed-node test modes in addition to wall-clock mode. Phase 1A repeats both modes five times and compares move, score, main/q nodes, depth and PV.
 
 **Exit gate:** no known correctness bug; pruning can be toggled and tested independently; deterministic search modes exist.

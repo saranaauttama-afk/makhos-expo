@@ -15,11 +15,13 @@ function signature(result: ReturnType<typeof probeSmallEndgameDeterministic>): s
     dtm: result.probe?.dtm ?? null,
     nodes: result.nodes,
     limitReached: result.limitReached,
+    limitReason: result.limitReason ?? null,
   });
 }
 
-function repeat(name: string, pos: Position, history: number[], limit: number, runs = 5) {
-  const results = Array.from({ length: runs }, () => probeSmallEndgameDeterministic(pos, history, limit));
+function repeat(name: string, pos: Position, history: number[], limit: number, runs = 5, maxDepth?: number) {
+  const results = Array.from({ length: runs }, () =>
+    probeSmallEndgameDeterministic(pos, history, limit, maxDepth));
   const expected = signature(results[0]);
   for (const result of results.slice(1))
     assert(signature(result) === expected, `${name} changed: ${expected} != ${signature(result)}`);
@@ -48,6 +50,13 @@ function main() {
   const limited = repeat('fixed-node-timeout-separation', oracleRisk, [hashPosition(oracleRisk)], 1);
   assert(limited.limitReached && limited.probe === undefined && limited.nodes === 1,
     'node-limited oracle did not report deterministic incomplete result');
+  checks++;
+
+  const depthLimited = repeat('fixed-depth-horizon-separation', oracleRisk,
+    [hashPosition(oracleRisk)], 10_000, 5, 0);
+  assert(depthLimited.limitReached && depthLimited.limitReason === 'depth' &&
+    depthLimited.probe === undefined && depthLimited.nodes === 1,
+  'depth-limited oracle incorrectly reported an exact result');
   checks++;
 
   console.log(`tablebaseDeterminismSuite: ${checks} assertions passed`);

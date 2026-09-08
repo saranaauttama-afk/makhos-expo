@@ -31,6 +31,7 @@ export interface DeterministicEndgameResult {
   probe?: EndgameProbe;
   nodes: number;
   limitReached: boolean;
+  limitReason?: 'nodes' | 'depth' | 'cycle';
 }
 
 const TABLEBASE_WIN = 500_000;
@@ -212,9 +213,12 @@ export function probeSmallEndgameDeterministic(
   pos: Position,
   historyHashes: number[] = [],
   nodeLimit = 100_000,
+  maxDepth = SOLVE_MAX_DEPTH,
 ): DeterministicEndgameResult {
   if (!Number.isInteger(nodeLimit) || nodeLimit < 1)
     throw new Error(`nodeLimit must be a positive integer, got ${nodeLimit}`);
+  if (!Number.isInteger(maxDepth) || maxDepth < 0)
+    throw new Error(`maxDepth must be a non-negative integer, got ${maxDepth}`);
   if (!canProbe(pos)) return { nodes: 0, limitReached: false };
 
   const hash = hashPosition(pos);
@@ -223,30 +227,47 @@ export function probeSmallEndgameDeterministic(
   const memo = new Map<string, SolveResult>();
   const visiting = new Set<string>();
   let nodes = 0;
+  let incompleteReason: DeterministicEndgameResult['limitReason'];
 
   function solve(current: Position, depth: number): SolveResult | undefined {
-    if (nodes >= nodeLimit) return undefined;
+    if (nodes >= nodeLimit) {
+      incompleteReason ??= 'nodes';
+      return undefined;
+    }
     nodes++;
     const currentHash = hashPosition(current);
     const key = deterministicStateKey(current, repetitions);
     if (isDrawByInactivity(current) || isThreefoldRepetition(repetitions, currentHash))
       return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
-    if (depth >= SOLVE_MAX_DEPTH) return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    // A search horizon is not game evidence and must never become an exact draw.
+    if (depth >= maxDepth) {
+      incompleteReason ??= 'depth';
+      return undefined;
+    }
     const cached = memo.get(key);
     if (cached) return cached;
-    if (visiting.has(key)) return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    // A DFS back-edge is not itself a threefold repetition. Real repetition
+    // draws are handled above from the explicit history counts.
+    if (visiting.has(key)) {
+      incompleteReason ??= 'cycle';
+      return undefined;
+    }
     const moves = generateMoves(current);
     if (!moves.length) return { outcome: -1, dtm: 0, bestMoveKey: NO_MOVE_KEY };
 
     visiting.add(key);
     let best: SolveResult | undefined;
+    let sawIncomplete = false;
     for (const move of moves) {
       const child = applyMove(current, move);
       const childHash = hashPosition(child);
       pushRepetition(repetitions, childHash);
       const childResult = solve(child, depth + 1);
       popRepetition(repetitions, childHash);
-      if (!childResult) { visiting.delete(key); return undefined; }
+      if (!childResult) {
+        sawIncomplete = true;
+        continue;
+      }
       best = chooseBetter(best, {
         outcome: (-childResult.outcome) as Outcome,
         dtm: childResult.dtm + 1,
@@ -255,13 +276,20 @@ export function probeSmallEndgameDeterministic(
       if (best.outcome === 1 && best.dtm === 1) break;
     }
     visiting.delete(key);
-    const resolved = best ?? { outcome: 0 as Outcome, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    // A proven winning continuation resolves the node. A loss or draw is only
+    // exact after every legal continuation has resolved.
+    if (best?.outcome === 1) {
+      memo.set(key, best);
+      return best;
+    }
+    if (sawIncomplete) return undefined;
+    const resolved = best!;
     memo.set(key, resolved);
     return resolved;
   }
 
   const solved = solve(pos, 0);
-  if (!solved) return { nodes, limitReached: true };
+  if (!solved) return { nodes, limitReached: true, limitReason: incompleteReason ?? 'cycle' };
   return {
     nodes,
     limitReached: false,

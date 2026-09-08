@@ -42,6 +42,26 @@ export interface DeterministicSearchOptions {
   /** Maximum combined main-search and qsearch nodes; wall clock is ignored. */
   nodes?: number;
 }
+export interface SearchFeatureFlags {
+  reverseFutility: boolean;
+  razoring: boolean;
+  nullMove: boolean;
+  probCut: boolean;
+  iid: boolean;
+  lmr: boolean;
+  lmp: boolean;
+  extensions: boolean;
+}
+export const DEFAULT_SEARCH_FEATURES: Readonly<SearchFeatureFlags> = Object.freeze({
+  reverseFutility: true,
+  razoring: true,
+  nullMove: true,
+  probCut: true,
+  iid: true,
+  lmr: true,
+  lmp: true,
+  extensions: true,
+});
 export type RootMoveScores = ReadonlyMap<number, number>;
 type OnInfo = (info: SearchInfo) => void;
 type RootCandidate = RootSearchCandidate;
@@ -88,6 +108,19 @@ const ENABLE_LOW_MOBILITY_EXACT_TIEBREAK =
 const stop = { flag: false };
 let activeNodeLimit: number | undefined;
 let activeNodeCount = 0;
+let activeFeatures: SearchFeatureFlags = { ...DEFAULT_SEARCH_FEATURES };
+
+export function scoreToTT(score: number, ply: number): number {
+  if (score >= INF - MAX_PLY) return score + ply;
+  if (score <= -INF + MAX_PLY) return score - ply;
+  return score;
+}
+
+export function scoreFromTT(score: number, ply: number): number {
+  if (score >= INF - MAX_PLY) return score - ply;
+  if (score <= -INF + MAX_PLY) return score + ply;
+  return score;
+}
 
 function enterNode(acc: {n:number; q:number}, kind: 'main' | 'q'): boolean {
   if (activeNodeLimit !== undefined && activeNodeCount >= activeNodeLimit) {
@@ -811,9 +844,32 @@ function negamax(
   }
 
   const bound: Bound = best <= a0 ? Bound.UPPER : best >= b0 ? Bound.LOWER : Bound.EXACT;
-  if (getRepetitionCount(rep, h) <= 1)
-    tt.put({ key: ttKey, verifyKey: ttVerifyKey, depth, score: best, move: bestKey >= 0 ? bestKey : undefined, bound });
+  // A timeout/node-stop can unwind a partially searched node. Never publish
+  // that provisional bound to a caller-reused TT.
+  if (!stop.flag && getRepetitionCount(rep, h) <= 1)
+    tt.put({ key: ttKey, verifyKey: ttVerifyKey, depth, score: scoreToTT(best, ply), move: bestKey >= 0 ? bestKey : undefined, bound });
   return best;
+}
+
+/**
+ * Regression-only entry point for exercising the real negamax/TT integration
+ * when the same position is reached at different distances from a search root.
+ */
+export function fixedDepthScoreAtPlyForTesting(
+  pos: Position,
+  depth: number,
+  ply: number,
+  tt = new TT(),
+): number {
+  if (!Number.isInteger(depth) || depth < 1) throw new Error(`depth must be a positive integer, got ${depth}`);
+  if (!Number.isInteger(ply) || ply < 0 || ply >= MAX_PLY) throw new Error(`invalid ply ${ply}`);
+  const hash = hashPosition(pos);
+  const rep = buildRepetitionCounts([hash]);
+  stop.flag = false;
+  activeNodeLimit = undefined;
+  activeNodeCount = 0;
+  activeFeatures = { ...DEFAULT_SEARCH_FEATURES };
+  return negamax(pos, depth, -INF, INF, tt, Number.POSITIVE_INFINITY, { n: 0, q: 0 }, ply, rep);
 }
 
 // ── Iterative Deepening ──────────────────────────────────────────────────────
@@ -824,6 +880,7 @@ export async function iterativeDeepening(
   rootMoveScores?: RootMoveScores,
   diversifyRoot = false,
   deterministic?: DeterministicSearchOptions,
+  featureOverrides: Partial<SearchFeatureFlags> = {},
 ): Promise<SearchResult> {
   rootOverrideStats.searches++;
   if (deterministic?.depth !== undefined && deterministic.nodes !== undefined)
@@ -845,6 +902,7 @@ export async function iterativeDeepening(
     ? undefined
     : Math.max(1, Math.floor(deterministic.nodes));
   activeNodeCount = 0;
+  activeFeatures = { ...DEFAULT_SEARCH_FEATURES, ...featureOverrides };
 
   if (isThreefoldRepetition(rep, rootHash))
     return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [] };
@@ -1134,9 +1192,10 @@ export function fixedDepthSearch(
   tt = new TT(),
   historyHashes: number[] = [],
   onInfo?: OnInfo,
+  featureOverrides: Partial<SearchFeatureFlags> = {},
 ): Promise<SearchResult> {
   if (!Number.isInteger(depth) || depth < 1) throw new Error(`depth must be a positive integer, got ${depth}`);
-  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth });
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth }, featureOverrides);
 }
 
 export function fixedNodeSearch(
@@ -1146,7 +1205,8 @@ export function fixedNodeSearch(
   historyHashes: number[] = [],
   maxDepth = 64,
   onInfo?: OnInfo,
+  featureOverrides: Partial<SearchFeatureFlags> = {},
 ): Promise<SearchResult> {
   if (!Number.isInteger(nodes) || nodes < 1) throw new Error(`nodes must be a positive integer, got ${nodes}`);
-  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes });
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes }, featureOverrides);
 }
