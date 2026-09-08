@@ -311,7 +311,7 @@ function tacticalCases(): TacticalCase[] {
     },
     {
       id: 'max-capture-choice',
-      bucket: 'max-capture choice',
+      bucket: 'unequal capture choice',
       pos: makePosition({ side: 1, p1Men: B1(22) | B1(25), p2Men: B1(17) | B1(9) | B1(20) }),
     },
     {
@@ -401,12 +401,12 @@ function tacticalCases(): TacticalCase[] {
     },
     {
       id: 'max-capture-tie-p1',
-      bucket: 'max-capture tie',
+      bucket: 'multiple capture choice',
       pos: makePosition({ side: 1, p1Men: B1(23) | B1(26), p2Men: B1(18) | B1(10) | B1(21) | B1(14) }),
     },
     {
       id: 'max-capture-tie-king',
-      bucket: 'max-capture tie',
+      bucket: 'multiple capture choice',
       pos: makePosition({ side: 1, p1Kings: B1(27), p1Men: B1(30), p2Men: B1(22) | B1(13) | B1(18) }),
     },
     {

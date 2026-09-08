@@ -27,12 +27,22 @@ function outcome(score: number): number { return Math.sign(score); }
 function main() {
   let checks = 0;
 
-  // Project rule evidence encoded by movegen: captures are mandatory and only
-  // maximum-length sequences survive; men move and capture forward.
+  // Makhos captures are mandatory, but every complete sequence is a legal
+  // choice; there is no global majority-capture priority.
   const mandatory = pos({ side: 1, p1Men: B1(22) | B1(30), p2Men: B1(17) });
   const mandatoryMoves = generateMoves(mandatory);
   assert(mandatoryMoves.length === 1 && mandatoryMoves[0].captured.join(',') === '17',
     'mandatory capture leaked a quiet move'); checks++;
+
+  const unequalChoices = pos({
+    side: 1,
+    p1Men: B1(8) | B1(16),
+    p2Men: B1(2) | B1(5) | B1(13),
+  });
+  const unequalLengths = generateMoves(unequalChoices)
+    .map(move => move.captured.length).sort((a, b) => a - b);
+  assert(unequalLengths.join(',') === '1,2',
+    `expected both shorter and longer complete captures, got ${unequalLengths}`); checks++;
 
   const alternatives = pos({ side: 1, p1Men: B1(8) | B1(9), p2Men: B1(2) | B1(5) });
   const alternativeMoves = generateMoves(alternatives);

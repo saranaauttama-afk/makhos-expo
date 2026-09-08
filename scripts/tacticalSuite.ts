@@ -50,7 +50,7 @@ async function main() {
   });
   const doubleCaptureMoves = generateMoves(doubleCapture);
   assert(doubleCaptureMoves.length === 1, `expected one forced double capture, got ${doubleCaptureMoves.map(moveLabel).join(' | ')}`);
-  assert(doubleCaptureMoves[0].from === 22 && doubleCaptureMoves[0].to === 6 && doubleCaptureMoves[0].captured.length === 2, 'movegen should keep the longest capture only');
+  assert(doubleCaptureMoves[0].from === 22 && doubleCaptureMoves[0].to === 6 && doubleCaptureMoves[0].captured.length === 2, 'the only capturing piece should complete its full sequence');
   checks += 2;
 
   const doubleCaptureSearch = await search(doubleCapture);

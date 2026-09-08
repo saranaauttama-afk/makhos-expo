@@ -68,19 +68,19 @@ const tests: PerftTest[] = [
     expected: [1], // Must have exactly 1 capture move 18x14->9
   },
 
-  // Test 3: Max-capture rule (must take longest capture chain)
+  // Test 3: free choice between complete capture sequences of unequal length
   {
-    name: 'Max-Capture Rule',
+    name: 'Unequal Complete Capture Choice',
     pos: {
       side: 1,
-      p1Men: B1(23), // P1 man
+      p1Men: B1(8) | B1(16), // two P1 men with unequal complete sequences
       p1Kings: 0,
-      p2Men: B1(18) | B1(14) | B1(13), // Three P2 pieces forming chain
+      p2Men: B1(2) | B1(5) | B1(13),
       p2Kings: 0,
       halfmoveClock: 0,
     },
     depths: [1],
-    expected: [1], // Only the max-length capture (must ignore shorter ones)
+    expected: [2], // Both the complete one-piece and two-piece sequences are legal
   },
 
   // Test 4: Men multi-capture
@@ -98,19 +98,19 @@ const tests: PerftTest[] = [
     expected: [1, 0], // Captures both 23 and 14, lands at 9, terminal (P2 has 0 pieces)
   },
 
-  // Test 5: King fly capture (king can land anywhere after jump)
+  // Test 5: Makhos king capture lands immediately behind the captured piece
   {
     name: 'King Fly Capture',
     pos: {
       side: 1,
       p1Men: 0,
-      p1Kings: B1(27), // P1 king at (r=6, c=6)
-      p2Men: B1(22), // P2 man at (r=5, c=4) - diagonal UL from 27
+      p1Kings: B1(22),
+      p2Men: B1(17),
       p2Kings: 0,
       halfmoveClock: 0,
     },
     depths: [1],
-    expected: [7], // King can land on 23, 18, 14, 9, 5, 0, 31 after capturing 22
+    expected: [1], // 22x17->13; farther landing squares are not legal
   },
 
   // Test 6: King multi-capture

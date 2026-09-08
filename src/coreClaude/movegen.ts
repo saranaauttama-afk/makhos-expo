@@ -161,22 +161,9 @@ export function generateCapturesInto(p: Position, out: Move[]): Move[] {
     genKingCapturesFromFast(p, from, out);
   }
 
-  if (out.length <= 1) return out;
-
-  let maxCaps = 0;
-  for (let i = 0; i < out.length; i++) {
-    const n = out[i].captured.length;
-    if (n > maxCaps) maxCaps = n;
-  }
-
-  let write = 0;
-  for (let i = 0; i < out.length; i++) {
-    if (out[i].captured.length === maxCaps) {
-      out[write++] = out[i];
-    }
-  }
-  out.length = write;
-
+  // Makhos has compulsory capture but no global majority-capture priority.
+  // Each DFS result is already a complete sequence (it is emitted only when
+  // that moving piece has no further capture), so preserve every such result.
   return out;
 }
 
