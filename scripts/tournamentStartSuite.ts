@@ -3,6 +3,8 @@ import { initialPosition, Position } from '../src/coreClaude/position';
 
 export interface TournamentStart {
   id: string;
+  /** Defaults to the standard initial position. Useful for explicit fixture suites. */
+  initialPosition?: Position;
   position: Position;
   openingMoves: Move[];
 }

@@ -385,6 +385,22 @@ Phase 2A does not complete position-suite curation, puzzle development/holdout
 splitting, real-game strategic starts, SPRT/distributed execution, or
 authoritative opening provenance.
 
+### PR #7 measurement-correctness review
+
+The follow-up makes compute comparability explicit: only equal node budgets and
+equal depth-cap semantics are canonical. Unequal modes/budgets/caps suppress
+score/Elo/CI unless explicitly requested as non-canonical descriptive data.
+Score confidence bounds remain numeric on `[0,1]`, while JSON-safe tagged Elo
+values distinguish finite, negative-infinity and positive-infinity results.
+
+Focused tests now cover no-move loss, repetition and inactivity draws,
+`maxPlies` unresolved classification, injected search errors, incomplete-pair
+exclusion, unequal-control rejection and every Elo boundary. The controlled
+`nullMove=false` smoke observes the effective feature value at actual search
+dispatch rather than merely inspecting output metadata. These are measurement
+correctness changes only; engine defaults, thresholds and playing strength are
+unchanged.
+
 ---
 
 # Experiment template

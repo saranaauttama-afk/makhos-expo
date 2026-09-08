@@ -15,9 +15,12 @@ as P2. Results are attributed to identity. Errors and the `maxPlies` safety cap
 are excluded from scores and Elo rather than converted to draws.
 
 The harness checks no-legal-move loss before searching and uses the production
-position transition, inactivity policy and board-hash threefold history. The
-full hash history starts at the supplied start position and is passed into
-every search.
+position transition, inactivity policy and board-hash threefold history. It
+replays the stored opening from its initial state, validates the recorded start
+position, preserves every pre-start hash, and passes that full history into
+every search. A start's game-theoretic context is therefore its position state
+(including the inactivity clock) **plus the replayed history**, not only its
+board bitboards.
 
 ## Start suite
 
@@ -38,9 +41,24 @@ explicitly non-canonical. Search output records main nodes, qnodes, completed
 depth, elapsed milliseconds and derived NPS for every move and totals them by
 engine.
 
-Candidate score is `(wins + draws / 2) / completed games`; Elo is
+Before scoring, the harness records a comparability assessment and reason.
+Canonical status requires equal fixed-node budgets and equal effective depth
+caps. Equal fixed-depth controls are compute-comparable but secondary/non-
+canonical, while equal fixed-time budgets/caps remain non-canonical because of
+wall-clock variability. Different modes, budgets, depths, or relevant caps are
+`nonComparable`; score/Elo/CI are suppressed unless the caller explicitly asks
+for descriptive compute-scaling statistics. Such opt-in data is never relabeled
+as canonical.
+
+Candidate score is `(wins + draws / 2) / completed games`; only fully completed
+pairs contribute, so `completedPairs` and `completedGames = 2 × completedPairs`
+are explicit alongside raw W/D/L, unresolved, and error totals. Separate
+`scoreEligibleBaselineWins`, `scoreEligibleCandidateWins`, and
+`scoreEligibleDraws` fields make clear which W/D/L subset enters Elo. Elo is
 `400 log10(score / (1-score))`. Infinite boundary estimates are serialized as
-`null`, not capped to an arbitrary value. The 95% interval is a deterministic
+`{kind: "negativeInfinity"}` or `{kind: "positiveInfinity"}`, never conflated
+or capped. The numeric score CI remains available on `[0,1]` even at those
+boundaries. The 95% interval is a deterministic
 20,000-sample **pair-level bootstrap**: whole two-game start pairs are sampled
 with replacement, retaining the color correlation. A pair containing an error
 or unresolved game is excluded from both estimate and interval. Small samples
@@ -56,9 +74,11 @@ and are not committed.
 
 `npm run test:tournament` regenerates the start suite twice, checks
 deduplication, paired assignment, identical-engine move equality, identity
-symmetry and repeat-run equality. `npm run tournament:smoke` runs both an
+symmetry, repeat-run equality, comparability decisions, Elo boundaries, and
+all termination/error classifications. `npm run tournament:smoke` runs both an
 identical-default check and a one-variable plumbing check (`nullMove=false` on
-the candidate only). The latter is not a strength experiment.
+the candidate only), and observes the effective flag at search dispatch. The
+latter is not a strength experiment.
 
 Limitations: Phase 2A is single-process and sequential because current search
 internals contain module-level working state; wall-clock/NPS remain machine
