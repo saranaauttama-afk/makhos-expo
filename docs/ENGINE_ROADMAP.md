@@ -14,19 +14,19 @@ No phase is considered complete because code exists. Completion requires measure
 
 Goal: know exactly what `engine-mainline` can do before changing strength.
 
-- [ ] Confirm branch/source checkpoint and inventory active engine modules.
-- [ ] Verify build/typecheck on a clean checkout.
-- [ ] Run `npm run test:rules`.
-- [ ] Run `npm run test:perft`.
-- [ ] Run `npm run test:tactical`.
-- [ ] Run `npm run bench:ai:fresh` and relevant full/teacher variants.
-- [ ] Run `npm run regression:harness` / existing AI gates.
-- [ ] Make puzzle suite runnable from a stable npm command if currently missing.
-- [ ] Validate puzzle fixtures against their original/authoritative solutions where possible.
-- [ ] Record puzzle first-move accuracy, full-line accuracy where available, depth, nodes, time.
-- [ ] Record machine, Node version, CPU, runtime settings and commit SHA.
-- [ ] Verify whether `timeManager.ts` is integrated into production iterative deepening or is only a scaffold.
-- [ ] Create `Teacher Baseline v0` record in the experiment log.
+- [x] Confirm branch/source checkpoint and inventory active engine modules.
+- [x] Verify build/typecheck on the installed clean dependency tree.
+- [x] Run `npm run test:rules`.
+- [x] Run `npm run test:perft`.
+- [x] Run `npm run test:tactical`.
+- [x] Run `npm run bench:ai:fresh` and relevant full/teacher variants.
+- [x] Run `npm run regression:harness` / existing AI gates.
+- [x] Make puzzle suite runnable from a stable npm command if currently missing.
+- [x] Validate puzzle fixtures against their original/authoritative solutions where possible.
+- [x] Record puzzle first-move accuracy, full-line accuracy where available, depth, nodes, time.
+- [x] Record machine, Node version, CPU, runtime settings and commit SHA.
+- [x] Verify whether `timeManager.ts` is integrated into production iterative deepening or is only a scaffold.
+- [x] Create `Teacher Baseline v0` record in the experiment log.
 
 **Exit gate:** correctness suites pass, measurements are reproducible, baseline commit and test protocol are frozen.
 

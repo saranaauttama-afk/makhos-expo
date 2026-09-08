@@ -89,7 +89,7 @@ async function scoreMoveWithOracle(pos: Position, move: Move): Promise<number> {
 }
 
 function scaledBenchmarkBudget(level: StrictDifficulty, pos: Position): number {
-  return Math.max(BENCHMARK_MODE === 'full' ? 400 : 60, Math.round(pickAdaptiveStrictBudgetMs(level, pos) * BENCHMARK_TIME_SCALE));
+  return Math.max(60, Math.round(pickAdaptiveStrictBudgetMs(level, pos) * BENCHMARK_TIME_SCALE));
 }
 
 async function inspectBenchmarkLevels(pos: Position, oracleMove: Move | undefined, oracleScore: number | undefined): Promise<void> {
