@@ -243,8 +243,8 @@ async function main() {
 
   console.log(`Total games played: ${totalGames}`);
   console.log(`Opening book wins: ${totalWins} (${(totalWins / totalGames * 100).toFixed(1)}%)`);
-  console.log(`No book wins: ${totalLosses} (${totalLosses / totalGames * 100).toFixed(1)}%)`);
-  console.log(`Draws: ${totalDraws} (${totalDraws / totalGames * 100).toFixed(1)}%)`);
+  console.log(`No book wins: ${totalLosses} (${(totalLosses / totalGames * 100).toFixed(1)}%)`);
+  console.log(`Draws: ${totalDraws} (${(totalDraws / totalGames * 100).toFixed(1)}%)`);
   console.log('');
 
   const overallElo = calculateElo(totalWins, totalLosses, totalDraws);

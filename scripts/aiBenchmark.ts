@@ -46,6 +46,7 @@ interface TacticalSample {
   depth: number;
   nodes: number;
   qnodes: number;
+  pvLength: number;
   timedOut: boolean;
   legalMoves: number;
   forcedCapture: boolean;
@@ -68,6 +69,7 @@ interface LevelSummary {
   avgDepth: number;
   avgNodes: number;
   avgQNodes: number;
+  avgPvLength: number;
   timedOut: number;
   overrides: number;
 }
@@ -286,6 +288,7 @@ async function runLevelOnCase(level: StrictDifficulty, testCase: TacticalCase, o
     depth: result.depth,
     nodes: result.nodes,
     qnodes: result.qnodes,
+    pvLength: result.pv.length,
     timedOut: result.timedOut,
     legalMoves: legal.length,
     forcedCapture,
@@ -565,7 +568,7 @@ async function runTacticalBenchmark(checkpoint: BenchmarkCheckpoint): Promise<Ta
 function summarizeTactical(samples: TacticalSample[]) {
   console.log(`\nTactical benchmark (${MODE}, time scale ${TIME_SCALE})`);
   console.log(`openingBookBypassed=${OPENING_BOOK_BYPASSED ? 'yes' : 'no'}`);
-  console.log('level   solve   blunder   avgMs   p95Ms   avgDepth   avgNodes   avgQNodes');
+  console.log('level   solve   blunder   avgMs   p95Ms   avgDepth   avgNodes   avgQNodes   avgPV');
   for (const level of STRICT_LEVELS) {
     const rows = samples.filter(sample => sample.level === level);
     const solveRate = rows.filter(sample => sample.solved).length / rows.length;
@@ -581,7 +584,8 @@ function summarizeTactical(samples: TacticalSample[]) {
       ` ${percentile(rows.map(row => row.p95BasisMs), 95).toFixed(0).padStart(7)}` +
       ` ${avgDepth.toFixed(1).padStart(9)}` +
       ` ${avgNodes.toFixed(0).padStart(10)}` +
-      ` ${avgQNodes.toFixed(0).padStart(11)}`,
+      ` ${avgQNodes.toFixed(0).padStart(11)}` +
+      ` ${(rows.reduce((sum, row) => sum + row.pvLength, 0) / rows.length).toFixed(1).padStart(7)}`,
     );
   }
 
@@ -612,6 +616,7 @@ function buildTacticalSummary(samples: TacticalSample[]): LevelSummary[] {
       avgDepth: rows.reduce((sum, row) => sum + row.depth, 0) / rows.length,
       avgNodes: rows.reduce((sum, row) => sum + row.nodes, 0) / rows.length,
       avgQNodes: rows.reduce((sum, row) => sum + row.qnodes, 0) / rows.length,
+      avgPvLength: rows.reduce((sum, row) => sum + row.pvLength, 0) / rows.length,
       timedOut: rows.filter(row => row.timedOut).length,
       overrides: rows.filter(row => !!row.overrideReason).length,
     };

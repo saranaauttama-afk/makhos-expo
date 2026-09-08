@@ -1,6 +1,7 @@
 // src/core/search/zobrist.ts
 import { BB, bits } from '../bitboards';
 import { Position } from '../position';
+import { RepetitionCounts } from './repetition';
 
 // Zobrist: [pieceType(0..3)][square(0..31)] and sideToMove
 // Types: 0=P1 man, 1=P1 king, 2=P2 man, 3=P2 king
@@ -49,5 +50,33 @@ export function verifyHashPosition(p: Position): number {
   for (const i of bits(p.p2Men))   h ^= Z_PIECE_VERIFY[2][i];
   for (const i of bits(p.p2Kings)) h ^= Z_PIECE_VERIFY[3][i];
   if (p.side === 1) h ^= Z_SIDE_VERIFY;
+  return h >>> 0;
+}
+
+function mix32(value: number): number {
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d);
+  value = Math.imul(value ^ (value >>> 15), 0x846ca68b);
+  return (value ^ (value >>> 16)) >>> 0;
+}
+
+/**
+ * TT keys must include draw state.  `hashPosition` deliberately remains a
+ * board-only key because repetition detection needs identical boards to hash
+ * identically.  Search uses this separate key so a TT entry cannot cross an
+ * inactivity-clock or repetition-history boundary.
+ */
+export function hashSearchState(p: Position, repetitions: RepetitionCounts): number {
+  let h = hashPosition(p) ^ mix32((p.halfmoveClock + 1) * 0x9e3779b1);
+  for (const [key, count] of repetitions) {
+    h ^= mix32(key ^ Math.imul(count, 0x85ebca6b));
+  }
+  return h >>> 0;
+}
+
+export function verifyHashSearchState(p: Position, repetitions: RepetitionCounts): number {
+  let h = verifyHashPosition(p) ^ mix32((p.halfmoveClock + 1) * 0xc2b2ae35);
+  for (const [key, count] of repetitions) {
+    h ^= mix32(key ^ Math.imul(count, 0x27d4eb2f));
+  }
   return h >>> 0;
 }

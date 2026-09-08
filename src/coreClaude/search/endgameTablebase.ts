@@ -24,11 +24,23 @@ export interface EndgameProbe {
   best?: Move;
   dtm: number;
   exact: boolean;
+  nodes?: number;
+}
+
+export interface DeterministicEndgameResult {
+  probe?: EndgameProbe;
+  nodes: number;
+  limitReached: boolean;
 }
 
 const TABLEBASE_WIN = 500_000;
 const NO_MOVE_KEY = -1;
 const sharedMemo = new Map<string, SolveResult>();
+
+export function clearEndgameTablebaseCache(): void {
+  sharedMemo.clear();
+  _tablebaseReady = false;
+}
 
 // Precompute status — true once background precomputation finishes
 let _tablebaseReady = false;
@@ -49,6 +61,15 @@ function stateKey(pos: Position, repetitionCount: number) {
     pos.halfmoveClock,
     repetitionCount,
   ].join(':');
+}
+
+function deterministicStateKey(pos: Position, repetitionCounts: RepetitionCounts): string {
+  const history = [...repetitionCounts]
+    .filter(([, count]) => count > 0)
+    .sort(([a], [b]) => a - b)
+    .map(([hash, count]) => `${hash >>> 0}.${Math.min(3, count)}`)
+    .join(',');
+  return `${pos.side}:${pos.p1Men >>> 0}:${pos.p1Kings >>> 0}:${pos.p2Men >>> 0}:${pos.p2Kings >>> 0}:${pos.halfmoveClock}:${history}`;
 }
 
 function chooseBetter(current: SolveResult | undefined, candidate: SolveResult): SolveResult {
@@ -183,6 +204,74 @@ export function probeSmallEndgame(
     best: findBestMove(pos, result.bestMoveKey),
     dtm: result.dtm,
     exact: true,
+  };
+}
+
+/** Fixed-work, history-complete oracle intended for regression fixtures. */
+export function probeSmallEndgameDeterministic(
+  pos: Position,
+  historyHashes: number[] = [],
+  nodeLimit = 100_000,
+): DeterministicEndgameResult {
+  if (!Number.isInteger(nodeLimit) || nodeLimit < 1)
+    throw new Error(`nodeLimit must be a positive integer, got ${nodeLimit}`);
+  if (!canProbe(pos)) return { nodes: 0, limitReached: false };
+
+  const hash = hashPosition(pos);
+  const repetitions = buildRepetitionCounts(historyHashes.length ? historyHashes : [hash]);
+  if (getRepetitionCount(repetitions, hash) === 0) repetitions.set(hash, 1);
+  const memo = new Map<string, SolveResult>();
+  const visiting = new Set<string>();
+  let nodes = 0;
+
+  function solve(current: Position, depth: number): SolveResult | undefined {
+    if (nodes >= nodeLimit) return undefined;
+    nodes++;
+    const currentHash = hashPosition(current);
+    const key = deterministicStateKey(current, repetitions);
+    if (isDrawByInactivity(current) || isThreefoldRepetition(repetitions, currentHash))
+      return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    if (depth >= SOLVE_MAX_DEPTH) return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    const cached = memo.get(key);
+    if (cached) return cached;
+    if (visiting.has(key)) return { outcome: 0, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    const moves = generateMoves(current);
+    if (!moves.length) return { outcome: -1, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+
+    visiting.add(key);
+    let best: SolveResult | undefined;
+    for (const move of moves) {
+      const child = applyMove(current, move);
+      const childHash = hashPosition(child);
+      pushRepetition(repetitions, childHash);
+      const childResult = solve(child, depth + 1);
+      popRepetition(repetitions, childHash);
+      if (!childResult) { visiting.delete(key); return undefined; }
+      best = chooseBetter(best, {
+        outcome: (-childResult.outcome) as Outcome,
+        dtm: childResult.dtm + 1,
+        bestMoveKey: keyMove(move),
+      });
+      if (best.outcome === 1 && best.dtm === 1) break;
+    }
+    visiting.delete(key);
+    const resolved = best ?? { outcome: 0 as Outcome, dtm: 0, bestMoveKey: NO_MOVE_KEY };
+    memo.set(key, resolved);
+    return resolved;
+  }
+
+  const solved = solve(pos, 0);
+  if (!solved) return { nodes, limitReached: true };
+  return {
+    nodes,
+    limitReached: false,
+    probe: {
+      score: scoreFromSolve(solved),
+      best: findBestMove(pos, solved.bestMoveKey),
+      dtm: solved.dtm,
+      exact: true,
+      nodes,
+    },
   };
 }
 

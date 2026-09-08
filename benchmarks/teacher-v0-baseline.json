@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "baseline": "Teacher v0",
+  "status": "frozen",
+  "measuredAtUtc": "2026-09-07",
+  "commit": "54278041642aa4aa6abca3e26f9085bdb6d301b1",
+  "engineCheckpoint": "db28e143bb06fb8a35a643877a055c5df9770020",
+  "environment": {
+    "os": "Linux 6.18.35 x86_64",
+    "cpu": "Intel Xeon Platinum 8370C @ 2.80 GHz",
+    "logicalCpus": 3,
+    "ramGiB": 17,
+    "node": "v24.15.0",
+    "npm": "11.4.2"
+  },
+  "correctness": {
+    "rules": { "status": "pass", "checks": 3501 },
+    "perft": {
+      "status": "pass",
+      "fixturesPassed": 8,
+      "fixturesTotal": 8,
+      "initialPosition": { "1": 7, "2": 49, "3": 392 }
+    },
+    "tactical": { "status": "pass", "checks": 8 },
+    "regressionHarness": {
+      "status": "warn",
+      "fatalReasons": 0,
+      "knownIssue": "small-piece-king-vs-men oracle/probe instability"
+    }
+  },
+  "productionTactical": {
+    "command": "npm run bench:ai:full:tactical",
+    "casesPerLevel": 39,
+    "searches": 156,
+    "timeScale": 1,
+    "oracleTimeMs": 5000,
+    "oracleDepth": 15,
+    "openingBook": false,
+    "levels": {
+      "easy": { "solvedPercent": 100, "blunderPercent": 0, "avgDepth": 2.7, "avgNodesAndQnodes": 83589, "approxNps": 192590, "avgThinkMs": 434, "p95ThinkMs": 1203 },
+      "normal": { "solvedPercent": 100, "blunderPercent": 0, "avgDepth": 3.4, "avgNodesAndQnodes": 233149, "approxNps": 242436, "avgThinkMs": 962, "p95ThinkMs": 2505 },
+      "hard": { "solvedPercent": 100, "blunderPercent": 0, "avgDepth": 4.2, "avgNodesAndQnodes": 433873, "approxNps": 269929, "avgThinkMs": 1607, "p95ThinkMs": 3282 },
+      "expert": { "solvedPercent": 100, "blunderPercent": 0, "avgDepth": 5.1, "avgNodesAndQnodes": 946510, "approxNps": 284858, "avgThinkMs": 3323, "p95ThinkMs": 6684 }
+    }
+  },
+  "puzzles": {
+    "dataset": "development",
+    "fixtures": 14,
+    "legalExpectedFirstMoves": 4,
+    "illegalExpectedFirstMoves": 10,
+    "observedCorrectRange": [1, 2],
+    "scoreableTotal": 4,
+    "holdoutFixtures": 0,
+    "fullLineAccuracy": null,
+    "gateEligible": false
+  },
+  "notes": [
+    "Numbers are the original Phase 0 wall-clock measurements and retain the pre-Phase-1A node-counting definition.",
+    "Puzzle fixtures have no authoritative provenance and are not a promotion gate.",
+    "This file is canonical evidence; generated rerun artifacts remain under .tmp/."
+  ]
+}
