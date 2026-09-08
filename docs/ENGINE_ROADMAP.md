@@ -60,14 +60,14 @@ Goal: make “stronger” statistically defensible.
 
 ## Head-to-head harness
 
-- [ ] Baseline vs candidate from identical codebase with one controlled difference.
-- [ ] Paired colors for each opening/start position.
-- [ ] Opening diversity to reduce first-move/start-position bias.
-- [ ] Support fixed time, fixed nodes and fixed depth.
-- [ ] Record W/D/L, score %, average nodes, depth, time, NPS.
-- [ ] Estimate Elo difference and confidence interval.
+- [x] Baseline vs candidate from identical codebase with one controlled difference. Phase 2A validates `nullMove=false` plumbing without making a strength claim.
+- [x] Paired colors for each opening/start position.
+- [x] Opening diversity to reduce first-move/start-position bias. Phase 2A freezes a seeded legal measurement suite; it is not an authoritative opening book.
+- [x] Support fixed time, fixed nodes and fixed depth.
+- [x] Record W/D/L, score %, average nodes, depth, time, NPS.
+- [x] Estimate Elo difference and confidence interval using a deterministic pair-level bootstrap.
 - [ ] Add sequential-testing/SPRT-style stopping later if useful.
-- [ ] Save machine-readable JSON/CSV results, not only console text.
+- [x] Save machine-readable JSON/CSV results, not only console text.
 
 ## Position suites
 

@@ -140,6 +140,15 @@ const history     = new Int32Array(1024); // (from<<5|to) max = 31*32+31 = 1023
 // caused a beta cutoff in response to it.  Improves move ordering ~10% nodes.
 const counterMove = new Int32Array(1024).fill(-1);
 
+/** Clear mutable move-ordering state for isolated measurement searches.
+ * Production play intentionally retains its existing history-aging behavior. */
+export function resetSearchHeuristicsForMeasurement(): void {
+  killers0.fill(-1);
+  killers1.fill(-1);
+  history.fill(0);
+  counterMove.fill(-1);
+}
+
 // LMR reduction table [moveIdx][depth]
 const LMR: Uint8Array[] = Array.from({ length: 32 }, (_, i) =>
   new Uint8Array(32).map((_, d) =>

@@ -348,6 +348,45 @@ The Phase 1B TT suite continues to cover bound semantics, mate-distance normaliz
 
 ---
 
+## EXP-2026-005 — Phase 2A paired A/B measurement infrastructure
+
+**Status:** KEEP (measurement infrastructure; no playing-strength claim)
+
+**Date:** 2026-09-08
+
+**Baseline:** `ff6e3dad6cd5d70ed8253d4fb90ad10545c52586` (merge PR #6)
+
+### Scope and protocol
+
+Replaced the historical head-to-head prototype with an identity-based harness.
+Each seeded, legal, deduplicated measurement start is played twice with colors
+reversed. Player configs carry independent identities, feature overrides and
+per-game TTs. Fixed nodes is canonical; fixed depth and time are also exposed.
+The runner preserves position halfmove state and complete in-game repetition
+history, applies project inactivity/threefold policy, and separates normal
+draws from unresolved safety limits and engine/harness errors.
+
+Detailed JSON and game-summary CSV include moves, per-move search metrics,
+aggregate metrics, configs and environment metadata. Candidate Elo has a 95%
+pair-level bootstrap interval; incomplete pairs are excluded. See
+`docs/TOURNAMENT_PROTOCOL.md` for formulas and limitations.
+
+### Validation and interpretation
+
+The regression command checks deterministic suite generation, deduplication,
+paired color assignment, identical A/B move sequences, exact repeat-run output,
+and symmetric identity results. The smoke command additionally passes exactly
+one existing difference (`nullMove=false`) to Candidate. That small controlled
+run proves plumbing only and is **not evidence** that either configuration is
+stronger. No evaluation weight, pruning threshold, search margin, default
+feature flag, rule semantic, or benchmark expected answer changed.
+
+Phase 2A does not complete position-suite curation, puzzle development/holdout
+splitting, real-game strategic starts, SPRT/distributed execution, or
+authoritative opening provenance.
+
+---
+
 # Experiment template
 
 Copy this section for each experiment.
