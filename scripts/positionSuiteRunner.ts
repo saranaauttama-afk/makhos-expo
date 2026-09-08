@@ -85,8 +85,11 @@ export function createPositionSuiteReport(rows: PositionRunRow[], mode: 'nodes' 
   revealHoldout = false, commit = 'test'): PositionSuiteReport {
   const dev = ratio(rows.filter(r => r.split === 'development'));
   const holdout = ratio(rows.filter(r => r.split === 'holdout'));
-  const motifs = Object.fromEntries([...new Set(rows.flatMap(r => r.motifs))].sort().map(motif =>
-    [motif, ratio(rows.filter(r => r.motifs.includes(motif) && r.pass !== undefined))]));
+  // In tuning-blind mode even aggregate motif buckets must exclude holdout:
+  // a singleton motif would otherwise disclose its case verdict indirectly.
+  const motifRows = revealHoldout ? rows : rows.filter(r => r.split !== 'holdout');
+  const motifs = Object.fromEntries([...new Set(motifRows.flatMap(r => r.motifs))].sort().map(motif =>
+    [motif, ratio(motifRows.filter(r => r.motifs.includes(motif) && r.pass !== undefined))]));
   return { generatedAt: new Date().toISOString(), commit, suiteVersion: POSITION_SUITE_VERSION,
     suiteFingerprint: POSITION_SUITE_V1_FINGERPRINT, search: { mode, budget }, revealHoldout,
     developmentVerified: dev, holdoutVerified: holdout,

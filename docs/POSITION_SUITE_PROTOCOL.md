@@ -56,10 +56,12 @@ a new suite version and freeze its new fingerprint; changing only a version
 string cannot disguise content drift.
 
 Normal runner output is tuning-blind: holdout case rows are omitted from both
-JSON and CSV, while aggregate verified holdout accuracy remains available.
-Development and diagnostic rows remain inspectable. `--reveal-holdout` is an
-explicit evaluation-only escape hatch; the frozen initial baseline command uses
-it, but Phase 3 parameter-selection runs must not.
+JSON and CSV, and holdout cases are also excluded from every per-motif bucket,
+while the single aggregate verified holdout accuracy remains available.
+Development and diagnostic rows and their verified motif statistics remain
+inspectable. `--reveal-holdout` is an explicit evaluation-only escape hatch
+that restores both full rows and full motif statistics; the frozen initial
+baseline command uses it, but Phase 3 parameter-selection runs must not.
 
 The diagnostic split contains the 14 historical handcrafted puzzles and four
 unlabeled positions replayed from the deterministic Phase 2A legal traces.

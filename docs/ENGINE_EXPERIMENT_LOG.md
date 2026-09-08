@@ -469,7 +469,9 @@ version string. These were measurement-correctness defects, not engine defects.
 - V1 freezes scored/leakage-relevant content with SHA-256
   `f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30`.
 - Default artifacts omit all holdout case rows while retaining aggregate
-  accuracy. Detailed rows require `--reveal-holdout`; the canonical initial
+  accuracy. Blinded per-motif statistics also exclude holdout cases, preventing
+  singleton motif buckets from disclosing verdicts indirectly. Detailed rows
+  and full motif statistics require `--reveal-holdout`; the canonical initial
   baseline invokes that evaluation-only option explicitly.
 
 Regression tests include positive/negative heuristic-score non-proof, direct

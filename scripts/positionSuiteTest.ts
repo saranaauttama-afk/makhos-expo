@@ -77,10 +77,20 @@ async function main() {
   const blinded = createPositionSuiteReport(first, 'nodes', 1_000);
   assert.equal(blinded.holdoutVerified.total, 2, 'blinded report lost aggregate holdout accuracy');
   assert(!blinded.rows.some(row => row.split === 'holdout'), 'default report leaked holdout case details');
+  const changedHoldout = first.map(row => row.split === 'holdout' ? { ...row, pass: !row.pass } : row);
+  const blindedChanged = createPositionSuiteReport(changedHoldout, 'nodes', 1_000);
+  assert.deepEqual(blindedChanged.byMotif, blinded.byMotif,
+    'a holdout verdict changed blinded per-motif statistics');
+  assert.equal(blinded.byMotif['low mobility']?.total ?? 0, 0,
+    'holdout-only low-mobility verdict leaked through blinded motif statistics');
   const revealed = createPositionSuiteReport(first, 'nodes', 1_000, true);
   assert(revealed.rows.some(row => row.split === 'holdout' && row.pass !== undefined),
     'explicit evaluation mode did not reveal holdout verdicts');
-  checks += 5;
+  assert.deepEqual(revealed.byMotif['low mobility'], { correct: 1, total: 1 },
+    'explicit evaluation mode did not restore full holdout motif statistics');
+  assert.notDeepEqual(createPositionSuiteReport(changedHoldout, 'nodes', 1_000, true).byMotif,
+    revealed.byMotif, 'revealed motif statistics ignored changed holdout verdicts');
+  checks += 9;
   console.log(`positionSuiteTest: ${checks} checks passed; ${verifiedDenominator} verified cases`);
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
