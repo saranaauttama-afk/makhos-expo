@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "makhos-search-ablation-config-v1",
+  "startSuite": "makhos-search-ablation-starts-v1",
+  "seed": 859914828,
+  "screening": { "pairedStarts": 32, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 240 },
+  "confirmation": { "pairedStarts": 64, "nodesPerMove": 10000, "maxDepth": 64, "maxPlies": 240 },
+  "features": ["reverseFutility", "razoring", "nullMove", "probCut", "iid", "lmr", "lmp", "extensions"],
+  "verdict": "likely beneficial when the disabled candidate's 95% score CI is wholly below 50%; likely harmful when wholly above 50%; otherwise inconclusive"
+}

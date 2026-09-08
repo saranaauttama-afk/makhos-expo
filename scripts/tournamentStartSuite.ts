@@ -58,3 +58,38 @@ export function generateTournamentStartSuite(seed = 0x4d414b48, count = 8): Tour
 }
 
 export const TOURNAMENT_START_SUITE = generateTournamentStartSuite();
+
+/** Phase 3A's frozen, larger legal-start corpus. Opening lengths deliberately
+ * span early and developed positions; this is generated measurement data, not
+ * an opening book and carries no opening-theory provenance. */
+export function generateSearchAblationStartSuite(seed = 0x3341424c, count = 64): TournamentStartSuite {
+  let state = seed >>> 0;
+  const random = () => {
+    state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+    return state >>> 0;
+  };
+  const starts: TournamentStart[] = [];
+  const seen = new Set<string>();
+  for (let attempt = 0; starts.length < count && attempt < count * 100; attempt++) {
+    let position = initialPosition();
+    const openingMoves: Move[] = [];
+    const plies = 2 + (attempt % 16);
+    for (let ply = 0; ply < plies; ply++) {
+      const legal = generateMoves(position).slice().sort((a, b) => moveKey(a).localeCompare(moveKey(b)));
+      if (!legal.length) break;
+      const move = legal[random() % legal.length];
+      openingMoves.push(move);
+      position = applyMove(position, move);
+    }
+    const key = positionKey(position);
+    if (openingMoves.length === plies && generateMoves(position).length && !seen.has(key)) {
+      seen.add(key);
+      starts.push({ id: `search-ablation-v1-${String(starts.length + 1).padStart(2, '0')}`, position, openingMoves });
+    }
+  }
+  if (starts.length !== count) throw new Error(`could only generate ${starts.length}/${count} unique ablation starts`);
+  return { version: 'makhos-search-ablation-starts-v1', seed: seed >>> 0,
+    generator: 'xorshift32/legal-sorted/diverse-plies-2-17/v1 (generated measurement corpus; not an opening book)', starts };
+}
+
+export const SEARCH_ABLATION_START_SUITE = generateSearchAblationStartSuite();

@@ -483,6 +483,92 @@ unchanged. No engine defaults or strength parameters changed.
 
 # Experiment template
 
+## EXP-2026-006 — Phase 3A search-feature ablation baseline
+
+**Status:** KEEP infrastructure and evidence; NEEDS MORE DATA before any production change
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `5b9659a13d22bd748474ec82947db72e48dc9131`
+
+### Hypothesis and controls
+
+One-at-a-time disabling at equal fixed work can identify which existing search
+feature is the strongest Phase 3B hypothesis without tuning a threshold or
+changing engine defaults. The audit, trigger details, fixed corpus, verdict
+definition, and replay commands are in `docs/SEARCH_ABLATION_PROTOCOL.md`.
+Screening used the first 32 of 64 frozen paired starts, 5,000 nodes per move,
+maximum 160 played plies, and two color-swapped games per start. All pairs
+completed without unresolved games or errors. Raw artifacts were generated in
+ignored `.tmp/search-ablation/`; only their concise evidence is recorded here.
+
+### Screening results
+
+Candidate is the engine with the named feature disabled. W/D/L is candidate
+wins/draws/losses. Depth is candidate average completed depth. All intervals
+except extensions cross or touch zero Elo and are therefore inconclusive.
+
+| Feature disabled | Pairs | W/D/L | Score | Elo | 95% CI | Depth | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| reverseFutility | 32 | 30/5/29 | 50.78% | +5.4 | [-43.7, +54.7] | 4.30 | inconclusive |
+| razoring | 32 | 29/10/25 | 53.13% | +21.7 | [0.0, +54.7] | 4.63 | inconclusive |
+| nullMove | 32 | 34/5/25 | 57.03% | +49.2 | [-5.4, +106.3] | 4.57 | inconclusive |
+| probCut | 32 | 32/8/24 | 56.25% | +43.7 | [-21.7, +112.3] | 4.17 | inconclusive |
+| iid | 32 | 29/7/28 | 50.78% | +5.4 | [-16.3, +32.7] | 4.74 | inconclusive |
+| lmr | 32 | 31/7/26 | 53.91% | +27.2 | [-21.7, +83.0] | 4.72 | inconclusive |
+| lmp | 32 | 34/5/25 | 57.03% | +49.2 | [-5.4, +106.3] | 4.95 | inconclusive |
+| extensions | 32 | 57/3/4 | 91.41% | +410.7 | [+303.8, +596.5] | 12.69 | likely harmful |
+
+At fixed nodes, candidate total main/qnodes respectively were: RFP
+6,671,866/547,851; razoring 6,615,131/400,973; null move6,844,060/234,345;
+ProbCut 6,607,999/467,312; IID 6,382,021/517,220; LMR
+6,379,877/570,788; LMP 6,334,837/533,111; extensions
+3,970,242/2,242,840. NPS is retained in the machine-readable raw summary but
+is diagnostic only because fixed-node strength does not depend on wall clock.
+
+### Confirmation and diagnostic
+
+The sole confirmation candidate was `extensions=false`: 64/64 paired starts
+(128 games), equal 5,000 nodes per move, maximum 160 plies; all pairs completed
+with zero unresolved/errors. Candidate W/D/L was **110/5/13**, score **87.89%**,
+estimated Elo **+344.3**, pair-bootstrap 95% CI **[+273.2, +438.4]**. Candidate
+average depth was **12.47**, with 7,779,030 main and 4,441,253 qnodes across
+the run. This repeats the screening direction but does not authorize changing
+the default.
+
+A depth-4 diagnostic over eight pairs proved impractical in this environment:
+grouped extensions expand forced/endgame lines beyond nominal depth and the run
+was stopped after more than five minutes before completing the first report; a
+depth-3/four-pair fallback was likewise stopped after three minutes without a
+complete report. This runtime limitation is recorded rather than substituting
+partial data. Fixed-depth data is explanatory only and is not included in the
+Elo conclusion.
+
+### Correctness and blinded position status
+
+Rules (3,755 checks), perft (8/8), tactical (8 checks), fixed-work search
+determinism (14 assertions), TT correctness (36 assertions, including each
+one-at-a-time flag), deterministic tablebase (4 assertions), Phase 1C (21
+assertions), tournament harness, position-suite tests (49 checks), and the new
+64-start ablation infrastructure test passed. The development position run at
+5,000 nodes scored 2/2 verified development cases. It used the default blinded
+mode (`revealHoldout=false`); no holdout case detail or per-case feedback was
+used for selection. Full application typecheck was blocked by absent installed
+Expo/font modules, not an engine TypeScript error.
+
+### Decision
+
+**`extensions` is the strongest Phase 3B hypothesis.** Evidence is unusually
+large and directionally repeated, but uncertainty remains about which member of
+the grouped extension switch causes the loss, corpus representativeness, and
+the relationship between equal nodes and mobile wall-clock cost. Phase 3B must
+split extension subtypes and test exactly one controlled hypothesis, repeat all
+gates with that candidate, and confirm it independently. Do **not** disable the
+group in production from Phase 3A, combine it with another ablation, or call the
+result Teacher v1.
+
+---
+
 Copy this section for each experiment.
 
 ## EXP-YYYY-NNN — Short title
