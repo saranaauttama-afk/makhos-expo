@@ -286,6 +286,68 @@ Phase 1 is **not ready to close**. The broader Thai-rules/state re-audit remains
 
 ---
 
+## EXP-2026-004 — Phase 1C final correctness audit
+
+**Status:** KEEP (correctness only; no playing-strength claim)
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `cd840ed1802d29776d362e13c8968da96f1c45c5` (merge PR #5)
+
+**Candidate commit:** recorded by the Phase 1C pull request
+
+### Scope and rule evidence
+
+The audit started at the requested PR #5 merge commit. This checkout has no configured Git remote, so upstream freshness beyond that exact commit could not be queried; the commit is nevertheless the documented `engine-mainline` merge baseline. Source, executable perft fixtures, and existing regression history were treated as project-rule evidence over generic draughts assumptions.
+
+The follow-up review found that the original audit had incorrectly inferred a majority-capture rule from current source. FMJD's Thai/Makhos family entry and Thai Sports Association material instead support compulsory capture with free choice among complete sequences. The global maximum-length filter was removed, and the focused fixture now requires both a complete one-piece sequence and a complete two-piece sequence to be legal. A chosen piece must still continue until it has no further capture. This was the foundational correctness bug found by Phase 1C.
+
+The suite also covers preservation of multiple equal captures; complete multi-capture moves; forward-only movement/capture for men; crowning only after a complete move; flying-king quiet rays; first-empty-square landing after a flying-king capture; no-move and elimination terminals; threefold repetition; the retained 32/16-ply inactivity policies; capture reset and quiet increment of `halfmoveClock`; and draw/history interactions. `docs/THAI_RULES_SPEC.md` is now canonical and records evidence status. In particular, threefold and automatic 16/32-ply draws remain project policy/variant-dependent because this audit did not establish authoritative Thai competition support; they are not described as universal Thai rules.
+
+### Fixture/search compatibility audit
+
+- The unequal-capture perft changed from the obsolete expected count 1 to the corrected count 2. The mislabeled king-capture fixture was also repaired: its old non-capture position counted seven quiet moves, while the corrected 22x17→13 capture position counts one forced capture. Initial perft remains 7/49/392; every other recorded fixture count is unchanged.
+- Tactical benchmark dataset IDs containing `max-capture` are retained to avoid changing benchmark identity/answers, but their display buckets no longer claim a majority rule. No expected answer was changed.
+- Opening-book moves that were complete captures remain legal; the correction adds alternatives rather than invalidating them. Coverage/choice quality is measurement work, not a Phase 1 correctness issue.
+- Puzzle fixtures may have newly legal alternatives. Existing expected answers were not changed, and their previously documented provenance/uniqueness limitations remain.
+- Search capture-length sorting remains a move-ordering heuristic only; it does not filter legal moves. No evaluation or search parameter was tuned.
+
+### Production small-endgame correctness bug and fix
+
+The production solver could publish `exact: true` without a proof:
+
+1. its shared memo key contained only the current board repetition count, so the same board could reuse a result across different prior histories;
+2. DFS back-edges and the 60-ply horizon became draws;
+3. completed descendants survived a timed-out call in shared cache, so wall-clock scheduling/cache warmth could change a later exact answer.
+
+A full-history production memo had already demonstrated state explosion in Phase 1A. Phase 1C therefore chooses the conservative design rather than a large tablebase rewrite: production probing now returns exact results only for explicit repetition/inactivity draws, terminal losses, and directly verified mate-in-one moves. Every other eligible endgame returns incomplete (`undefined`) and safely falls through to regular search. Cache warmth and deadlines can no longer create a production exact claim. The full-history, fixed-node deterministic solver remains the bounded regression oracle.
+
+The cross-check set contains an exact king-vs-man win, a terminal loss, repetition and inactivity draws, the same winning board under threefold history, and an unresolved king-vs-men position. Whenever production returns exact, outcome and best-move semantics agree with the deterministic oracle; unresolved production calls are explicitly accepted as fall-through.
+
+### Search correctness verification
+
+The Phase 1B TT suite continues to cover bound semantics, mate-distance normalization, collision/occupancy behavior, interrupted-store protection, warmed-TT reuse, and all eight pruning feature flags with production-equivalent `true` defaults. Fixed-depth/fixed-node runs remain repeatable, and qsearch continues through mandatory captures rather than standing pat. No evaluation weight, pruning threshold, search margin, benchmark answer, or feature default changed.
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run test:rules` | PASS — 3,755 checks after free-choice correction |
+| `npm run test:perft` | PASS — 8/8; initial 7/49/392 |
+| `npm run test:tactical` | PASS — 8 checks |
+| `npm run test:search-determinism` | PASS — 14 assertions; both modes 5/5 identical |
+| `npm run test:tt-correctness` | PASS — 36 assertions |
+| `npm run test:tablebase-determinism` | PASS — 4 assertions and 20 repeated runs |
+| `npm run test:phase1c` | PASS — 21 focused assertions |
+| `npm run regression:harness` | PASS — no warnings or fatal reasons after capture-priority correction |
+| `npx tsc --noEmit` | ENVIRONMENT LIMITATION — installed tree lacks `@expo-google-fonts/kanit` and `expo-av`; not recorded as PASS |
+
+### Decision
+
+**Phase 1 READY TO CLOSE.** The audit leaves no known correctness bug. Opportunistic production endgame coverage is intentionally narrower, which is a performance/strength opportunity rather than a correctness blocker. The engine is ready for Phase 2 measurement and A/B infrastructure; Phase 2 work is deliberately not started here. Puzzle quality, Elo evidence, and pruning-strength uncertainty are not Phase 1 blockers.
+
+---
+
 # Experiment template
 
 Copy this section for each experiment.

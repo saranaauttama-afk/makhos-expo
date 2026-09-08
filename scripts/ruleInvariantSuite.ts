@@ -137,12 +137,7 @@ function validatePosition(pos: Position, label: string): number {
     identities.add(id);
   }
 
-  if (fullHasCapture) {
-    const maxCaps = Math.max(...moves.map(move => move.captured.length));
-    for (const move of moves) {
-      assert(move.captured.length === maxCaps, `${label}: non-max capture leaked through ${moveLabel(move)}`);
-    }
-  } else {
+  if (!fullHasCapture) {
     for (const move of moves) {
       assert(move.captured.length === 0, `${label}: capture mixed with quiet move ${moveLabel(move)}`);
     }
@@ -176,13 +171,14 @@ function runCuratedPositions(): number {
       assert(moves.length === 1, `forced double capture: expected one move, got ${moves.map(moveLabel).join(' | ')}`);
       assert(moves[0].from === 22 && moves[0].to === 6 && moves[0].captured.length === 2, 'forced double capture: wrong chain');
     }],
-    ['max capture filter', makePosition({
+    ['free choice between complete capture sequences', makePosition({
       side: 1,
-      p1Men: B1(22) | B1(25),
-      p2Men: B1(17) | B1(9) | B1(20),
+      p1Men: B1(8) | B1(16),
+      p2Men: B1(2) | B1(5) | B1(13),
     }), moves => {
-      assert(moves.length >= 1, 'max capture filter: expected at least one capture');
-      assert(moves.every(move => move.captured.length === 2), `max capture filter: shorter capture was returned ${moves.map(moveLabel).join(' | ')}`);
+      const lengths = moves.map(move => move.captured.length).sort((a, b) => a - b);
+      assert(lengths.join(',') === '1,2',
+        `free capture choice: expected complete 1- and 2-piece sequences, got ${moves.map(moveLabel).join(' | ')}`);
     }],
     ['king fly immediate landing', makePosition({
       side: 1,

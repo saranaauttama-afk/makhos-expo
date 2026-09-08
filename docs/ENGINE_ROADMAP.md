@@ -38,8 +38,8 @@ Goal: remove subtle search bugs before tuning evaluation.
 
 ## Rules and state
 
-- [ ] Re-audit Thai capture rules, multi-capture, promotion timing, flying king behavior, mandatory capture, no-legal-move result, repetition and inactivity draw.
-- [ ] Add targeted regression fixtures for every discovered rule bug.
+- [x] Re-audit Thai capture rules, multi-capture, promotion timing, flying king behavior, mandatory capture, no-legal-move result, repetition and inactivity draw. Phase 1C follow-up removed the incorrect majority-capture rule: any complete capture sequence may be chosen. `docs/THAI_RULES_SPEC.md` separates externally supported Makhos rules from unresolved 16/32-ply project draw policy.
+- [x] Add targeted regression fixtures for every discovered rule bug. Phase 1C found and fixed two correctness bugs: incorrect global majority/max-capture filtering in move generation, and unsafe exact claims in production small-endgame probing caused by incomplete history/cache/deadline behavior.
 - [x] Verify position hashing includes every state component that can change the game-theoretic result. Phase 1A split board/repetition identity from TT search-state keys and covered inactivity clock plus full repetition context.
 
 ## Search correctness
