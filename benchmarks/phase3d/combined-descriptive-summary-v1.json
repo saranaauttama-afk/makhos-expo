@@ -1,0 +1,168 @@
+{
+  "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+  "suite": "makhos-phase3d-sound-forced-trap-confirmation-starts-v1",
+  "seed": 123524543,
+  "fingerprint": "d68b1b8f33b3f4e7b490e44ff8bd2c4576ba11b14c81a52a987471598cb1ab6d",
+  "maxPlies": 160,
+  "maxDepth": 64,
+  "nodeBudgets": [
+    20000,
+    50000
+  ],
+  "timeBudgets": [
+    100
+  ],
+  "schemaVersion": "makhos-phase3d-combined-descriptive-v1",
+  "startNumberRange": [
+    1,
+    64
+  ],
+  "pairs": 64,
+  "confidenceNote": "Combined pair-bootstrap CI is not reconstructible from the retained first-half aggregate artifact; no first-half games were rerun. Independent half CIs remain authoritative.",
+  "results": [
+    {
+      "label": "nodes-20000",
+      "summary": {
+        "baselineWins": 49,
+        "candidateWins": 69,
+        "draws": 10,
+        "unresolved": 0,
+        "errors": 0,
+        "games": 128,
+        "completedPairs": 64,
+        "completedGames": 128,
+        "candidateScorePercent": 57.8125,
+        "eloDifference": 54.735183963203085,
+        "pairBootstrapConfidenceInterval95": null
+      },
+      "baseline": {
+        "nodes": 37994501,
+        "qnodes": 17519966,
+        "elapsedMs": 460406,
+        "moves": 2922,
+        "averageDepth": 7.918891170431212,
+        "nps": 120577.20142656699,
+        "soundForcedTrap": {
+          "triggers": 1364,
+          "addedDepth": 2152,
+          "rootTriggers": 1364,
+          "rootAddedDepth": 2152,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "candidate": {
+        "nodes": 38186678,
+        "qnodes": 17484591,
+        "elapsedMs": 474884,
+        "moves": 2932,
+        "averageDepth": 8.094133697135062,
+        "nps": 117231.30069659116,
+        "soundForcedTrap": {
+          "triggers": 0,
+          "addedDepth": 0,
+          "rootTriggers": 0,
+          "rootAddedDepth": 0,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      }
+    },
+    {
+      "label": "nodes-50000",
+      "summary": {
+        "baselineWins": 50,
+        "candidateWins": 69,
+        "draws": 9,
+        "unresolved": 0,
+        "errors": 0,
+        "games": 128,
+        "completedPairs": 64,
+        "completedGames": 128,
+        "candidateScorePercent": 57.421875,
+        "eloDifference": 51.95633472302097,
+        "pairBootstrapConfidenceInterval95": null
+      },
+      "baseline": {
+        "nodes": 93977795,
+        "qnodes": 41840642,
+        "elapsedMs": 941122,
+        "moves": 2870,
+        "averageDepth": 8.970383275261325,
+        "nps": 144315.44156868078,
+        "soundForcedTrap": {
+          "triggers": 2449,
+          "addedDepth": 3833,
+          "rootTriggers": 2449,
+          "rootAddedDepth": 3833,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "candidate": {
+        "nodes": 94225219,
+        "qnodes": 41575425,
+        "elapsedMs": 957236,
+        "moves": 2878,
+        "averageDepth": 9.235580264072272,
+        "nps": 141867.46424079328,
+        "soundForcedTrap": {
+          "triggers": 0,
+          "addedDepth": 0,
+          "rootTriggers": 0,
+          "rootAddedDepth": 0,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      }
+    },
+    {
+      "label": "time-100ms",
+      "summary": {
+        "baselineWins": 36,
+        "candidateWins": 66,
+        "draws": 26,
+        "unresolved": 0,
+        "errors": 0,
+        "games": 128,
+        "completedPairs": 64,
+        "completedGames": 128,
+        "candidateScorePercent": 61.71875,
+        "eloDifference": 82.9724045047711,
+        "pairBootstrapConfidenceInterval95": null
+      },
+      "baseline": {
+        "nodes": 24346904,
+        "qnodes": 12921649,
+        "elapsedMs": 294243,
+        "moves": 3157,
+        "averageDepth": 4.002850807728857,
+        "nps": 126659.09809239302,
+        "soundForcedTrap": {
+          "triggers": 652,
+          "addedDepth": 812,
+          "rootTriggers": 652,
+          "rootAddedDepth": 812,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "candidate": {
+        "nodes": 23805452,
+        "qnodes": 12642820,
+        "elapsedMs": 294165,
+        "moves": 3171,
+        "averageDepth": 3.9757174392935983,
+        "nps": 123904.17622762735,
+        "soundForcedTrap": {
+          "triggers": 0,
+          "addedDepth": 0,
+          "rootTriggers": 0,
+          "rootAddedDepth": 0,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      }
+    }
+  ]
+}

@@ -160,3 +160,23 @@ export const PHASE3C_FINAL_CONFIRMATION_START_SUITE: TournamentStartSuite = (() 
 })();
 export const PHASE3C_FINAL_CONFIRMATION_V1_FINGERPRINT =
   searchAblationSuiteFingerprint(PHASE3C_FINAL_CONFIRMATION_START_SUITE);
+
+/** Phase 3D independent confirmation corpus. The seed is mechanically derived
+ * from the first eight hex digits of canonical engine-mainline tip 075cd5bf... .
+ * The generator is deliberately unchanged from the previously audited v1
+ * generator; complete final states are filtered against every Phase 3A-3C
+ * corpus before the first 64 states are selected. */
+export const PHASE3D_CONFIRMATION_SEED = 0x075cd5bf;
+export const PHASE3D_CONFIRMATION_START_SUITE: TournamentStartSuite = (() => {
+  const priorStates = new Set([...SEARCH_ABLATION_START_SUITE.starts,
+    ...EXTENSION_CONFIRMATION_START_SUITE.starts, ...PHASE3C_CONFIRMATION_START_SUITE.starts,
+    ...PHASE3C_FINAL_CONFIRMATION_START_SUITE.starts].map(s => positionKey(s.position)));
+  const raw = generateSearchAblationStartSuite(PHASE3D_CONFIRMATION_SEED, 320);
+  const independent = raw.starts.filter(s => !priorStates.has(positionKey(s.position))).slice(0, 64);
+  if (independent.length !== 64) throw new Error('could not generate 64 Phase 3D states disjoint from all Phase 3A-3C suites');
+  return { ...raw, version: 'makhos-phase3d-sound-forced-trap-confirmation-starts-v1',
+    generator: 'xorshift32/legal-sorted/diverse-plies-2-17/v1; seed=first8hex(canonical engine-mainline tip 075cd5bf...)',
+    starts: independent.map((s, i) => ({ ...s, id: `phase3d-confirmation-v1-${String(i + 1).padStart(2, '0')}` })) };
+})();
+export const PHASE3D_CONFIRMATION_V1_FINGERPRINT =
+  searchAblationSuiteFingerprint(PHASE3D_CONFIRMATION_START_SUITE);

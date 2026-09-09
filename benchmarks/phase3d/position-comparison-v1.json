@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "makhos-phase3d-position-comparison-v1",
+  "blinded": {
+    "baseline": {
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      }
+    },
+    "candidate": {
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      }
+    }
+  },
+  "revealed": {
+    "baseline": {
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      }
+    },
+    "candidate": {
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      }
+    },
+    "candidateEndgames": [
+      {
+        "id": "exact-dev-forced-king-capture-p1",
+        "split": "development",
+        "pass": true
+      },
+      {
+        "id": "exact-holdout-forced-king-capture-p2",
+        "split": "holdout",
+        "pass": true
+      },
+      {
+        "id": "exact-holdout-forced-edge-capture",
+        "split": "holdout",
+        "pass": true
+      }
+    ]
+  }
+}

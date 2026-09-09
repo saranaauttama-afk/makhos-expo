@@ -821,3 +821,115 @@ Both emit machine-readable JSON/CSV under ignored `.tmp/phase3c/`.
 only `smallEndgame` to false; every other extension/search feature remains at
 the baseline value. PR #11 merge commit
 `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f` **is the frozen Teacher v1 release identity**.
+
+---
+
+## EXP-2026-010 — Phase 3D soundForcedTrap confirmation
+
+**Status:** NEEDS MORE DATA — candidate supported, production default unchanged
+
+**Date:** 2026-09-09
+
+**Canonical starting commit:** `075cd5bfb69eabac4555eef6d048fa35700efadb`
+
+**Frozen Teacher v1 identity:** `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`
+
+### Frozen hypothesis and controls
+
+The candidate differs from Teacher v1 only by `soundForcedTrap=false`.
+Both tournament engines explicitly pin the complete extension configuration,
+including Teacher v1's `smallEndgame=false`; no production default, evaluation,
+pruning, reductions, null move, ProbCut, IID, ordering, or
+`singleCaptureRecapture` behavior changed. The protocol was fixed before games
+were inspected. Phase 3B's approximately +100 Elo screen was not confirmation.
+
+The fresh suite is
+`makhos-phase3d-sound-forced-trap-confirmation-starts-v1`, seed `0x075cd5bf`
+(123524543), mechanically derived from the canonical starting commit, with
+SHA-256 `d68b1b8f33b3f4e7b490e44ff8bd2c4576ba11b14c81a52a987471598cb1ab6d`.
+Its frozen v1 generator and first-64 selection rule are documented in the
+protocol. Automated complete-state checks prove all 64 unique states disjoint
+from every retained Phase 3A, 3B, superseded Phase 3C, and final Phase 3C
+corpus. No alternate corpus or seed was generated after outcomes.
+
+### Independent paired-color results
+
+Candidate W/D/L is candidate wins/draws/baseline wins. Each row contains 32
+pairs/64 games, depth cap 64, and 160-ply maximum. All games completed with no
+unresolved games or errors. Node and time metrics are totals for baseline then
+candidate. Pair-bootstrap intervals use 20,000 deterministic pair resamples.
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C | baseline trap trigger/add |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 35/6/23 | 59.38% | +65.9 [+21.7,+118.4] | 7.92/8.30 | 18,787,579/18,846,016 | 8,668,785/8,650,141 | 228,743/234,979 | 120,031/117,015 | 761/1,197 |
+| 50,000 nodes/move | 36/2/26 | 57.81% | +54.7 [0.0,+112.3] | 9.44/9.66 | 46,688,804/46,914,627 | 20,151,518/20,027,273 | 488,743/494,535 | 136,760/135,363 | 1,690/2,748 |
+| 100 ms/move | 30/13/21 | 57.03% | +49.2 [-5.4,+106.3] | 4.06/4.09 | 11,557,331/11,344,447 | 6,192,873/6,109,077 | 142,964/143,210 | 124,159/121,874 | 399/489 |
+
+All measured trap events were root events. Candidate trap counters were zero,
+as expected. The canonical 20k interval excludes zero and all point estimates
+favor the candidate. The 50k lower bound touches zero and the production-like
+time interval crosses zero, however, so the preferred evidence standard is not
+met at both fixed work and time.
+
+### Correctness, holdout, and decision
+
+Rules passed 3,755 checks; perft 8/8; tactical 8; search determinism 14; TT 36;
+tablebase determinism four assertions/20 repeat probes; Phase 1C 21; tournament
+harness; position-suite infrastructure 49; Phase 3B/3C extension semantics and
+all corpus checks; and full TypeScript typecheck all passed. The Phase 3C
+position regression gate also passed. Phase 3D development output was first run
+blinded. Only after candidate, corpus, results, and decision rule were frozen
+was holdout revealed: baseline and candidate both passed development 2/2 and
+holdout 2/2, with all three endgame-tagged rows passing. No verified tactical,
+holdout, or endgame regression occurred.
+
+**Decision: NEEDS MORE DATA.** Independent evidence supports the hypothesis,
+and correctness gates pass, but the preferred confidence condition is not met
+at 50k or equal time. Retain the candidate as a supported follow-up hypothesis;
+do not promote or change the production `soundForcedTrap` default in this PR.
+
+### Untouched second-half confirmation (PR #14 continuation)
+
+Before inspecting starts 33-64, the runner was corrected to encode all eight
+Teacher v1 extension flags as literals rather than spreading contemporary
+defaults. The position comparison uses the same literal baseline. Candidate is
+constructed from that frozen object with only `soundForcedTrap=false`. A
+zero-based start offset selects the existing suite range without changing its
+seed, content, ordering, or fingerprint. No first-half games were rerun and no
+candidate setting was changed in response to outcomes.
+
+Candidate W/D/L remains candidate wins/draws/baseline wins. These are the
+independent results from only the previously untouched starts 33-64:
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C | baseline trap trigger/add |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 34/4/26 | 56.25% | +43.7 [0.0,+94.6] | 7.92/7.89 | 19,206,922/19,340,662 | 8,851,181/8,834,450 | 231,663/239,905 | 121,116/117,443 | 603/955 |
+| 50,000 nodes/move | 33/7/24 | 57.03% | +49.2 [0.0,+100.4] | 8.51/8.82 | 47,288,991/47,310,592 | 21,689,124/21,548,152 | 452,379/462,701 | 152,479/148,819 | 759/1,085 |
+| 100 ms/move | 36/13/15 | 66.41% | +118.4 [+65.9,+176.7] | 3.95/3.87 | 12,789,573/12,461,005 | 6,728,776/6,533,743 | 151,279/150,955 | 129,022/125,831 | 253/323 |
+
+All 192 second-half games completed with zero unresolved games and errors. All
+trap instrumentation was at the root, and candidate trap counters were zero.
+The 100 ms interval is wholly above zero, but both fixed-work lower bounds only
+touch zero rather than exceed it. Therefore the stated continuation promotion
+rule is not satisfied.
+
+### All-64 descriptive aggregation
+
+The two halves aggregate descriptively as follows. This aggregation is not a
+substitute for the independent second half. The retained first-half artifact
+contains aggregate statistics rather than individual pair scores, so an exact
+all-64 pair bootstrap cannot be reconstructed without rerunning forbidden
+first-half games; the combined CI is reported as unavailable rather than using
+an invalid game-level or synthetic-pair interval.
+
+| Budget | W/D/L | Score | Elo | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C | baseline trap trigger/add |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 69/10/49 | 57.81% | +54.7 | 7.92/8.09 | 37,994,501/38,186,678 | 17,519,966/17,484,591 | 460,406/474,884 | 120,577/117,231 | 1,364/2,152 |
+| 50,000 nodes/move | 69/9/50 | 57.42% | +52.0 | 8.97/9.24 | 93,977,795/94,225,219 | 41,840,642/41,575,425 | 941,122/957,236 | 144,315/141,867 | 2,449/3,833 |
+| 100 ms/move | 66/26/36 | 61.72% | +83.0 | 4.00/3.98 | 24,346,904/23,805,452 | 12,921,649/12,642,820 | 294,243/294,165 | 126,659/123,904 | 652/812 |
+
+**Continuation decision: NEEDS MORE DATA.** The untouched second half again
+has positive point estimates and provides strong equal-time evidence, but its
+fixed-work intervals do not lie entirely above zero. Keep the hypothesis; do
+not mark it a strong promotion candidate and do not change the production
+default in PR #14.

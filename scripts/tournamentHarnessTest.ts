@@ -33,6 +33,10 @@ async function main() {
   assert.deepEqual(first.summary,second.summary,'same seed/config must reproduce aggregate strength statistics');
   for(const pair of first.pairs){ assert.equal(pair.games[0].p1EngineId,'a');assert.equal(pair.games[1].p1EngineId,'b');assert.deepEqual(pair.games[0].moves,pair.games[1].moves); }
   assert.equal(first.summary.baselineWins,first.summary.candidateWins); assert.equal(first.summary.candidateScorePercent,first.summary.completedGames?50:null);
+  const secondStartOnly=await runTournament(a,b,suite1,{startOffset:1,startLimit:1,maxPlies:1,searchProvider:firstLegal});
+  assert.deepEqual(secondStartOnly.starts.map(s=>s.id),[suite1.starts[1].id]);
+  assert.equal(secondStartOnly.summary.pairedStarts,1);
+  await assert.rejects(()=>runTournament(a,b,suite1,{startOffset:3,startLimit:1}),/startOffset/);
 
   assert.deepEqual(assessComparability({mode:'nodes',budget:500,maxDepth:8},{mode:'nodes',budget:500,maxDepth:8}).status,'canonical');
   assert.equal(assessComparability({mode:'nodes',budget:500},{mode:'nodes',budget:5000}).status,'nonComparable');

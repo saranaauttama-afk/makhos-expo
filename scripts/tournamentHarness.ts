@@ -25,7 +25,7 @@ export interface ComparabilityAssessment { computeComparable: boolean; canonical
 export interface TournamentSummary { baselineWins: number; candidateWins: number; draws: number; unresolved: number; errors: number; games: number; scoreEligibleBaselineWins: number; scoreEligibleCandidateWins: number; scoreEligibleDraws: number; completedPairs: number; completedGames: number; pairedStarts: number; candidateScorePercent: number|null; scoreConfidenceInterval95: [number|null, number|null]; eloDifference: EloValue|null; eloConfidenceInterval95: [EloValue|null, EloValue|null]; confidenceMethod: string }
 export interface TournamentResult { schemaVersion: 'makhos-tournament-result-v1'; metadata: Record<string, unknown>; baseline: EngineConfig; candidate: EngineConfig; starts: TournamentStartSuite['starts']; summary: TournamentSummary; engines: Record<string, EngineTotals>; pairs: PairRecord[] }
 export type SearchProvider = (pos: Position, history: number[], config: EngineConfig, tt: TT) => Promise<SearchResult>;
-export interface TournamentOptions { maxPlies?: number; startLimit?: number; generatedAt?: string; allowDescriptiveStatistics?: boolean; searchProvider?: SearchProvider; onSearch?: (engine: EngineConfig, effectiveFeatures: SearchFeatureFlags) => void }
+export interface TournamentOptions { maxPlies?: number; startOffset?: number; startLimit?: number; generatedAt?: string; allowDescriptiveStatistics?: boolean; searchProvider?: SearchProvider; onSearch?: (engine: EngineConfig, effectiveFeatures: SearchFeatureFlags) => void }
 
 function sameMove(a: Move, b: Move): boolean { return a.from === b.from && a.to === b.to && a.promote === b.promote && a.captured.join(',') === b.captured.join(',') && (a.path ?? []).join(',') === (b.path ?? []).join(','); }
 async function search(pos: Position, history: number[], config: EngineConfig, tt: TT): Promise<SearchResult> {
@@ -100,7 +100,10 @@ export function calculatePairStatistics(pairScores: number[], seed: number): Pic
 export async function runTournament(baseline: EngineConfig, candidate: EngineConfig, suite: TournamentStartSuite,
   options: TournamentOptions = {}): Promise<TournamentResult> {
   if (baseline.id === candidate.id) throw new Error('engine ids must be distinct');
-  const starts=suite.starts.slice(0, options.startLimit); const pairs: PairRecord[]=[];
+  const startOffset=options.startOffset??0;
+  if (!Number.isInteger(startOffset) || startOffset < 0 || startOffset > suite.starts.length)
+    throw new Error('startOffset must select a valid zero-based suite position');
+  const starts=suite.starts.slice(startOffset, options.startLimit===undefined?undefined:startOffset+options.startLimit); const pairs: PairRecord[]=[];
   for (const [i,start] of starts.entries()) { const pairId=`pair-${i+1}`; const games=[await playTournamentGame(start,pairId,1,baseline,candidate,options.maxPlies??240,options), await playTournamentGame(start,pairId,2,candidate,baseline,options.maxPlies??240,options)]; const ss=games.map(g=>score(g,candidate.id)); pairs.push({pairId,startId:start.id,games,candidateScore:ss.every(x=>x!==undefined)?(ss[0]!+ss[1]!):undefined}); }
   const games=pairs.flatMap(p=>p.games), pairScores=pairs.map(p=>p.candidateScore).filter((x):x is number=>x!==undefined);
   const scoreEligibleGames=pairs.filter(p=>p.candidateScore!==undefined).flatMap(p=>p.games);

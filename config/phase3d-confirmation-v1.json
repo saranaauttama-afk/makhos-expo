@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "makhos-phase3d-confirmation-config-v1",
+  "seedSourceCommit": "075cd5bfb69eabac4555eef6d048fa35700efadb",
+  "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+  "suite": "makhos-phase3d-sound-forced-trap-confirmation-starts-v1",
+  "seedHex": "0x075cd5bf",
+  "seed": 123524543,
+  "fingerprint": "d68b1b8f33b3f4e7b490e44ff8bd2c4576ba11b14c81a52a987471598cb1ab6d",
+  "pairedStarts": 32,
+  "confirmationStartOffset": 32,
+  "confirmationStartRange": [33, 64],
+  "nodeBudgets": [20000, 50000],
+  "timeBudgetsMs": [100],
+  "maxDepth": 64,
+  "maxPlies": 160,
+  "baseline": {
+    "singleLegalMove": true,
+    "smallEndgame": false,
+    "tacticalCapture": true,
+    "multiCapture": true,
+    "opponentForcedCapture": true,
+    "singleCaptureRecapture": true,
+    "rootLowMobility": true,
+    "soundForcedTrap": true
+  },
+  "candidate": {
+    "singleLegalMove": true,
+    "smallEndgame": false,
+    "tacticalCapture": true,
+    "multiCapture": true,
+    "opponentForcedCapture": true,
+    "singleCaptureRecapture": true,
+    "rootLowMobility": true,
+    "soundForcedTrap": false
+  }
+}

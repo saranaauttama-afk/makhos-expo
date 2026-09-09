@@ -1,0 +1,244 @@
+{
+  "schemaVersion": "makhos-phase3d-confirmation-v1",
+  "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+  "suite": "makhos-phase3d-sound-forced-trap-confirmation-starts-v1",
+  "seed": 123524543,
+  "fingerprint": "d68b1b8f33b3f4e7b490e44ff8bd2c4576ba11b14c81a52a987471598cb1ab6d",
+  "pairs": 32,
+  "maxPlies": 160,
+  "maxDepth": 64,
+  "nodeBudgets": [
+    20000,
+    50000
+  ],
+  "timeBudgets": [
+    100
+  ],
+  "results": [
+    {
+      "label": "nodes-20000",
+      "summary": {
+        "baselineWins": 23,
+        "candidateWins": 35,
+        "draws": 6,
+        "unresolved": 0,
+        "errors": 0,
+        "games": 64,
+        "scoreEligibleBaselineWins": 23,
+        "scoreEligibleCandidateWins": 35,
+        "scoreEligibleDraws": 6,
+        "completedPairs": 32,
+        "completedGames": 64,
+        "candidateScorePercent": 59.375,
+        "scoreConfidenceInterval95": [
+          0.53125,
+          0.6640625
+        ],
+        "eloDifference": {
+          "kind": "finite",
+          "value": 65.92409945839685
+        },
+        "eloConfidenceInterval95": [
+          {
+            "kind": "finite",
+            "value": 21.74306492903707
+          },
+          {
+            "kind": "finite",
+            "value": 118.38018805388248
+          }
+        ],
+        "pairedStarts": 32,
+        "confidenceMethod": "deterministic pair-level bootstrap, 20,000 resamples; incomplete pairs excluded"
+      },
+      "baseline": {
+        "nodes": 18787579,
+        "qnodes": 8668785,
+        "elapsedMs": 228743,
+        "moves": 1442,
+        "averageDepth": 7.916782246879334,
+        "nps": 120031.4938599214,
+        "soundForcedTrap": {
+          "triggers": 761,
+          "addedDepth": 1197,
+          "rootTriggers": 761,
+          "rootAddedDepth": 1197,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "candidate": {
+        "nodes": 18846016,
+        "qnodes": 8650141,
+        "elapsedMs": 234979,
+        "moves": 1450,
+        "averageDepth": 8.297931034482758,
+        "nps": 117015.38009779598,
+        "soundForcedTrap": {
+          "triggers": 0,
+          "addedDepth": 0,
+          "rootTriggers": 0,
+          "rootAddedDepth": 0,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "comparability": {
+        "computeComparable": true,
+        "canonical": true,
+        "status": "canonical",
+        "reason": "equal fixed-node budget 20000 and depth cap 64"
+      }
+    },
+    {
+      "label": "nodes-50000",
+      "summary": {
+        "baselineWins": 26,
+        "candidateWins": 36,
+        "draws": 2,
+        "unresolved": 0,
+        "errors": 0,
+        "games": 64,
+        "scoreEligibleBaselineWins": 26,
+        "scoreEligibleCandidateWins": 36,
+        "scoreEligibleDraws": 2,
+        "completedPairs": 32,
+        "completedGames": 64,
+        "candidateScorePercent": 57.8125,
+        "scoreConfidenceInterval95": [
+          0.5,
+          0.65625
+        ],
+        "eloDifference": {
+          "kind": "finite",
+          "value": 54.735183963203085
+        },
+        "eloConfidenceInterval95": [
+          {
+            "kind": "finite",
+            "value": 0
+          },
+          {
+            "kind": "finite",
+            "value": 112.3306438302777
+          }
+        ],
+        "pairedStarts": 32,
+        "confidenceMethod": "deterministic pair-level bootstrap, 20,000 resamples; incomplete pairs excluded"
+      },
+      "baseline": {
+        "nodes": 46688804,
+        "qnodes": 20151518,
+        "elapsedMs": 488743,
+        "moves": 1417,
+        "averageDepth": 9.440366972477063,
+        "nps": 136759.65077760705,
+        "soundForcedTrap": {
+          "triggers": 1690,
+          "addedDepth": 2748,
+          "rootTriggers": 1690,
+          "rootAddedDepth": 2748,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "candidate": {
+        "nodes": 46914627,
+        "qnodes": 20027273,
+        "elapsedMs": 494535,
+        "moves": 1422,
+        "averageDepth": 9.660337552742616,
+        "nps": 135363.32109961883,
+        "soundForcedTrap": {
+          "triggers": 0,
+          "addedDepth": 0,
+          "rootTriggers": 0,
+          "rootAddedDepth": 0,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "comparability": {
+        "computeComparable": true,
+        "canonical": true,
+        "status": "canonical",
+        "reason": "equal fixed-node budget 50000 and depth cap 64"
+      }
+    },
+    {
+      "label": "time-100ms",
+      "summary": {
+        "baselineWins": 21,
+        "candidateWins": 30,
+        "draws": 13,
+        "unresolved": 0,
+        "errors": 0,
+        "games": 64,
+        "scoreEligibleBaselineWins": 21,
+        "scoreEligibleCandidateWins": 30,
+        "scoreEligibleDraws": 13,
+        "completedPairs": 32,
+        "completedGames": 64,
+        "candidateScorePercent": 57.03125,
+        "scoreConfidenceInterval95": [
+          0.4921875,
+          0.6484375
+        ],
+        "eloDifference": {
+          "kind": "finite",
+          "value": 49.18406825048483
+        },
+        "eloConfidenceInterval95": [
+          {
+            "kind": "finite",
+            "value": -5.429122875709548
+          },
+          {
+            "kind": "finite",
+            "value": 106.34623144029209
+          }
+        ],
+        "pairedStarts": 32,
+        "confidenceMethod": "deterministic pair-level bootstrap, 20,000 resamples; incomplete pairs excluded"
+      },
+      "baseline": {
+        "nodes": 11557331,
+        "qnodes": 6192873,
+        "elapsedMs": 142964,
+        "moves": 1543,
+        "averageDepth": 4.055735580038886,
+        "nps": 124158.5573990655,
+        "soundForcedTrap": {
+          "triggers": 399,
+          "addedDepth": 489,
+          "rootTriggers": 399,
+          "rootAddedDepth": 489,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "candidate": {
+        "nodes": 11344447,
+        "qnodes": 6109077,
+        "elapsedMs": 143210,
+        "moves": 1546,
+        "averageDepth": 4.0860284605433375,
+        "nps": 121873.64010893094,
+        "soundForcedTrap": {
+          "triggers": 0,
+          "addedDepth": 0,
+          "rootTriggers": 0,
+          "rootAddedDepth": 0,
+          "interiorTriggers": 0,
+          "interiorAddedDepth": 0
+        }
+      },
+      "comparability": {
+        "computeComparable": true,
+        "canonical": false,
+        "status": "nonCanonical",
+        "reason": "equal fixed-time budget 100ms and depth cap 64; wall clock is not canonical evidence"
+      }
+    }
+  ]
+}
