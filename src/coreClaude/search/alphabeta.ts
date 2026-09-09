@@ -74,7 +74,7 @@ export interface ExtensionFeatureFlags {
   soundForcedTrap: boolean;
 }
 export const DEFAULT_EXTENSION_FEATURES: Readonly<ExtensionFeatureFlags> = Object.freeze({
-  singleLegalMove:true, smallEndgame:true, tacticalCapture:true, multiCapture:true,
+  singleLegalMove:true, smallEndgame:false, tacticalCapture:true, multiCapture:true,
   opponentForcedCapture:true, singleCaptureRecapture:true, rootLowMobility:true, soundForcedTrap:true,
 });
 export interface ExtensionCounter { triggers:number; addedDepth:number; rootTriggers:number; rootAddedDepth:number; interiorTriggers:number; interiorAddedDepth:number }

@@ -3,5 +3,5 @@
   "protocolVersion": "phase3b-extension-attribution-v1",
   "phase3aMergeSha": "4149c4b1989378b2a85746b36190c915fdb16d4d",
   "screening": { "suite": "makhos-search-ablation-starts-v1", "pairedStarts": 32, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 160 },
-  "confirmation": { "suite": "makhos-extension-confirmation-starts-v1", "seed": 1095357617, "fingerprint": "58475f4a2913f4a6c093d12a54a89e6a30d6160f5921f63964bb83267d5384ab", "pairedStarts": 64, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 160 }
+  "confirmation": { "suite": "makhos-extension-confirmation-starts-v1", "seed": 1095353521, "fingerprint": "58475f4a2913f4a6c093d12a54a89e6a30d6160f5921f63964bb83267d5384ab", "pairedStarts": 64, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 160 }
 }

@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { Move, generateMoves } from '../src/coreClaude/movegen';
 import { isDrawByInactivity } from '../src/coreClaude/position';
-import { fixedDepthSearch, fixedNodeSearch } from '../src/coreClaude/search/alphabeta';
+import { ExtensionFeatureFlags, fixedDepthSearch, fixedNodeSearch } from '../src/coreClaude/search/alphabeta';
 import { probeSmallEndgameDeterministic } from '../src/coreClaude/search/endgameTablebase';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreClaude/search/repetition';
 import { TT } from '../src/coreClaude/search/tt';
@@ -55,12 +55,13 @@ export function resolveWdlEvidence(c: PositionCase, _ordinarySearchScore?: numbe
   return undefined;
 }
 
-export async function runPositionSuite(mode: 'nodes' | 'depth' = 'nodes', budget = CANONICAL_POSITION_NODE_BUDGET) {
+export async function runPositionSuite(mode: 'nodes' | 'depth' = 'nodes', budget = CANONICAL_POSITION_NODE_BUDGET,
+  extensionOverrides?: Partial<ExtensionFeatureFlags>) {
   const rows: PositionRunRow[] = [];
   for (const c of POSITION_SUITE) {
     const result = mode === 'nodes'
-      ? await fixedNodeSearch(c.position, budget, new TT(), c.historyHashes)
-      : await fixedDepthSearch(c.position, budget, new TT(), c.historyHashes);
+      ? await fixedNodeSearch(c.position, budget, new TT(), c.historyHashes, 64, undefined, {}, extensionOverrides)
+      : await fixedDepthSearch(c.position, budget, new TT(), c.historyHashes, undefined, {}, extensionOverrides);
     const acceptable = acceptedMoves(c.expected);
     const wdlEvidence = resolveWdlEvidence(c, result.score);
     const pass = !isVerified(c) ? undefined : c.expected.type === 'wdl'
