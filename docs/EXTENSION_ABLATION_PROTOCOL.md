@@ -61,11 +61,12 @@ npm run experiment:extension-ablation -- --stage=confirmation --subtypes=smallEn
 
 Phase 3C's original multi-budget run reused the first 32 starts above. It is a
 same-corpus robustness replication, not a second independent-corpus result.
-Before inspecting any additional game result, the promotion review froze
-`makhos-phase3c-confirmation-starts-v1`. Its seed `0x3a144f82` (974409602) is
-mechanically the first eight hexadecimal digits of pre-confirmation PR head
-`3a144f82a2a214e7fedcf71c922323db363f586a`. Its 64 retained complete states
-are disjoint from both Phase 3A and Phase 3B, and its content fingerprint is
-`d44718e2fef2304f05e991d18cd592b72bac7346f4d99a8d0e2f2d29dcac7a1c`.
-No alternate seed was tried. Exact frozen metadata is also stored in
-`config/phase3c-promotion-v1.json`.
+The final promotion review freezes `makhos-phase3c-final-confirmation-starts-v1`.
+Its seed `0xb59570ad` (3046469805) is mechanically the first eight hexadecimal
+digits of immutable, GitHub-resolvable PR #11 commit
+`b59570adb3e94dc629fc5a9af262b96b9d030498`. Its 64 retained complete states
+are disjoint from Phase 3A, Phase 3B, and the superseded Phase 3C review corpus.
+Its content fingerprint is
+`fc48f9aee765fd13d30c2577d6c3031bada555214d1d831148a58ae68ea16d0f`.
+No alternate seed was tried. Exact metadata is frozen in
+`config/phase3c-promotion-v1.json` before final games are inspected.

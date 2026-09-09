@@ -737,7 +737,7 @@ Production defaults remain unchanged in this PR. This is not Teacher v1.
 
 **Baseline commit:** `564b298ac07f30709b81093861e61ccf01cb0d4e`
 
-**Teacher v1 commit:** pending — use the PR #11 merge commit and update this field immediately after merge. The frozen pre-results confirmation-corpus commit is `123e5039b34a3def0d0638aaee157204b76108f8`.
+**Teacher v1 commit:** pending — use the PR #11 merge commit and update this field immediately after merge.
 
 ### Frozen hypothesis and controls
 
@@ -774,22 +774,23 @@ frozen corpus, not a second independent-corpus result.
 
 ### New disjoint-corpus confirmation (PR review)
 
-Before inspecting these results, commit `123e5039b34a3def0d0638aaee157204b76108f8`
-froze `makhos-phase3c-confirmation-starts-v1`: seed `0x3a144f82`
-(974409602), fingerprint
-`d44718e2fef2304f05e991d18cd592b72bac7346f4d99a8d0e2f2d29dcac7a1c`.
-The seed is mechanically derived from the previous PR head, no alternate seed
-was tried, and all 64 corpus states are checked disjoint from both Phase 3A and
-Phase 3B. The first 32 frozen starts produced:
+The final corpus is `makhos-phase3c-final-confirmation-starts-v1`, seeded with
+`0xb59570ad` (3046469805), mechanically derived from the first eight digits of
+GitHub-resolvable PR #11 commit
+`b59570adb3e94dc629fc5a9af262b96b9d030498`. No alternate seed was tried. Its
+fingerprint is `fc48f9aee765fd13d30c2577d6c3031bada555214d1d831148a58ae68ea16d0f`;
+all 64 states are checked disjoint from Phase 3A, Phase 3B, and the superseded
+Phase 3C review corpus. Final results are recorded below after the run.
 
 | Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 20,000 nodes/move | 49/7/8 | 82.03% | +263.8 [+169.8,+394.1] | 4.72/8.08 | 27,181,191/19,304,368 | 1,096,134/9,060,712 | 208,087/221,263 | 135,892/128,196 |
-| 100 ms/move | 47/5/12 | 77.34% | +213.3 [+130.7,+314.4] | 2.20/3.80 | 21,662,936/13,842,136 | 855,435/7,508,491 | 147,701/138,122 | 152,459/154,578 |
+| 20,000 nodes/move | 43/6/15 | 71.88% | +163.0 [+100.4,+237.5] | 4.50/7.51 | 26,543,806/18,881,891 | 1,215,961/8,891,277 | 211,978/214,209 | 130,956/129,655 |
+| 100 ms/move | 44/0/20 | 68.75% | +137.0 [+54.7,+221.1] | 2.35/3.62 | 19,378,770/13,301,190 | 866,472/7,167,844 | 140,652/134,109 | 143,939/152,630 |
 
-Both independent confirmation intervals exclude zero Elo; all 128 games
-completed with no unresolved games or errors. This supplies the independent
-evidence missing from the original Phase 3C wording.
+Both final confirmation intervals exclude zero Elo. All 128 games completed
+with paired colors, no unresolved games, and no errors. This remotely auditable,
+new-corpus result is the independent evidence supporting promotion; the earlier
+Phase 3C runs remain same-corpus robustness evidence only.
 
 ### Correctness and regression gates
 
