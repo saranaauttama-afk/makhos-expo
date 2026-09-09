@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "makhos-phase3e-move-ordering-config-v1",
+  "canonicalTip": "07a3f052904a4e72095b694d4e546f16c4162afa",
+  "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+  "suite": "makhos-phase3e-move-ordering-starts-v1",
+  "seedHex": "0x07a3f052",
+  "seed": 128184402,
+  "fingerprint": "00db4d9cedfe76202dae15373d33bfdc89f31726ad2b9b4e0fe3438701e97091",
+  "screening": { "startOffset": 0, "pairedStarts": 32, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 160 },
+  "confirmation": { "startOffset": 32, "pairedStarts": 32, "nodeBudgets": [20000, 50000], "timeBudgetsMs": [100], "maxDepth": 64, "maxPlies": 160 },
+  "selectionRule": "Select exactly the highest candidate score strictly above 50%; ties use inventory order. Otherwise stop as inconclusive.",
+  "inventory": ["ttMove", "captures", "killers", "history", "countermove", "recapture"],
+  "baselineSearch": { "reverseFutility": true, "razoring": true, "nullMove": true, "probCut": true, "iid": true, "lmr": true, "lmp": true, "extensions": true },
+  "baselineExtensions": { "singleLegalMove": true, "smallEndgame": false, "tacticalCapture": true, "multiCapture": true, "opponentForcedCapture": true, "singleCaptureRecapture": true, "rootLowMobility": true, "soundForcedTrap": true },
+  "baselineMoveOrdering": { "ttMove": true, "captures": true, "killers": true, "history": true, "countermove": true, "recapture": true }
+}

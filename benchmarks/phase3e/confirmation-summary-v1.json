@@ -1,0 +1,373 @@
+{
+  "schemaVersion": "makhos-phase3e-confirmation-summary-v1",
+  "config": {
+    "schemaVersion": "makhos-phase3e-move-ordering-config-v1",
+    "canonicalTip": "07a3f052904a4e72095b694d4e546f16c4162afa",
+    "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+    "suite": "makhos-phase3e-move-ordering-starts-v1",
+    "seedHex": "0x07a3f052",
+    "seed": 128184402,
+    "fingerprint": "00db4d9cedfe76202dae15373d33bfdc89f31726ad2b9b4e0fe3438701e97091",
+    "screening": {
+      "startOffset": 0,
+      "pairedStarts": 32,
+      "nodesPerMove": 5000,
+      "maxDepth": 64,
+      "maxPlies": 160
+    },
+    "confirmation": {
+      "startOffset": 32,
+      "pairedStarts": 32,
+      "nodeBudgets": [
+        20000,
+        50000
+      ],
+      "timeBudgetsMs": [
+        100
+      ],
+      "maxDepth": 64,
+      "maxPlies": 160
+    },
+    "selectionRule": "Select exactly the highest candidate score strictly above 50%; ties use inventory order. Otherwise stop as inconclusive.",
+    "inventory": [
+      "ttMove",
+      "captures",
+      "killers",
+      "history",
+      "countermove",
+      "recapture"
+    ],
+    "baselineSearch": {
+      "reverseFutility": true,
+      "razoring": true,
+      "nullMove": true,
+      "probCut": true,
+      "iid": true,
+      "lmr": true,
+      "lmp": true,
+      "extensions": true
+    },
+    "baselineExtensions": {
+      "singleLegalMove": true,
+      "smallEndgame": false,
+      "tacticalCapture": true,
+      "multiCapture": true,
+      "opponentForcedCapture": true,
+      "singleCaptureRecapture": true,
+      "rootLowMobility": true,
+      "soundForcedTrap": true
+    },
+    "baselineMoveOrdering": {
+      "ttMove": true,
+      "captures": true,
+      "killers": true,
+      "history": true,
+      "countermove": true,
+      "recapture": true
+    }
+  },
+  "selectedCandidate": "countermove",
+  "results": [
+    {
+      "budget": "20,000 nodes/move",
+      "wdl": {
+        "wins": 31,
+        "draws": 11,
+        "losses": 22
+      },
+      "scorePercent": 57.03125,
+      "elo": 49.18406825048483,
+      "scoreCI95": [
+        0.484375,
+        0.65625
+      ],
+      "eloCI95": [
+        -10.86089841744591,
+        112.3306438302777
+      ],
+      "baselineMetrics": {
+        "averageDepth": 7.352941176470588,
+        "nodes": 21797752,
+        "qnodes": 10406637,
+        "elapsedMs": 277232,
+        "nps": 116164.03950481907,
+        "moves": 1683,
+        "moveOrderingStats": {
+          "ttMove": {
+            "scoreHits": 863776,
+            "firstAfterOrdering": 863748,
+            "updates": 0
+          },
+          "captures": {
+            "scoreHits": 2226317,
+            "firstAfterOrdering": 1945554,
+            "updates": 0
+          },
+          "killers": {
+            "scoreHits": 3977247,
+            "firstAfterOrdering": 2829995,
+            "updates": 2364735
+          },
+          "history": {
+            "scoreHits": 16997148,
+            "firstAfterOrdering": 4811698,
+            "updates": 2364735
+          },
+          "countermove": {
+            "scoreHits": 1082164,
+            "firstAfterOrdering": 806039,
+            "updates": 2272466
+          },
+          "recapture": {
+            "scoreHits": 4286,
+            "firstAfterOrdering": 4286,
+            "updates": 0
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 7.462085308056872,
+        "nodes": 21797777,
+        "qnodes": 10438943,
+        "elapsedMs": 275997,
+        "nps": 116800.97972079407,
+        "moves": 1688,
+        "moveOrderingStats": {
+          "ttMove": {
+            "scoreHits": 883855,
+            "firstAfterOrdering": 883825,
+            "updates": 0
+          },
+          "captures": {
+            "scoreHits": 2249319,
+            "firstAfterOrdering": 1966279,
+            "updates": 0
+          },
+          "killers": {
+            "scoreHits": 3993790,
+            "firstAfterOrdering": 2842780,
+            "updates": 2376679
+          },
+          "history": {
+            "scoreHits": 17008711,
+            "firstAfterOrdering": 4814823,
+            "updates": 2376679
+          },
+          "countermove": {
+            "scoreHits": 0,
+            "firstAfterOrdering": 0,
+            "updates": 0
+          },
+          "recapture": {
+            "scoreHits": 4245,
+            "firstAfterOrdering": 4245,
+            "updates": 0
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "budget": "50,000 nodes/move",
+      "wdl": {
+        "wins": 28,
+        "draws": 9,
+        "losses": 27
+      },
+      "scorePercent": 50.78125,
+      "elo": 5.429122875709566,
+      "scoreCI95": [
+        0.4296875,
+        0.5859375
+      ],
+      "eloCI95": [
+        -49.18406825048483,
+        60.31415751636439
+      ],
+      "baselineMetrics": {
+        "averageDepth": 8.456140350877194,
+        "nodes": 50575993,
+        "qnodes": 22905743,
+        "elapsedMs": 513761,
+        "nps": 143027.08068537706,
+        "moves": 1539,
+        "moveOrderingStats": {
+          "ttMove": {
+            "scoreHits": 1789532,
+            "firstAfterOrdering": 1789413,
+            "updates": 0
+          },
+          "captures": {
+            "scoreHits": 5402553,
+            "firstAfterOrdering": 4728404,
+            "updates": 0
+          },
+          "killers": {
+            "scoreHits": 8842318,
+            "firstAfterOrdering": 6328271,
+            "updates": 5200875
+          },
+          "history": {
+            "scoreHits": 47082032,
+            "firstAfterOrdering": 11347309,
+            "updates": 5200875
+          },
+          "countermove": {
+            "scoreHits": 2534718,
+            "firstAfterOrdering": 1857441,
+            "updates": 4995272
+          },
+          "recapture": {
+            "scoreHits": 11029,
+            "firstAfterOrdering": 11029,
+            "updates": 0
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 8.526281635301752,
+        "nodes": 50422129,
+        "qnodes": 22991429,
+        "elapsedMs": 516891,
+        "nps": 142029.08930509526,
+        "moves": 1541,
+        "moveOrderingStats": {
+          "ttMove": {
+            "scoreHits": 1772287,
+            "firstAfterOrdering": 1772239,
+            "updates": 0
+          },
+          "captures": {
+            "scoreHits": 5386944,
+            "firstAfterOrdering": 4722296,
+            "updates": 0
+          },
+          "killers": {
+            "scoreHits": 8847751,
+            "firstAfterOrdering": 6338443,
+            "updates": 5216692
+          },
+          "history": {
+            "scoreHits": 47134460,
+            "firstAfterOrdering": 11330256,
+            "updates": 5216692
+          },
+          "countermove": {
+            "scoreHits": 0,
+            "firstAfterOrdering": 0,
+            "updates": 0
+          },
+          "recapture": {
+            "scoreHits": 10018,
+            "firstAfterOrdering": 10018,
+            "updates": 0
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "budget": "100 ms/move",
+      "wdl": {
+        "wins": 30,
+        "draws": 7,
+        "losses": 27
+      },
+      "scorePercent": 52.34375,
+      "elo": 16.297987076023777,
+      "scoreCI95": [
+        0.4296875,
+        0.6171875
+      ],
+      "eloCI95": [
+        -49.18406825048483,
+        82.97240450477112
+      ],
+      "baselineMetrics": {
+        "averageDepth": 3.6683640992998092,
+        "nodes": 12680378,
+        "qnodes": 6832481,
+        "elapsedMs": 147301,
+        "nps": 132469.29077195673,
+        "moves": 1571,
+        "moveOrderingStats": {
+          "ttMove": {
+            "scoreHits": 357604,
+            "firstAfterOrdering": 357595,
+            "updates": 0
+          },
+          "captures": {
+            "scoreHits": 1437116,
+            "firstAfterOrdering": 1238282,
+            "updates": 0
+          },
+          "killers": {
+            "scoreHits": 2488392,
+            "firstAfterOrdering": 1809880,
+            "updates": 1506012
+          },
+          "history": {
+            "scoreHits": 10117316,
+            "firstAfterOrdering": 3026046,
+            "updates": 1506012
+          },
+          "countermove": {
+            "scoreHits": 676230,
+            "firstAfterOrdering": 498838,
+            "updates": 1452138
+          },
+          "recapture": {
+            "scoreHits": 3267,
+            "firstAfterOrdering": 3267,
+            "updates": 0
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 3.6352641629535327,
+        "nodes": 12583617,
+        "qnodes": 6772488,
+        "elapsedMs": 147024,
+        "nps": 131652.6893568397,
+        "moves": 1571,
+        "moveOrderingStats": {
+          "ttMove": {
+            "scoreHits": 363486,
+            "firstAfterOrdering": 363476,
+            "updates": 0
+          },
+          "captures": {
+            "scoreHits": 1431558,
+            "firstAfterOrdering": 1234989,
+            "updates": 0
+          },
+          "killers": {
+            "scoreHits": 2467648,
+            "firstAfterOrdering": 1796631,
+            "updates": 1495166
+          },
+          "history": {
+            "scoreHits": 10008120,
+            "firstAfterOrdering": 2999957,
+            "updates": 1495166
+          },
+          "countermove": {
+            "scoreHits": 0,
+            "firstAfterOrdering": 0,
+            "updates": 0
+          },
+          "recapture": {
+            "scoreHits": 3273,
+            "firstAfterOrdering": 3273,
+            "updates": 0
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    }
+  ],
+  "decision": "measurement only; do not promote from this PR"
+}

@@ -933,3 +933,70 @@ has positive point estimates and provides strong equal-time evidence, but its
 fixed-work intervals do not lie entirely above zero. Keep the hypothesis; do
 not mark it a strong promotion candidate and do not change the production
 default in PR #14.
+
+## EXP-2026-011 — Phase 3E move-ordering ablation
+
+**Status:** MEASURED — countermove removal selected for confirmation; no production change
+
+**Date:** 2026-09-09
+
+**Canonical starting commit:** `07a3f052904a4e72095b694d4e546f16c4162afa`
+
+**Frozen Teacher v1 identity:** `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`
+
+### Audit, controls, and frozen corpus
+
+The pre-outcome audit is recorded in `docs/PHASE3E_MOVE_ORDERING_PROTOCOL.md`.
+All six requested mechanisms exist, although recapture is qsearch-only and uses
+the prior capture's `from` square; there is no distinct main-search recapture
+bonus. Phase 3E added measurement-only flags and counters. All defaults remain
+true. Baseline and candidates explicitly pin all search flags, all extension
+flags (`smallEndgame=false`, `soundForcedTrap=true`), and all ordering flags.
+No value was tuned and no evaluation, LMR/LMP, pruning, extension, TT
+replacement, qsearch legality/rule, or production default changed.
+
+The fresh 64-state corpus uses seed `0x07a3f052` (128184402) and unchanged
+deterministic generator style. Version
+`makhos-phase3e-move-ordering-starts-v1` has fingerprint
+`00db4d9cedfe76202dae15373d33bfdc89f31726ad2b9b4e0fe3438701e97091`.
+Tests prove complete-state uniqueness and disjointness from all retained Phase
+3A–3D corpora. Identity, starts 1–32 screening, starts 33–64 confirmation, and
+the point-estimate selection rule were frozen before outcomes.
+
+### Screening — starts 1–32 only
+
+Candidate W/D/L means removal wins/draws/baseline wins. Every row is 32 paired
+starts (64 games), 5,000 nodes/move, depth cap 64, max 160 plies. All games
+completed without errors or unresolved adjudications. CIs are deterministic
+20,000-resample pair bootstraps. Nodes, qnodes, elapsed, and NPS are baseline /
+candidate totals; instrumentation is preserved in the JSON artifact.
+
+| Disabled | W/D/L | Score | Elo (95% pair CI) | Avg depth B/C | Nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| TT move | 21/16/27 | 45.31% | -32.7 [-83.0,+16.3] | 6.16/5.65 | 5,299,142/5,257,992 | 2,647,276/2,686,441 | 110,298/104,285 | 72,045/76,180 |
+| capture | 27/12/25 | 51.56% | +10.9 [-10.9,+32.7] | 6.05/6.06 | 5,165,293/5,167,558 | 2,526,141/2,529,327 | 156,950/160,966 | 49,006/47,817 |
+| killers | 27/9/28 | 49.22% | -5.4 [-77.2,+65.9] | 6.14/6.17 | 4,994,428/4,951,085 | 2,419,721/2,448,947 | 153,227/155,233 | 48,387/47,670 |
+| history | 24/10/30 | 45.31% | -32.7 [-88.7,+21.7] | 5.88/5.94 | 5,291,627/5,217,716 | 2,597,001/2,632,103 | 164,551/162,036 | 47,940/48,445 |
+| countermove | 28/11/25 | 52.34% | +16.3 [-32.7,+65.9] | 5.93/6.19 | 5,074,463/5,042,891 | 2,453,579/2,465,328 | 158,344/156,366 | 47,542/48,017 |
+| recapture | 25/14/25 | 50.00% | 0.0 [0.0,0.0] | 5.94/5.94 | 5,146,317/5,146,323 | 2,535,162/2,535,156 | 157,366/158,320 | 48,813/48,519 |
+
+The mechanical rule selected **countermove removal**, the strongest point
+estimate strictly above 50%. This weak screen (CI crosses zero) is only a way to
+choose one candidate; it is not promotion evidence. Starts 33–64 were not read
+before that selection.
+
+### Confirmation — untouched starts 33–64
+
+The selected candidate alone was measured on the reserved 32 paired starts.
+All 192 games completed, with no errors or unresolved games.
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Avg depth B/C | Nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 31/11/22 | 57.03% | +49.2 [-10.9,+112.3] | 7.35/7.46 | 21,797,752/21,797,777 | 10,406,637/10,438,943 | 277,232/275,997 | 116,164/116,801 |
+| 50,000 nodes/move | 28/9/27 | 50.78% | +5.4 [-49.2,+60.3] | 8.46/8.53 | 50,575,993/50,422,129 | 22,905,743/22,991,429 | 513,761/516,891 | 143,027/142,029 |
+| 100 ms/move | 30/7/27 | 52.34% | +16.3 [-49.2,+83.0] | 3.67/3.64 | 12,680,378/12,583,617 | 6,832,481/6,772,488 | 147,301/147,024 | 132,469/131,653 |
+
+All confirmation point estimates favor removal, but every interval crosses
+zero and the effect contracts materially at 50k. **Decision: inconclusive for
+promotion.** Keep countermove removal only as a measured follow-up hypothesis.
+Do not change any production default in this PR.

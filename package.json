@@ -44,7 +44,9 @@
     "experiment:phase3c": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3c-build scripts/phase3cPromotionRunner.ts && node .tmp/phase3c-build/scripts/phase3cPromotionRunner.js",
     "test:phase3c-positions": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3c-position-build scripts/phase3cPositionSuite.ts && node .tmp/phase3c-position-build/scripts/phase3cPositionSuite.js",
     "experiment:phase3d": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3d-build scripts/phase3dConfirmationRunner.ts && node .tmp/phase3d-build/scripts/phase3dConfirmationRunner.js",
-    "test:phase3d-positions": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3d-position-build scripts/phase3dPositionSuite.ts && node .tmp/phase3d-position-build/scripts/phase3dPositionSuite.js"
+    "test:phase3d-positions": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3d-position-build scripts/phase3dPositionSuite.ts && node .tmp/phase3d-position-build/scripts/phase3dPositionSuite.js",
+    "test:phase3e": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3e-test scripts/phase3eMoveOrderingTest.ts && node .tmp/phase3e-test/scripts/phase3eMoveOrderingTest.js",
+    "experiment:phase3e": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3e-build scripts/phase3eMoveOrderingRunner.ts && node .tmp/phase3e-build/scripts/phase3eMoveOrderingRunner.js"
   },
   "dependencies": {
     "@expo-google-fonts/kanit": "^0.4.1",
