@@ -180,3 +180,20 @@ export const PHASE3D_CONFIRMATION_START_SUITE: TournamentStartSuite = (() => {
 })();
 export const PHASE3D_CONFIRMATION_V1_FINGERPRINT =
   searchAblationSuiteFingerprint(PHASE3D_CONFIRMATION_START_SUITE);
+
+
+/** Phase 3E move-ordering corpus, frozen before screening outcomes. The seed is
+ * first8hex(07a3f052904a4e72095b694d4e546f16c4162afa). */
+export const PHASE3E_MOVE_ORDERING_SEED = 0x07a3f052;
+export const PHASE3E_MOVE_ORDERING_START_SUITE: TournamentStartSuite = (() => {
+  const priorStates=new Set([...SEARCH_ABLATION_START_SUITE.starts,...EXTENSION_CONFIRMATION_START_SUITE.starts,
+    ...PHASE3C_CONFIRMATION_START_SUITE.starts,...PHASE3C_FINAL_CONFIRMATION_START_SUITE.starts,
+    ...PHASE3D_CONFIRMATION_START_SUITE.starts].map(s=>positionKey(s.position)));
+  const raw=generateSearchAblationStartSuite(PHASE3E_MOVE_ORDERING_SEED,384);
+  const independent=raw.starts.filter(s=>!priorStates.has(positionKey(s.position))).slice(0,64);
+  if(independent.length!==64)throw new Error('could not generate 64 Phase 3E states disjoint from all Phase 3A-3D suites');
+  return {...raw,version:'makhos-phase3e-move-ordering-starts-v1',
+    generator:'xorshift32/legal-sorted/diverse-plies-2-17/v1; seed=first8hex(canonical engine-mainline tip 07a3f052...)',
+    starts:independent.map((s,i)=>({...s,id:`phase3e-move-ordering-v1-${String(i+1).padStart(2,'0')}`}))};
+})();
+export const PHASE3E_MOVE_ORDERING_V1_FINGERPRINT=searchAblationSuiteFingerprint(PHASE3E_MOVE_ORDERING_START_SUITE);
