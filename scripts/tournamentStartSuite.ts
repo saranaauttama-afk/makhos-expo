@@ -114,3 +114,17 @@ export function searchAblationSuiteFingerprint(suite: TournamentStartSuite): str
 
 export const SEARCH_ABLATION_START_SUITE_V1_FINGERPRINT =
   searchAblationSuiteFingerprint(SEARCH_ABLATION_START_SUITE);
+
+/** Phase 3B independent confirmation corpus. The seed is mechanically the
+ * first eight hexadecimal digits of the Phase 3A merge SHA 4149c4b1..., and
+ * was frozen before any games were inspected. */
+export const EXTENSION_CONFIRMATION_SEED = 0x4149c4b1;
+export const EXTENSION_CONFIRMATION_START_SUITE: TournamentStartSuite = (() => {
+  const phase3aStates=new Set(SEARCH_ABLATION_START_SUITE.starts.map(s=>positionKey(s.position)));
+  const raw=generateSearchAblationStartSuite(EXTENSION_CONFIRMATION_SEED,128);
+  const independent=raw.starts.filter(s=>!phase3aStates.has(positionKey(s.position))).slice(0,64);
+  if(independent.length!==64)throw new Error('could not generate 64 Phase 3B states disjoint from Phase 3A');
+  return {...raw,version:'makhos-extension-confirmation-starts-v1',generator:'xorshift32/legal-sorted/diverse-plies-2-17/v1; seed=first8hex(Phase3A merge SHA)',
+    starts:independent.map((s,i)=>({...s,id:`extension-confirmation-v1-${String(i+1).padStart(2,'0')}`}))};
+})();
+export const EXTENSION_CONFIRMATION_V1_FINGERPRINT=searchAblationSuiteFingerprint(EXTENSION_CONFIRMATION_START_SUITE);

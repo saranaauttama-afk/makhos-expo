@@ -34,6 +34,7 @@ export interface SearchResult {
   limitReached?: 'nodes';
   overrideReason?: string;
   rootCandidates?: RootSearchCandidate[];
+  extensionStats?: ExtensionStats;
 }
 export interface CancelToken  { cancelled: boolean; }
 export interface DeterministicSearchOptions {
@@ -62,6 +63,22 @@ export const DEFAULT_SEARCH_FEATURES: Readonly<SearchFeatureFlags> = Object.free
   lmp: true,
   extensions: true,
 });
+export interface ExtensionFeatureFlags {
+  singleLegalMove: boolean;
+  smallEndgame: boolean;
+  tacticalCapture: boolean;
+  multiCapture: boolean;
+  opponentForcedCapture: boolean;
+  singleCaptureRecapture: boolean;
+  rootLowMobility: boolean;
+  soundForcedTrap: boolean;
+}
+export const DEFAULT_EXTENSION_FEATURES: Readonly<ExtensionFeatureFlags> = Object.freeze({
+  singleLegalMove:true, smallEndgame:true, tacticalCapture:true, multiCapture:true,
+  opponentForcedCapture:true, singleCaptureRecapture:true, rootLowMobility:true, soundForcedTrap:true,
+});
+export interface ExtensionCounter { triggers:number; addedDepth:number; rootTriggers:number; rootAddedDepth:number; interiorTriggers:number; interiorAddedDepth:number }
+export type ExtensionStats = Record<keyof ExtensionFeatureFlags, ExtensionCounter>;
 export type RootMoveScores = ReadonlyMap<number, number>;
 type OnInfo = (info: SearchInfo) => void;
 type RootCandidate = RootSearchCandidate;
@@ -109,6 +126,17 @@ const stop = { flag: false };
 let activeNodeLimit: number | undefined;
 let activeNodeCount = 0;
 let activeFeatures: SearchFeatureFlags = { ...DEFAULT_SEARCH_FEATURES };
+let activeExtensionFeatures: ExtensionFeatureFlags = { ...DEFAULT_EXTENSION_FEATURES };
+function makeExtensionStats(): ExtensionStats {
+  const out={} as ExtensionStats;
+  for(const key of Object.keys(DEFAULT_EXTENSION_FEATURES) as (keyof ExtensionFeatureFlags)[]) out[key]={triggers:0,addedDepth:0,rootTriggers:0,rootAddedDepth:0,interiorTriggers:0,interiorAddedDepth:0};
+  return out;
+}
+let activeExtensionStats=makeExtensionStats();
+function addExtension(kind:keyof ExtensionFeatureFlags,d:number,amount:number,cap:number,ply:number):number {
+  const c=activeExtensionStats[kind]; c.triggers++; const next=Math.min(cap,d+amount), added=next-d; c.addedDepth+=added;
+  if(ply===0){c.rootTriggers++;c.rootAddedDepth+=added;}else{c.interiorTriggers++;c.interiorAddedDepth+=added;} return next;
+}
 
 export function scoreToTT(score: number, ply: number): number {
   if (score >= INF - MAX_PLY) return score + ply;
@@ -236,18 +264,21 @@ function pickDiversifiedRoot(candidates: RootCandidate[], bestScore: number): Ro
 
 function extendTacticalDepth(depth: number, d: number, move: Move, opHasCaptures: boolean, ply: number): number {
   if (ply > 18 || depth < 2) return d;
-  let ext = 0;
-  if (move.captured.length > 0 || opHasCaptures) ext++;
-  if (move.captured.length >= 2 && depth <= 6) ext++;
-  // Common tactical blind spot on low depths: quiet move that allows immediate
-  // capture, or a shallow single-capture that gets recaptured right away.
-  if (depth <= 6 && opHasCaptures) {
-    if (move.captured.length === 0) ext++;
-    if (move.captured.length === 1) ext++;
-  }
-  if (ext <= 0) return d;
+  let ext=0;
+  if(move.captured.length>0&&activeExtensionFeatures.tacticalCapture) ext++;
+  if(opHasCaptures&&activeExtensionFeatures.opponentForcedCapture) ext++;
+  if(move.captured.length>=2&&depth<=6&&activeExtensionFeatures.multiCapture) ext++;
+  if(depth<=6&&opHasCaptures&&move.captured.length===0&&activeExtensionFeatures.opponentForcedCapture) ext++;
+  if(depth<=6&&opHasCaptures&&move.captured.length===1&&activeExtensionFeatures.singleCaptureRecapture) ext++;
+  if(ext<=0)return d;
   const cap = move.captured.length >= 2 ? depth + 2 : depth + 1;
-  return Math.min(cap, d + ext);
+  // Attribute each enabled trigger in the same order while retaining the old aggregate cap.
+  if(move.captured.length>0&&activeExtensionFeatures.tacticalCapture)d=addExtension('tacticalCapture',d,1,cap,ply);
+  if(opHasCaptures&&activeExtensionFeatures.opponentForcedCapture)d=addExtension('opponentForcedCapture',d,1,cap,ply);
+  if(move.captured.length>=2&&depth<=6&&activeExtensionFeatures.multiCapture)d=addExtension('multiCapture',d,1,cap,ply);
+  if(depth<=6&&opHasCaptures&&move.captured.length===0&&activeExtensionFeatures.opponentForcedCapture)d=addExtension('opponentForcedCapture',d,1,cap,ply);
+  if(depth<=6&&opHasCaptures&&move.captured.length===1&&activeExtensionFeatures.singleCaptureRecapture)d=addExtension('singleCaptureRecapture',d,1,cap,ply);
+  return d;
 }
 
 function candidateWindow(candidates: RootCandidate[], bestScore: number, margin = 80): RootCandidate[] {
@@ -811,8 +842,8 @@ function negamax(
 
     // Extensions
     let d = depth - 1;
-    if (activeFeatures.extensions && single) d = Math.min(depth, d+1);       // our only move — extend
-    if (activeFeatures.extensions && total <= 5) d = Math.min(depth, d+1);   // endgame ext
+    if (activeFeatures.extensions && activeExtensionFeatures.singleLegalMove && single) d = addExtension('singleLegalMove',d,1,depth,ply);
+    if (activeFeatures.extensions && activeExtensionFeatures.smallEndgame && total <= 5) d = addExtension('smallEndgame',d,1,depth,ply);
 
     // LMR — skip if opponent will have forced captures (sacrifice/tactic position).
     // hasCapturesAvailable is O(pieces) vs full generateMoves, avoiding double movegen.
@@ -878,6 +909,8 @@ export function fixedDepthScoreAtPlyForTesting(
   activeNodeLimit = undefined;
   activeNodeCount = 0;
   activeFeatures = { ...DEFAULT_SEARCH_FEATURES };
+  activeExtensionFeatures = { ...DEFAULT_EXTENSION_FEATURES };
+  activeExtensionStats = makeExtensionStats();
   return negamax(pos, depth, -INF, INF, tt, Number.POSITIVE_INFINITY, { n: 0, q: 0 }, ply, rep);
 }
 
@@ -890,6 +923,7 @@ export async function iterativeDeepening(
   diversifyRoot = false,
   deterministic?: DeterministicSearchOptions,
   featureOverrides: Partial<SearchFeatureFlags> = {},
+  extensionOverrides: Partial<ExtensionFeatureFlags> = {},
 ): Promise<SearchResult> {
   rootOverrideStats.searches++;
   if (deterministic?.depth !== undefined && deterministic.nodes !== undefined)
@@ -912,9 +946,13 @@ export async function iterativeDeepening(
     : Math.max(1, Math.floor(deterministic.nodes));
   activeNodeCount = 0;
   activeFeatures = { ...DEFAULT_SEARCH_FEATURES, ...featureOverrides };
+  activeExtensionFeatures = activeFeatures.extensions
+    ? { ...DEFAULT_EXTENSION_FEATURES, ...extensionOverrides }
+    : Object.fromEntries(Object.keys(DEFAULT_EXTENSION_FEATURES).map(k=>[k,false])) as unknown as ExtensionFeatureFlags;
+  activeExtensionStats=makeExtensionStats();
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [] };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
@@ -931,7 +969,7 @@ export async function iterativeDeepening(
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best] };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats };
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
@@ -991,13 +1029,13 @@ export async function iterativeDeepening(
         const isQ    = m.captured.length === 0;
 
         let d = depth - 1;
-        if (activeFeatures.extensions && single) d = Math.min(depth, d+1);
-        if (activeFeatures.extensions && total <= 5) d = Math.min(depth, d+1);
+        if (activeFeatures.extensions && activeExtensionFeatures.singleLegalMove && single) d = addExtension('singleLegalMove',d,1,depth,0);
+        if (activeFeatures.extensions && activeExtensionFeatures.smallEndgame && total <= 5) d = addExtension('smallEndgame',d,1,depth,0);
         // LMR at root — skip on tactical positions (opponent has forced captures)
         const opCapRoot = isQ && hasCapturesAvailable(child);
         if (activeFeatures.extensions) d = extendTacticalDepth(depth, d, m, opCapRoot, 0);
-        if (activeFeatures.extensions && rootLowMobilityExtension > 0) d = Math.min(depth + rootLowMobilityExtension, d + rootLowMobilityExtension);
-        if (activeFeatures.extensions && isSoundForcedTrap(root, m)) d = Math.min(depth + 2, d + 2);
+        if (activeFeatures.extensions && activeExtensionFeatures.rootLowMobility && rootLowMobilityExtension > 0) d = addExtension('rootLowMobility',d,rootLowMobilityExtension,depth+rootLowMobilityExtension,0);
+        if (activeFeatures.extensions && activeExtensionFeatures.soundForcedTrap && isSoundForcedTrap(root, m)) d = addExtension('soundForcedTrap',d,2,depth+2,0);
         const fullD = d;
         if (activeFeatures.lmr && i >= 3 && d >= 2 && isQ && !single && !opCapRoot) {
           d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
@@ -1079,10 +1117,10 @@ export async function iterativeDeepening(
         const isQ = candidate.move.captured.length === 0;
         let d = Math.max(1, reached - 1);
         const total = bitCount(child.p1Men | child.p1Kings | child.p2Men | child.p2Kings);
-        if (activeFeatures.extensions && total <= 5) d = Math.min(reached, d + 1);
+        if (activeFeatures.extensions && activeExtensionFeatures.smallEndgame && total <= 5) d = addExtension('smallEndgame',d,1,reached,0);
         if (activeFeatures.extensions) d = extendTacticalDepth(reached, d, candidate.move, isQ && hasCapturesAvailable(child), 0);
-        if (activeFeatures.extensions && isSoundForcedTrap(root, candidate.move)) d = Math.min(reached + 2, d + 2);
-        if (activeFeatures.extensions && candidate.move.captured.length >= 2) d = Math.min(reached + 1, d + 1);
+        if (activeFeatures.extensions && activeExtensionFeatures.soundForcedTrap && isSoundForcedTrap(root, candidate.move)) d = addExtension('soundForcedTrap',d,2,reached+2,0);
+        if (activeFeatures.extensions && activeExtensionFeatures.multiCapture && candidate.move.captured.length >= 2) d = addExtension('multiCapture',d,1,reached+1,0);
 
         pushRepetition(rep, ch);
         const score = -negamax(child, d, -INF, INF, tt, deadline, verifyAcc, 1, rep, true, moveKey(candidate.move));
@@ -1192,6 +1230,7 @@ export async function iterativeDeepening(
     limitReached: activeNodeLimit !== undefined && activeNodeCount >= activeNodeLimit ? 'nodes' : undefined,
     overrideReason,
     rootCandidates: lastRootCandidates,
+    extensionStats: activeExtensionStats,
   };
 }
 
@@ -1202,9 +1241,10 @@ export function fixedDepthSearch(
   historyHashes: number[] = [],
   onInfo?: OnInfo,
   featureOverrides: Partial<SearchFeatureFlags> = {},
+  extensionOverrides: Partial<ExtensionFeatureFlags> = {},
 ): Promise<SearchResult> {
   if (!Number.isInteger(depth) || depth < 1) throw new Error(`depth must be a positive integer, got ${depth}`);
-  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth }, featureOverrides);
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth }, featureOverrides, extensionOverrides);
 }
 
 export function fixedNodeSearch(
@@ -1215,7 +1255,8 @@ export function fixedNodeSearch(
   maxDepth = 64,
   onInfo?: OnInfo,
   featureOverrides: Partial<SearchFeatureFlags> = {},
+  extensionOverrides: Partial<ExtensionFeatureFlags> = {},
 ): Promise<SearchResult> {
   if (!Number.isInteger(nodes) || nodes < 1) throw new Error(`nodes must be a positive integer, got ${nodes}`);
-  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes }, featureOverrides);
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes }, featureOverrides, extensionOverrides);
 }

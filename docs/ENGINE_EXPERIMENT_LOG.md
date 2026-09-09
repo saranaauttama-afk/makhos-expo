@@ -659,3 +659,70 @@ These are historical observations from earlier branches/reports and must not be 
 - `tuneNN` contains later NN/training/mobile work and some classical changes; recover tools selectively instead of merging the branch wholesale.
 
 The purpose of this section is to preserve context while forcing all future claims through the new baseline/testing protocol.
+
+## EXP-2026-008 — Extension subtype attribution and independent confirmation
+
+**Status:** KEEP AS PHASE 3C HYPOTHESIS (production defaults unchanged)
+
+**Date:** 2026-09-08
+
+**Baseline commit:** `4149c4b1989378b2a85746b36190c915fdb16d4d`
+
+### Hypothesis and change
+
+Split the grouped extension control without changing semantics, instrument its
+actual triggers/cost, screen each subtype alone, and independently confirm only
+the strongest. No evaluation, pruning threshold, other feature, or production
+default changed. The frozen protocol and source audit are in
+`docs/EXTENSION_ABLATION_PROTOCOL.md`.
+
+### Phase 3A-corpus screening
+
+Candidate W/D/L is candidate wins/draws/baseline wins. All runs completed 32
+pairs/64 games with no unresolved games or errors. Main/qnodes are totals for
+baseline then candidate. Trigger/add are the baseline count and cumulative
+actual added depth for the disabled subtype; R/I splits triggers by root/interior.
+
+| Disabled subtype | W/D/L | Score | Elo (95% pair CI) | Avg depth B/C | Main/qnodes B; C | Trigger / add (R/I) | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| single legal move | 32/6/26 | 54.69% | +32.7 [-32.7,+100.4] | 4.70/4.84 | 6,213,712/525,374; 6,130,619/642,475 | 721,093 / 721,093 (5,139/715,954) | inconclusive |
+| small endgame | 40/7/17 | 67.97% | +130.7 [+60.3,+213.3] | 4.58/6.38 | 6,343,357/525,060; 4,694,428/2,214,103 | 5,874,554 / 5,229,114 (6,534/5,868,020) | likely harmful |
+| tactical capture | 34/7/23 | 58.59% | +60.3 [-10.9,+130.7] | 5.00/5.57 | 6,207,047/521,915; 6,118,296/675,749 | 89,202 / 89,202 (4,821/84,381) | inconclusive |
+| multi-capture | 28/9/27 | 50.78% | +5.4 [-32.7,+43.7] | 4.87/4.75 | 6,684,630/546,827; 6,685,048/557,150 | 9,497 / 9,497 (273/9,224) | inconclusive |
+| opponent forced capture | 27/6/31 | 46.88% | -21.7 [-106.3,+60.3] | 4.51/5.84 | 6,433,376/539,133; 6,027,441/956,207 | 287,647 / 252,371 (10,680/276,967) | inconclusive |
+| single-capture recapture | 27/10/27 | 50.00% | 0.0 [0.0,0.0] | 4.54/4.54 | 6,643,365/532,631; identical | 0 / 0 (0/0) | unreachable/inconclusive |
+| root low mobility | 27/10/27 | 50.00% | 0.0 [0.0,0.0] | 4.50/4.61 | 6,662,962/534,150; 6,655,532/535,269 | 2,038 / 5,263 (2,038/0) | inconclusive |
+| sound forced trap | 35/12/17 | 64.06% | +100.4 [+54.7,+156.3] | 4.06/4.53 | 6,814,873/526,426; 6,791,896/536,378 | 904 / 1,420 (904/0) | likely harmful |
+
+Small-endgame was selected mechanically as the strongest single candidate by
+screening score, ahead of sound-forced-trap. Root low mobility did add 2.58 plies
+per trigger on average but occurred only 2,038 times and its removal produced
+identical game scores; it did not consume a disproportionate share compared
+with small-endgame's 5.23 million actually added plies. The grouped Phase 3A
+ceiling was 91.41% (+410.7 Elo) on the same 32 starts, materially larger than
+any subtype, so interaction/additional-subtype effects remain plausible.
+
+### Independent confirmation
+
+On the pre-frozen independent v1 suite, disabling only `smallEndgame` scored
+**83/11/34, 69.14%, +140.1 Elo, pair-bootstrap 95% CI [+94.6,+194.5]** over
+64 complete pairs/128 games, with zero unresolved/errors. Average completed
+depth rose from 4.64 to 6.66. Baseline main/qnodes were
+12,454,210/1,027,820; candidate 9,146,904/4,367,355. Baseline small-endgame
+instrumentation recorded 11,666,298 triggers, 10,365,493 actual added plies,
+including 17,047 root triggers/11,863 root added and 11,649,251 interior
+triggers/10,353,630 interior added. Thus its repeated late-game extension work
+explains a large part of the fixed-node completed-depth collapse.
+
+### Correctness and decision
+
+Semantic tests compare full move identity, score, completed depth and PV for
+quiet, forced-capture, multi-capture, <=5-piece, and low-mobility fixtures with
+implicit versus explicit all-on defaults; they also prove master-off equals all
+subtypes-off. All required correctness gates passed (the blinded development
+measurement used no `--reveal-holdout`). Full app typecheck remains blocked only
+by the repository environment's missing Expo modules.
+
+**Phase 3C hypothesis: disable `smallEndgame`.** The enabled subtype is likely
+harmful because the independent candidate score CI is wholly above 50%.
+Production defaults remain unchanged in this PR. This is not Teacher v1.
