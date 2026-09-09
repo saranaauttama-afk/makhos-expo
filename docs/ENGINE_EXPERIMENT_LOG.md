@@ -726,3 +726,77 @@ by the repository environment's missing Expo modules.
 **Phase 3C hypothesis: disable `smallEndgame`.** The enabled subtype is likely
 harmful because the independent candidate score CI is wholly above 50%.
 Production defaults remain unchanged in this PR. This is not Teacher v1.
+
+---
+
+## EXP-2026-009 — Phase 3C smallEndgame promotion
+
+**Status:** KEEP — PROMOTED AS TEACHER V1
+
+**Date:** 2026-09-09
+
+**Baseline commit:** `564b298ac07f30709b81093861e61ccf01cb0d4e`
+
+**Teacher v1 commit:** `3b4e34d2eeb0ec7ab4a4e45122e799d5d5175a27`
+
+### Frozen hypothesis and controls
+
+Candidate was identical to the production baseline except
+`smallEndgame=false`. No evaluation weight, pruning threshold, or other search
+feature changed. All games used paired colors and the already frozen,
+independent `makhos-extension-confirmation-starts-v1` corpus (seed 1095353521,
+SHA-256 `58475f4a2913f4a6c093d12a54a89e6a30d6160f5921f63964bb83267d5384ab`).
+The first 32 starts were selected before these results, with 160 plies maximum;
+all 256 games completed with no unresolved games or errors. Pair-bootstrap CIs
+used 20,000 deterministic resamples.
+
+### Paired promotion tournaments
+
+W/D/L is from the candidate perspective. Node and qnode figures are total
+baseline then candidate; elapsed is total search milliseconds and NPS includes
+both main and qnodes.
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 5,000 nodes/move | 38/6/20 | 64.06% | +100.4 [+38.2,+169.8] | 4.78/6.76 | 6,270,683/4,594,434 | 508,492/2,196,311 | 81,865/96,058 | 82,809/70,694 |
+| 20,000 nodes/move | 47/1/16 | 74.22% | +183.7 [+112.3,+273.2] | 4.94/7.87 | 24,725,757/17,911,737 | 1,189,972/8,094,019 | 190,921/196,935 | 135,741/132,052 |
+| 50,000 nodes/move | 53/4/7 | 85.94% | +314.4 [+229.2,+448.5] | 4.87/9.28 | 63,589,752/45,694,914 | 2,038,696/20,502,333 | 439,990/432,760 | 149,159/152,965 |
+| 100 ms/move | 48/4/12 | 78.13% | +221.1 [+149.8,+314.4] | 2.18/3.68 | 17,737,355/11,589,544 | 812,042/6,233,116 | 153,106/144,612 | 121,154/123,245 |
+
+The win does not disappear at higher fixed work: it grows from +100 Elo at 5k
+to +314 Elo at 50k, and every CI excludes zero. The production-like equal-time
+test also strongly favors the candidate, while using 5.5% less aggregate search
+time and slightly higher NPS. The candidate consistently converts the removed
+extension overhead into much greater completed nominal depth. Phase 3B's
+separate 64-pair confirmation (+140.1 Elo, CI [+94.6,+194.5]) supplies additional
+independent-corpus evidence beyond this multi-budget subset.
+
+### Correctness and regression gates
+
+Rules passed 3,755 checks; perft passed 8/8 (initial 7/49/392); tactical passed
+8 checks; fixed-node/depth determinism passed 14 assertions; TT passed 36;
+deterministic tablebase passed four assertions/20 repeat probes; Phase 1C passed
+21; position infrastructure passed 49; and Phase 3B semantic/corpus checks
+passed. Full TypeScript `npx tsc --noEmit` also passed.
+
+The verified position suite was kept blind through selection. After the
+promotion decision was fixed, the evaluation-only comparison revealed baseline
+and candidate both at development 2/2 and holdout 2/2. All three endgame-tagged
+rows, including the <=5-piece exact cases most directly exposed to this change,
+passed for the candidate. There were no newly regressed verified tactical,
+endgame, or holdout cases; the corpus is small, so this is a regression guard
+rather than a broad endgame-strength estimate.
+
+### Environment and reproducibility
+
+Ubuntu 24.04.4 LTS, Intel Xeon Platinum 8370C @ 2.80 GHz, Node v24.15.0. Run
+`npm run experiment:phase3c` for the frozen multi-budget tournament and
+`npm run test:phase3c-positions` for the post-decision verified-suite comparison.
+Both emit machine-readable JSON/CSV under ignored `.tmp/phase3c/`.
+
+### Decision
+
+**KEEP AND PROMOTE.** All promotion criteria passed. Production now defaults
+only `smallEndgame` to false; every other extension/search feature remains at
+the baseline value. Commit `3b4e34d2eeb0ec7ab4a4e45122e799d5d5175a27`
+is frozen as **Teacher v1**.
