@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "makhos-phase3c-promotion-config-v1",
+  "seedSourceCommit": "3a144f82a2a214e7fedcf71c922323db363f586a",
+  "confirmation": {
+    "suite": "makhos-phase3c-confirmation-starts-v1",
+    "seedHex": "0x3a144f82",
+    "seed": 974409602,
+    "fingerprint": "d44718e2fef2304f05e991d18cd592b72bac7346f4d99a8d0e2f2d29dcac7a1c",
+    "pairedStarts": 64,
+    "disjointFrom": ["makhos-search-ablation-starts-v1", "makhos-extension-confirmation-starts-v1"],
+    "maxDepth": 64,
+    "maxPlies": 160
+  }
+}

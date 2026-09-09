@@ -128,3 +128,19 @@ export const EXTENSION_CONFIRMATION_START_SUITE: TournamentStartSuite = (() => {
     starts:independent.map((s,i)=>({...s,id:`extension-confirmation-v1-${String(i+1).padStart(2,'0')}`}))};
 })();
 export const EXTENSION_CONFIRMATION_V1_FINGERPRINT=searchAblationSuiteFingerprint(EXTENSION_CONFIRMATION_START_SUITE);
+
+/** Phase 3C promotion confirmation corpus. Its seed is the first eight hex
+ * digits of the pre-confirmation PR head 3a144f82..., frozen before games were
+ * run. Complete final states are disjoint from both earlier ablation suites. */
+export const PHASE3C_CONFIRMATION_SEED = 0x3a144f82;
+export const PHASE3C_CONFIRMATION_START_SUITE: TournamentStartSuite = (() => {
+  const priorStates = new Set([...SEARCH_ABLATION_START_SUITE.starts,
+    ...EXTENSION_CONFIRMATION_START_SUITE.starts].map(s => positionKey(s.position)));
+  const raw = generateSearchAblationStartSuite(PHASE3C_CONFIRMATION_SEED, 192);
+  const independent = raw.starts.filter(s => !priorStates.has(positionKey(s.position))).slice(0, 64);
+  if (independent.length !== 64) throw new Error('could not generate 64 Phase 3C states disjoint from Phase 3A/3B');
+  return { ...raw, version: 'makhos-phase3c-confirmation-starts-v1',
+    generator: 'xorshift32/legal-sorted/diverse-plies-2-17/v1; seed=first8hex(pre-confirmation PR head)',
+    starts: independent.map((s, i) => ({ ...s, id: `phase3c-confirmation-v1-${String(i + 1).padStart(2, '0')}` })) };
+})();
+export const PHASE3C_CONFIRMATION_V1_FINGERPRINT = searchAblationSuiteFingerprint(PHASE3C_CONFIRMATION_START_SUITE);

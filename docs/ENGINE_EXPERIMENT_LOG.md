@@ -737,14 +737,14 @@ Production defaults remain unchanged in this PR. This is not Teacher v1.
 
 **Baseline commit:** `564b298ac07f30709b81093861e61ccf01cb0d4e`
 
-**Teacher v1 commit:** `3b4e34d2eeb0ec7ab4a4e45122e799d5d5175a27`
+**Teacher v1 commit:** pending — use the PR #11 merge commit and update this field immediately after merge. The frozen pre-results confirmation-corpus commit is `123e5039b34a3def0d0638aaee157204b76108f8`.
 
 ### Frozen hypothesis and controls
 
 Candidate was identical to the production baseline except
 `smallEndgame=false`. No evaluation weight, pruning threshold, or other search
 feature changed. All games used paired colors and the already frozen,
-independent `makhos-extension-confirmation-starts-v1` corpus (seed 1095353521,
+Phase 3B `makhos-extension-confirmation-starts-v1` corpus (seed 1095353521,
 SHA-256 `58475f4a2913f4a6c093d12a54a89e6a30d6160f5921f63964bb83267d5384ab`).
 The first 32 starts were selected before these results, with 160 plies maximum;
 all 256 games completed with no unresolved games or errors. Pair-bootstrap CIs
@@ -768,8 +768,28 @@ to +314 Elo at 50k, and every CI excludes zero. The production-like equal-time
 test also strongly favors the candidate, while using 5.5% less aggregate search
 time and slightly higher NPS. The candidate consistently converts the removed
 extension overhead into much greater completed nominal depth. Phase 3B's
-separate 64-pair confirmation (+140.1 Elo, CI [+94.6,+194.5]) supplies additional
-independent-corpus evidence beyond this multi-budget subset.
+separate 64-pair confirmation (+140.1 Elo, CI [+94.6,+194.5]) selected this
+corpus. Therefore the multi-budget subset is robustness/replication on the same
+frozen corpus, not a second independent-corpus result.
+
+### New disjoint-corpus confirmation (PR review)
+
+Before inspecting these results, commit `123e5039b34a3def0d0638aaee157204b76108f8`
+froze `makhos-phase3c-confirmation-starts-v1`: seed `0x3a144f82`
+(974409602), fingerprint
+`d44718e2fef2304f05e991d18cd592b72bac7346f4d99a8d0e2f2d29dcac7a1c`.
+The seed is mechanically derived from the previous PR head, no alternate seed
+was tried, and all 64 corpus states are checked disjoint from both Phase 3A and
+Phase 3B. The first 32 frozen starts produced:
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 49/7/8 | 82.03% | +263.8 [+169.8,+394.1] | 4.72/8.08 | 27,181,191/19,304,368 | 1,096,134/9,060,712 | 208,087/221,263 | 135,892/128,196 |
+| 100 ms/move | 47/5/12 | 77.34% | +213.3 [+130.7,+314.4] | 2.20/3.80 | 21,662,936/13,842,136 | 855,435/7,508,491 | 147,701/138,122 | 152,459/154,578 |
+
+Both independent confirmation intervals exclude zero Elo; all 128 games
+completed with no unresolved games or errors. This supplies the independent
+evidence missing from the original Phase 3C wording.
 
 ### Correctness and regression gates
 
@@ -796,7 +816,7 @@ Both emit machine-readable JSON/CSV under ignored `.tmp/phase3c/`.
 
 ### Decision
 
-**KEEP AND PROMOTE.** All promotion criteria passed. Production now defaults
+**KEEP AND APPROVE FOR PROMOTION.** All promotion criteria passed. Production now defaults
 only `smallEndgame` to false; every other extension/search feature remains at
-the baseline value. Commit `3b4e34d2eeb0ec7ab4a4e45122e799d5d5175a27`
-is frozen as **Teacher v1**.
+the baseline value. The final **Teacher v1** SHA will be the PR #11 merge commit;
+do not record a local-only or nonexistent object as the release identity.

@@ -94,7 +94,7 @@ Work one hypothesis at a time and keep only measured wins.
 
 ## Search
 
-- [x] Complete Phase 3A–3C extension ablation and promote Teacher v1: independent paired evidence at 5k/20k/50k nodes and 100 ms supports disabling only `smallEndgame`, with all correctness and verified-position gates passing.
+- [x] Complete Phase 3A–3C extension ablation and approve Teacher v1: same-corpus robustness at 5k/20k/50k nodes plus a new disjoint-corpus 20k/100 ms confirmation support disabling only `smallEndgame`, with all correctness and verified-position gates passing.
 - [ ] Move-ordering ablations: TT move, captures, killers, history, countermove, recapture ordering.
 - [ ] Tune LMR based on measured strength, not only speed.
 - [ ] Tune/select pruning thresholds using tournaments and tactical regressions.
@@ -120,7 +120,7 @@ Potential features to test individually or in small groups:
 
 Use self-play/position data for parameter tuning where appropriate, but confirm tuned parameters in holdout games.
 
-**Exit gate:** **MET for Teacher v1 at `3b4e34d2eeb0ec7ab4a4e45122e799d5d5175a27`.** The remaining Phase 3 items are future Teacher improvements, not blockers to the frozen v1 promotion.
+**Exit gate:** **MET.** The final Teacher v1 identity will be the PR #11 merge commit and must be added after merge; `123e5039b34a3def0d0638aaee157204b76108f8` is the frozen pre-results confirmation-corpus commit, not the final Teacher identity.
 
 ---
 
