@@ -120,7 +120,7 @@ Potential features to test individually or in small groups:
 
 Use self-play/position data for parameter tuning where appropriate, but confirm tuned parameters in holdout games.
 
-**Exit gate:** **MET.** The final Teacher v1 identity will be the PR #11 merge commit and must be added after merge; corpus provenance uses GitHub-resolvable PR #11 commit `b59570adb3e94dc629fc5a9af262b96b9d030498`.
+**Exit gate:** **MET.** PR #11 merge commit `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f` **is the frozen Teacher v1 release identity**; corpus provenance uses GitHub-resolvable PR #11 historical commit `b59570adb3e94dc629fc5a9af262b96b9d030498`.
 
 ---
 

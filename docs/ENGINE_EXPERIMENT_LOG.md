@@ -737,7 +737,7 @@ Production defaults remain unchanged in this PR. This is not Teacher v1.
 
 **Baseline commit:** `564b298ac07f30709b81093861e61ccf01cb0d4e`
 
-**Teacher v1 commit:** pending — use the PR #11 merge commit and update this field immediately after merge.
+**Teacher v1 commit:** `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f` — frozen Teacher v1 release identity.
 
 ### Frozen hypothesis and controls
 
@@ -819,5 +819,5 @@ Both emit machine-readable JSON/CSV under ignored `.tmp/phase3c/`.
 
 **KEEP AND APPROVE FOR PROMOTION.** All promotion criteria passed. Production now defaults
 only `smallEndgame` to false; every other extension/search feature remains at
-the baseline value. The final **Teacher v1** SHA will be the PR #11 merge commit;
-do not record a local-only or nonexistent object as the release identity.
+the baseline value. PR #11 merge commit
+`b2e6a35db6a50ea294a10f6b76a90b4e70e0689f` **is the frozen Teacher v1 release identity**.
