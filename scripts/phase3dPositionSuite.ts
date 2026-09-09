@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createPositionSuiteReport, runPositionSuite } from './positionSuiteRunner';
+import { ExtensionFeatureFlags } from '../src/coreClaude/search/alphabeta';
 
 (async () => {
-  const baselineRows = await runPositionSuite('nodes', 5_000, { smallEndgame: false, soundForcedTrap: true });
-  const candidateRows = await runPositionSuite('nodes', 5_000, { smallEndgame: false, soundForcedTrap: false });
+  const baselineExtensions: ExtensionFeatureFlags = {
+    singleLegalMove: true,
+    smallEndgame: false,
+    tacticalCapture: true,
+    multiCapture: true,
+    opponentForcedCapture: true,
+    singleCaptureRecapture: true,
+    rootLowMobility: true,
+    soundForcedTrap: true,
+  };
+  const candidateExtensions: ExtensionFeatureFlags = { ...baselineExtensions, soundForcedTrap: false };
+  const baselineRows = await runPositionSuite('nodes', 5_000, baselineExtensions);
+  const candidateRows = await runPositionSuite('nodes', 5_000, candidateExtensions);
   const blinded = { baseline: createPositionSuiteReport(baselineRows, 'nodes', 5_000, false),
     candidate: createPositionSuiteReport(candidateRows, 'nodes', 5_000, false) };
   assert(!blinded.baseline.rows.some(r => r.split === 'holdout'));

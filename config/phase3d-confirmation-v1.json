@@ -7,10 +7,30 @@
   "seed": 123524543,
   "fingerprint": "d68b1b8f33b3f4e7b490e44ff8bd2c4576ba11b14c81a52a987471598cb1ab6d",
   "pairedStarts": 32,
+  "confirmationStartOffset": 32,
+  "confirmationStartRange": [33, 64],
   "nodeBudgets": [20000, 50000],
   "timeBudgetsMs": [100],
   "maxDepth": 64,
   "maxPlies": 160,
-  "baseline": { "smallEndgame": false, "soundForcedTrap": true },
-  "candidate": { "smallEndgame": false, "soundForcedTrap": false }
+  "baseline": {
+    "singleLegalMove": true,
+    "smallEndgame": false,
+    "tacticalCapture": true,
+    "multiCapture": true,
+    "opponentForcedCapture": true,
+    "singleCaptureRecapture": true,
+    "rootLowMobility": true,
+    "soundForcedTrap": true
+  },
+  "candidate": {
+    "singleLegalMove": true,
+    "smallEndgame": false,
+    "tacticalCapture": true,
+    "multiCapture": true,
+    "opponentForcedCapture": true,
+    "singleCaptureRecapture": true,
+    "rootLowMobility": true,
+    "soundForcedTrap": false
+  }
 }

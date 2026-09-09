@@ -887,3 +887,49 @@ holdout, or endgame regression occurred.
 and correctness gates pass, but the preferred confidence condition is not met
 at 50k or equal time. Retain the candidate as a supported follow-up hypothesis;
 do not promote or change the production `soundForcedTrap` default in this PR.
+
+### Untouched second-half confirmation (PR #14 continuation)
+
+Before inspecting starts 33-64, the runner was corrected to encode all eight
+Teacher v1 extension flags as literals rather than spreading contemporary
+defaults. The position comparison uses the same literal baseline. Candidate is
+constructed from that frozen object with only `soundForcedTrap=false`. A
+zero-based start offset selects the existing suite range without changing its
+seed, content, ordering, or fingerprint. No first-half games were rerun and no
+candidate setting was changed in response to outcomes.
+
+Candidate W/D/L remains candidate wins/draws/baseline wins. These are the
+independent results from only the previously untouched starts 33-64:
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C | baseline trap trigger/add |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 34/4/26 | 56.25% | +43.7 [0.0,+94.6] | 7.92/7.89 | 19,206,922/19,340,662 | 8,851,181/8,834,450 | 231,663/239,905 | 121,116/117,443 | 603/955 |
+| 50,000 nodes/move | 33/7/24 | 57.03% | +49.2 [0.0,+100.4] | 8.51/8.82 | 47,288,991/47,310,592 | 21,689,124/21,548,152 | 452,379/462,701 | 152,479/148,819 | 759/1,085 |
+| 100 ms/move | 36/13/15 | 66.41% | +118.4 [+65.9,+176.7] | 3.95/3.87 | 12,789,573/12,461,005 | 6,728,776/6,533,743 | 151,279/150,955 | 129,022/125,831 | 253/323 |
+
+All 192 second-half games completed with zero unresolved games and errors. All
+trap instrumentation was at the root, and candidate trap counters were zero.
+The 100 ms interval is wholly above zero, but both fixed-work lower bounds only
+touch zero rather than exceed it. Therefore the stated continuation promotion
+rule is not satisfied.
+
+### All-64 descriptive aggregation
+
+The two halves aggregate descriptively as follows. This aggregation is not a
+substitute for the independent second half. The retained first-half artifact
+contains aggregate statistics rather than individual pair scores, so an exact
+all-64 pair bootstrap cannot be reconstructed without rerunning forbidden
+first-half games; the combined CI is reported as unavailable rather than using
+an invalid game-level or synthetic-pair interval.
+
+| Budget | W/D/L | Score | Elo | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C | baseline trap trigger/add |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 69/10/49 | 57.81% | +54.7 | 7.92/8.09 | 37,994,501/38,186,678 | 17,519,966/17,484,591 | 460,406/474,884 | 120,577/117,231 | 1,364/2,152 |
+| 50,000 nodes/move | 69/9/50 | 57.42% | +52.0 | 8.97/9.24 | 93,977,795/94,225,219 | 41,840,642/41,575,425 | 941,122/957,236 | 144,315/141,867 | 2,449/3,833 |
+| 100 ms/move | 66/26/36 | 61.72% | +83.0 | 4.00/3.98 | 24,346,904/23,805,452 | 12,921,649/12,642,820 | 294,243/294,165 | 126,659/123,904 | 652/812 |
+
+**Continuation decision: NEEDS MORE DATA.** The untouched second half again
+has positive point estimates and provides strong equal-time evidence, but its
+fixed-work intervals do not lie entirely above zero. Keep the hypothesis; do
+not mark it a strong promotion candidate and do not change the production
+default in PR #14.

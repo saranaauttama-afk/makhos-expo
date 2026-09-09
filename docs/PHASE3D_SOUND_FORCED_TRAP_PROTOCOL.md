@@ -36,3 +36,12 @@ intervals are wholly above zero Elo. Phase 3B's roughly +100 Elo observation is
 screening context only. Keep holdout output blinded until configurations,
 corpus, and this decision rule are frozen and the strength runs are complete.
 This experiment does not change the production default.
+
+## Second-half continuation
+
+The first 32 starts were the initial sample. Starts 33-64 are the untouched,
+pre-existing second half of the same frozen suite and fingerprint. Run them
+with `--start-offset=32`; the offset is zero-based and selects a view of the
+suite without regenerating or modifying it. The independent second-half result
+controls the continuation decision. Any all-64 aggregation is descriptive and
+must be reported separately rather than substituted for that result.
