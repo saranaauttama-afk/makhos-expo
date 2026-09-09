@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { applyMove, generateMoves, Move } from '../src/coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position, Side } from '../src/coreClaude/position';
 import { DEFAULT_SEARCH_FEATURES, fixedDepthSearch, fixedNodeSearch, iterativeDeepening,
-  ExtensionFeatureFlags, ExtensionStats, MoveOrderingFeatureFlags, MoveOrderingStats, resetSearchHeuristicsForMeasurement, SearchFeatureFlags, SearchResult } from '../src/coreClaude/search/alphabeta';
+  ExtensionFeatureFlags, ExtensionStats, MoveOrderingFeatureFlags, MoveOrderingStats, SearchMeasurementOptions, resetSearchHeuristicsForMeasurement, SearchFeatureFlags, SearchResult } from '../src/coreClaude/search/alphabeta';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreClaude/search/repetition';
 import { TT } from '../src/coreClaude/search/tt';
 import { hashPosition } from '../src/coreClaude/search/zobrist';
@@ -14,7 +14,7 @@ import { TournamentStart, TournamentStartSuite } from './tournamentStartSuite';
 export type SearchControl = { mode: 'nodes'; budget: number; maxDepth?: number }
   | { mode: 'depth'; budget: number }
   | { mode: 'time'; budget: number; maxDepth?: number };
-export interface EngineConfig { id: string; name: string; search: SearchControl; featureOverrides?: Partial<SearchFeatureFlags>; extensionOverrides?: Partial<ExtensionFeatureFlags>; moveOrderingOverrides?: Partial<MoveOrderingFeatureFlags> }
+export interface EngineConfig { id: string; name: string; search: SearchControl; featureOverrides?: Partial<SearchFeatureFlags>; extensionOverrides?: Partial<ExtensionFeatureFlags>; moveOrderingOverrides?: Partial<MoveOrderingFeatureFlags>; measurementOptions?: SearchMeasurementOptions }
 export interface MoveMetric { ply: number; engineId: string; side: Side; move: Move; nodes: number; qnodes: number; depth: number; elapsedMs: number; nps: number; extensionStats?: ExtensionStats; moveOrderingStats?: MoveOrderingStats }
 export type GameStatus = 'normal' | 'unresolved' | 'error';
 export interface GameRecord { pairId: string; startId: string; gameInPair: 1 | 2; p1EngineId: string; p2EngineId: string; winnerEngineId?: string; status: GameStatus; result: 'p1-win'|'p2-win'|'draw'|'unresolved'|'error'; reason: string; plies: number; moves: Move[]; moveMetrics: MoveMetric[] }
@@ -33,9 +33,9 @@ async function search(pos: Position, history: number[], config: EngineConfig, tt
   // each measured move isolated; only the owning player's TT survives moves.
   resetSearchHeuristicsForMeasurement();
   const f = config.featureOverrides ?? {};
-  if (config.search.mode === 'nodes') return fixedNodeSearch(pos, config.search.budget, tt, history, config.search.maxDepth ?? 64, undefined, f, config.extensionOverrides, config.moveOrderingOverrides);
-  if (config.search.mode === 'depth') return fixedDepthSearch(pos, config.search.budget, tt, history, undefined, f, config.extensionOverrides, config.moveOrderingOverrides);
-  return iterativeDeepening(pos, config.search.budget, tt, undefined, history, undefined, config.search.maxDepth ?? 64, undefined, false, {}, f, config.extensionOverrides, config.moveOrderingOverrides);
+  if (config.search.mode === 'nodes') return fixedNodeSearch(pos, config.search.budget, tt, history, config.search.maxDepth ?? 64, undefined, f, config.extensionOverrides, config.moveOrderingOverrides, config.measurementOptions);
+  if (config.search.mode === 'depth') return fixedDepthSearch(pos, config.search.budget, tt, history, undefined, f, config.extensionOverrides, config.moveOrderingOverrides, config.measurementOptions);
+  return iterativeDeepening(pos, config.search.budget, tt, undefined, history, undefined, config.search.maxDepth ?? 64, undefined, false, {}, f, config.extensionOverrides, config.moveOrderingOverrides, config.measurementOptions);
 }
 
 export async function playTournamentGame(start: TournamentStart, pairId: string, gameInPair: 1|2,

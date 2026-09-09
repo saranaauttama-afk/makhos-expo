@@ -1000,3 +1000,15 @@ All confirmation point estimates favor removal, but every interval crosses
 zero and the effect contracts materially at 50k. **Decision: inconclusive for
 promotion.** Keep countermove removal only as a measured follow-up hypothesis.
 Do not change any production default in this PR.
+
+### Pre-merge production instrumentation correction
+
+The accepted frozen results, corpus, selection, and inconclusive decision above
+were not rerun or reinterpreted. Move-ordering counter collection is now
+independently opt-in and defaults off, avoiding per-search statistics allocation
+and hot-path increments in production. The Phase 3E runner opts both baseline
+and candidate into collection to retain the experiment's measurement behavior.
+Targeted quiet/capture tests prove that default ordering, explicit all-enabled
+ordering, and statistics-enabled ordering produce identical best move, score,
+completed depth, PV, nodes, and qnodes; only the optional instrumentation field
+differs.

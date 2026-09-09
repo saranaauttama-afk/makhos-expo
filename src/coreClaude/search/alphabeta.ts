@@ -38,6 +38,7 @@ export interface SearchResult {
   moveOrderingStats?: MoveOrderingStats;
 }
 export interface CancelToken  { cancelled: boolean; }
+export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; }
 export interface DeterministicSearchOptions {
   /** Exact completed iterative-deepening depth; wall clock is ignored. */
   depth?: number;
@@ -144,7 +145,7 @@ function makeMoveOrderingStats(): MoveOrderingStats {
   return Object.fromEntries(Object.keys(DEFAULT_MOVE_ORDERING_FEATURES).map(k =>
     [k,{scoreHits:0,firstAfterOrdering:0,updates:0}])) as MoveOrderingStats;
 }
-let activeMoveOrderingStats=makeMoveOrderingStats();
+let activeMoveOrderingStats: MoveOrderingStats | undefined;
 function makeExtensionStats(): ExtensionStats {
   const out={} as ExtensionStats;
   for(const key of Object.keys(DEFAULT_EXTENSION_FEATURES) as (keyof ExtensionFeatureFlags)[]) out[key]={triggers:0,addedDepth:0,rootTriggers:0,rootAddedDepth:0,interiorTriggers:0,interiorAddedDepth:0};
@@ -604,13 +605,13 @@ function orderMoves(
   const cm = activeMoveOrderingFeatures.countermove && prevKey >= 0 ? counterMove[prevKey] : -1;
   const annotated = moves.map(m => {
     const k=moveKey(m); let s=0;
-    if(activeMoveOrderingFeatures.ttMove&&k===ttMove){s+=2_000_000;activeMoveOrderingStats.ttMove.scoreHits++;}
+    if(activeMoveOrderingFeatures.ttMove&&k===ttMove){s+=2_000_000;if(activeMoveOrderingStats)activeMoveOrderingStats.ttMove.scoreHits++;}
     s += Math.round(rootHint(rootMoveScores,k)*120_000);
-    if(activeMoveOrderingFeatures.captures&&m.captured.length){s+=100_000+m.captured.length*10_000;activeMoveOrderingStats.captures.scoreHits++;}
-    if(activeMoveOrderingFeatures.killers&&k===killers0[ply]){s+=8_000;activeMoveOrderingStats.killers.scoreHits++;}
-    if(activeMoveOrderingFeatures.killers&&k===killers1[ply]){s+=7_000;activeMoveOrderingStats.killers.scoreHits++;}
-    if(activeMoveOrderingFeatures.countermove&&k===cm){s+=6_000;activeMoveOrderingStats.countermove.scoreHits++;}
-    if(activeMoveOrderingFeatures.history&&history[k])activeMoveOrderingStats.history.scoreHits++;
+    if(activeMoveOrderingFeatures.captures&&m.captured.length){s+=100_000+m.captured.length*10_000;if(activeMoveOrderingStats)activeMoveOrderingStats.captures.scoreHits++;}
+    if(activeMoveOrderingFeatures.killers&&k===killers0[ply]){s+=8_000;if(activeMoveOrderingStats)activeMoveOrderingStats.killers.scoreHits++;}
+    if(activeMoveOrderingFeatures.killers&&k===killers1[ply]){s+=7_000;if(activeMoveOrderingStats)activeMoveOrderingStats.killers.scoreHits++;}
+    if(activeMoveOrderingFeatures.countermove&&k===cm){s+=6_000;if(activeMoveOrderingStats)activeMoveOrderingStats.countermove.scoreHits++;}
+    if(activeMoveOrderingFeatures.history&&history[k])if(activeMoveOrderingStats)activeMoveOrderingStats.history.scoreHits++;
     if(activeMoveOrderingFeatures.history)s+=history[k]|0;
     // Existing static forward-advance ordering is not a Phase 3E candidate.
     if(!m.captured.length){const myKings=pos.side===1?pos.p1Kings:pos.p2Kings;if(!(myKings&B1(m.from))){
@@ -618,7 +619,7 @@ function orderMoves(
     }}
     return {m,s};
   }).sort((a,b)=>b.s-a.s);
-  if(annotated.length){const first=annotated[0].m,k=moveKey(first);
+  if(activeMoveOrderingStats&&annotated.length){const first=annotated[0].m,k=moveKey(first);
     if(activeMoveOrderingFeatures.ttMove&&k===ttMove)activeMoveOrderingStats.ttMove.firstAfterOrdering++;
     if(activeMoveOrderingFeatures.captures&&first.captured.length)activeMoveOrderingStats.captures.firstAfterOrdering++;
     if(activeMoveOrderingFeatures.killers&&(k===killers0[ply]||k===killers1[ply]))activeMoveOrderingStats.killers.firstAfterOrdering++;
@@ -630,7 +631,7 @@ function orderMoves(
 function updateKillers(m: Move, ply: number) {
   const k = moveKey(m);
   if (killers0[ply] !== k) { killers1[ply] = killers0[ply]; killers0[ply] = k; }
-  activeMoveOrderingStats.killers.updates++;
+  if(activeMoveOrderingStats)activeMoveOrderingStats.killers.updates++;
 }
 
 function getPV(pos: Position, tt: TT, repetitions: RepetitionCounts, max = 64): Move[] {
@@ -704,12 +705,15 @@ function quiesce(
     if (aIsRecap !== bIsRecap) return bIsRecap - aIsRecap;
     return activeMoveOrderingFeatures.captures ? b.captured.length - a.captured.length : 0;
   });
-  if (activeMoveOrderingFeatures.captures && caps.length > 1) {
-    activeMoveOrderingStats.captures.scoreHits += caps.length;
-    activeMoveOrderingStats.captures.firstAfterOrdering++;
-  }
-  if (activeMoveOrderingFeatures.recapture && caps.length && lastCapSquare >= 0 && caps[0].to === lastCapSquare) {
-    activeMoveOrderingStats.recapture.scoreHits++; activeMoveOrderingStats.recapture.firstAfterOrdering++;
+  if (activeMoveOrderingStats) {
+    if (activeMoveOrderingFeatures.captures && caps.length > 1) {
+      activeMoveOrderingStats.captures.scoreHits += caps.length;
+      activeMoveOrderingStats.captures.firstAfterOrdering++;
+    }
+    if (activeMoveOrderingFeatures.recapture && caps.length && lastCapSquare >= 0 && caps[0].to === lastCapSquare) {
+      activeMoveOrderingStats.recapture.scoreHits++;
+      activeMoveOrderingStats.recapture.firstAfterOrdering++;
+    }
   }
 
   for (const m of caps) {
@@ -902,11 +906,11 @@ function negamax(
         if (activeMoveOrderingFeatures.killers) updateKillers(m, ply);
         if (activeMoveOrderingFeatures.history) {
           history[mk] = Math.min(30000, history[mk] + depth * depth);
-          activeMoveOrderingStats.history.updates++;
+          if(activeMoveOrderingStats)activeMoveOrderingStats.history.updates++;
         }
         // Countermove: remember that this quiet move countered prevMoveKey well.
         if (activeMoveOrderingFeatures.countermove && prevMoveKey >= 0) {
-          counterMove[prevMoveKey] = mk; activeMoveOrderingStats.countermove.updates++;
+          counterMove[prevMoveKey] = mk; if(activeMoveOrderingStats)activeMoveOrderingStats.countermove.updates++;
         }
       }
       break;
@@ -942,7 +946,7 @@ export function fixedDepthScoreAtPlyForTesting(
   activeExtensionFeatures = { ...DEFAULT_EXTENSION_FEATURES };
   activeExtensionStats = makeExtensionStats();
   activeMoveOrderingFeatures = { ...DEFAULT_MOVE_ORDERING_FEATURES };
-  activeMoveOrderingStats = makeMoveOrderingStats();
+  activeMoveOrderingStats = undefined;
   return negamax(pos, depth, -INF, INF, tt, Number.POSITIVE_INFINITY, { n: 0, q: 0 }, ply, rep);
 }
 
@@ -957,6 +961,7 @@ export async function iterativeDeepening(
   featureOverrides: Partial<SearchFeatureFlags> = {},
   extensionOverrides: Partial<ExtensionFeatureFlags> = {},
   moveOrderingOverrides: Partial<MoveOrderingFeatureFlags> = {},
+  measurementOptions: SearchMeasurementOptions = {},
 ): Promise<SearchResult> {
   rootOverrideStats.searches++;
   if (deterministic?.depth !== undefined && deterministic.nodes !== undefined)
@@ -984,10 +989,10 @@ export async function iterativeDeepening(
     : Object.fromEntries(Object.keys(DEFAULT_EXTENSION_FEATURES).map(k=>[k,false])) as unknown as ExtensionFeatureFlags;
   activeExtensionStats=makeExtensionStats();
   activeMoveOrderingFeatures={...DEFAULT_MOVE_ORDERING_FEATURES,...moveOrderingOverrides};
-  activeMoveOrderingStats=makeMoveOrderingStats();
+  activeMoveOrderingStats=measurementOptions.collectMoveOrderingStats ? makeMoveOrderingStats() : undefined;
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, moveOrderingStats:activeMoveOrderingStats };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}) };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
@@ -1004,7 +1009,7 @@ export async function iterativeDeepening(
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, moveOrderingStats:activeMoveOrderingStats };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}) };
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
@@ -1266,7 +1271,7 @@ export async function iterativeDeepening(
     overrideReason,
     rootCandidates: lastRootCandidates,
     extensionStats: activeExtensionStats,
-    moveOrderingStats: activeMoveOrderingStats,
+    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}),
   };
 }
 
@@ -1279,9 +1284,10 @@ export function fixedDepthSearch(
   featureOverrides: Partial<SearchFeatureFlags> = {},
   extensionOverrides: Partial<ExtensionFeatureFlags> = {},
   moveOrderingOverrides: Partial<MoveOrderingFeatureFlags> = {},
+  measurementOptions: SearchMeasurementOptions = {},
 ): Promise<SearchResult> {
   if (!Number.isInteger(depth) || depth < 1) throw new Error(`depth must be a positive integer, got ${depth}`);
-  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth }, featureOverrides, extensionOverrides, moveOrderingOverrides);
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, depth, undefined, false, { depth }, featureOverrides, extensionOverrides, moveOrderingOverrides, measurementOptions);
 }
 
 export function fixedNodeSearch(
@@ -1294,7 +1300,8 @@ export function fixedNodeSearch(
   featureOverrides: Partial<SearchFeatureFlags> = {},
   extensionOverrides: Partial<ExtensionFeatureFlags> = {},
   moveOrderingOverrides: Partial<MoveOrderingFeatureFlags> = {},
+  measurementOptions: SearchMeasurementOptions = {},
 ): Promise<SearchResult> {
   if (!Number.isInteger(nodes) || nodes < 1) throw new Error(`nodes must be a positive integer, got ${nodes}`);
-  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes }, featureOverrides, extensionOverrides, moveOrderingOverrides);
+  return iterativeDeepening(root, 0, tt, onInfo, historyHashes, undefined, maxDepth, undefined, false, { nodes }, featureOverrides, extensionOverrides, moveOrderingOverrides, measurementOptions);
 }

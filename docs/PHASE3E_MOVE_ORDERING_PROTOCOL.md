@@ -53,3 +53,14 @@ Only if selected, use untouched starts 33–64 for independent confirmation at
 20,000 nodes/move, 50,000 nodes/move, and 100 ms/move, paired colors, depth cap
 64, and 160 plies. The time run is descriptive because wall time is not the
 canonical deterministic comparison.
+
+## Production instrumentation gate
+
+Ordering flags remain opt-in controls, but ordering statistics are independently
+opt-in through `collectMoveOrderingStats: true`. Normal searches neither create
+the statistics object nor execute counter increments and may omit
+`SearchResult.moveOrderingStats`. The Phase 3E runner explicitly enables
+collection for both engines. Semantic-preservation tests compare default,
+explicit-all-enabled, and statistics-enabled fixed-node searches on quiet and
+capture positions; best move, score, completed depth, PV, nodes, and qnodes must
+match exactly.
