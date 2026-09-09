@@ -40,7 +40,9 @@
     "build:android:prod": "eas build --platform android --profile production",
     "submit:android:prod": "eas submit --platform android --profile production",
     "test:phase3b": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3b scripts/phase3bExtensionTest.ts && node .tmp/phase3b/scripts/phase3bExtensionTest.js",
-    "experiment:extension-ablation": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/extension-ablation-build scripts/extensionAblationRunner.ts && node .tmp/extension-ablation-build/scripts/extensionAblationRunner.js"
+    "experiment:extension-ablation": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/extension-ablation-build scripts/extensionAblationRunner.ts && node .tmp/extension-ablation-build/scripts/extensionAblationRunner.js",
+    "experiment:phase3c": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3c-build scripts/phase3cPromotionRunner.ts && node .tmp/phase3c-build/scripts/phase3cPromotionRunner.js",
+    "test:phase3c-positions": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3c-position-build scripts/phase3cPositionSuite.ts && node .tmp/phase3c-position-build/scripts/phase3cPositionSuite.js"
   },
   "dependencies": {
     "@expo-google-fonts/kanit": "^0.4.1",

@@ -16,7 +16,7 @@ same limits. Candidate always means the subtype-disabled engine. Pair-bootstrap
 below means likely beneficial; otherwise the result is inconclusive.
 
 The independent suite is `makhos-extension-confirmation-starts-v1`. Its unsigned
-32-bit seed `0x4149c4b1` (1095357617) is mechanically the first eight hex digits
+32-bit seed `0x4149c4b1` (1095353521) is mechanically the first eight hex digits
 of the Phase 3A merge SHA `4149c4b1989378b2a85746b36190c915fdb16d4d`.
 The generator produced candidates once, removed exact complete-state collisions
 with Phase 3A v1, retained the first 64, and was frozen before results were run.
@@ -56,3 +56,17 @@ npm run test:phase3b
 npm run experiment:extension-ablation -- --stage=screening
 npm run experiment:extension-ablation -- --stage=confirmation --subtypes=smallEndgame
 ```
+
+## Phase 3C promotion confirmation
+
+Phase 3C's original multi-budget run reused the first 32 starts above. It is a
+same-corpus robustness replication, not a second independent-corpus result.
+The final promotion review freezes `makhos-phase3c-final-confirmation-starts-v1`.
+Its seed `0xb59570ad` (3046469805) is mechanically the first eight hexadecimal
+digits of immutable, GitHub-resolvable PR #11 commit
+`b59570adb3e94dc629fc5a9af262b96b9d030498`. Its 64 retained complete states
+are disjoint from Phase 3A, Phase 3B, and the superseded Phase 3C review corpus.
+Its content fingerprint is
+`fc48f9aee765fd13d30c2577d6c3031bada555214d1d831148a58ae68ea16d0f`.
+No alternate seed was tried. Exact metadata is frozen in
+`config/phase3c-promotion-v1.json` before final games are inspected.

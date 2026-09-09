@@ -94,7 +94,7 @@ Work one hypothesis at a time and keep only measured wins.
 
 ## Search
 
-- [-] Measure the Phase 3A one-at-a-time search-feature ablation baseline before tuning; reproducible 64-start corpus and fixed-node runner are complete, while conclusions depend on the recorded screening/confirmation evidence.
+- [x] Complete Phase 3A–3C extension ablation and approve Teacher v1: same-corpus robustness at 5k/20k/50k nodes plus a new disjoint-corpus 20k/100 ms confirmation support disabling only `smallEndgame`, with all correctness and verified-position gates passing.
 - [ ] Move-ordering ablations: TT move, captures, killers, history, countermove, recapture ordering.
 - [ ] Tune LMR based on measured strength, not only speed.
 - [ ] Tune/select pruning thresholds using tournaments and tactical regressions.
@@ -120,7 +120,7 @@ Potential features to test individually or in small groups:
 
 Use self-play/position data for parameter tuning where appropriate, but confirm tuned parameters in holdout games.
 
-**Exit gate:** candidate Teacher v1 clearly exceeds Teacher v0 in paired tournaments without tactical/correctness regression.
+**Exit gate:** **MET.** The final Teacher v1 identity will be the PR #11 merge commit and must be added after merge; corpus provenance uses GitHub-resolvable PR #11 commit `b59570adb3e94dc629fc5a9af262b96b9d030498`.
 
 ---
 
