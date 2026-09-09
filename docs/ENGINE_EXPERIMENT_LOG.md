@@ -821,3 +821,69 @@ Both emit machine-readable JSON/CSV under ignored `.tmp/phase3c/`.
 only `smallEndgame` to false; every other extension/search feature remains at
 the baseline value. PR #11 merge commit
 `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f` **is the frozen Teacher v1 release identity**.
+
+---
+
+## EXP-2026-010 — Phase 3D soundForcedTrap confirmation
+
+**Status:** NEEDS MORE DATA — candidate supported, production default unchanged
+
+**Date:** 2026-09-09
+
+**Canonical starting commit:** `075cd5bfb69eabac4555eef6d048fa35700efadb`
+
+**Frozen Teacher v1 identity:** `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`
+
+### Frozen hypothesis and controls
+
+The candidate differs from Teacher v1 only by `soundForcedTrap=false`.
+Both tournament engines explicitly pin the complete extension configuration,
+including Teacher v1's `smallEndgame=false`; no production default, evaluation,
+pruning, reductions, null move, ProbCut, IID, ordering, or
+`singleCaptureRecapture` behavior changed. The protocol was fixed before games
+were inspected. Phase 3B's approximately +100 Elo screen was not confirmation.
+
+The fresh suite is
+`makhos-phase3d-sound-forced-trap-confirmation-starts-v1`, seed `0x075cd5bf`
+(123524543), mechanically derived from the canonical starting commit, with
+SHA-256 `d68b1b8f33b3f4e7b490e44ff8bd2c4576ba11b14c81a52a987471598cb1ab6d`.
+Its frozen v1 generator and first-64 selection rule are documented in the
+protocol. Automated complete-state checks prove all 64 unique states disjoint
+from every retained Phase 3A, 3B, superseded Phase 3C, and final Phase 3C
+corpus. No alternate corpus or seed was generated after outcomes.
+
+### Independent paired-color results
+
+Candidate W/D/L is candidate wins/draws/baseline wins. Each row contains 32
+pairs/64 games, depth cap 64, and 160-ply maximum. All games completed with no
+unresolved games or errors. Node and time metrics are totals for baseline then
+candidate. Pair-bootstrap intervals use 20,000 deterministic pair resamples.
+
+| Budget | W/D/L | Score | Elo (95% pair CI) | Depth B/C | Main nodes B/C | Qnodes B/C | Elapsed ms B/C | NPS B/C | baseline trap trigger/add |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes/move | 35/6/23 | 59.38% | +65.9 [+21.7,+118.4] | 7.92/8.30 | 18,787,579/18,846,016 | 8,668,785/8,650,141 | 228,743/234,979 | 120,031/117,015 | 761/1,197 |
+| 50,000 nodes/move | 36/2/26 | 57.81% | +54.7 [0.0,+112.3] | 9.44/9.66 | 46,688,804/46,914,627 | 20,151,518/20,027,273 | 488,743/494,535 | 136,760/135,363 | 1,690/2,748 |
+| 100 ms/move | 30/13/21 | 57.03% | +49.2 [-5.4,+106.3] | 4.06/4.09 | 11,557,331/11,344,447 | 6,192,873/6,109,077 | 142,964/143,210 | 124,159/121,874 | 399/489 |
+
+All measured trap events were root events. Candidate trap counters were zero,
+as expected. The canonical 20k interval excludes zero and all point estimates
+favor the candidate. The 50k lower bound touches zero and the production-like
+time interval crosses zero, however, so the preferred evidence standard is not
+met at both fixed work and time.
+
+### Correctness, holdout, and decision
+
+Rules passed 3,755 checks; perft 8/8; tactical 8; search determinism 14; TT 36;
+tablebase determinism four assertions/20 repeat probes; Phase 1C 21; tournament
+harness; position-suite infrastructure 49; Phase 3B/3C extension semantics and
+all corpus checks; and full TypeScript typecheck all passed. The Phase 3C
+position regression gate also passed. Phase 3D development output was first run
+blinded. Only after candidate, corpus, results, and decision rule were frozen
+was holdout revealed: baseline and candidate both passed development 2/2 and
+holdout 2/2, with all three endgame-tagged rows passing. No verified tactical,
+holdout, or endgame regression occurred.
+
+**Decision: NEEDS MORE DATA.** Independent evidence supports the hypothesis,
+and correctness gates pass, but the preferred confidence condition is not met
+at 50k or equal time. Retain the candidate as a supported follow-up hypothesis;
+do not promote or change the production `soundForcedTrap` default in this PR.
