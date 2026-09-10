@@ -36,9 +36,16 @@ export interface SearchResult {
   rootCandidates?: RootSearchCandidate[];
   extensionStats?: ExtensionStats;
   moveOrderingStats?: MoveOrderingStats;
+  lmrStats?: LmrStats;
 }
 export interface CancelToken  { cancelled: boolean; }
-export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; }
+export type LmrProfile = 'current' | 'off' | 'gentler' | 'delayed' | 'aggressive';
+export const DEFAULT_LMR_PROFILE: LmrProfile = 'current';
+export interface LmrStatsPartition { eligibleMoves:number; reducedMoves:number; totalReducedPlies:number; reductionHistogram:[number,number,number,number]; fullDepthResearches:number }
+export interface LmrStats extends LmrStatsPartition { root:LmrStatsPartition; interior:LmrStatsPartition }
+/** Both controls are opt-in. The profile defaults to the exact production
+ * schedule; counter objects are not created or touched unless collection is requested. */
+export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; collectLmrStats?: boolean; lmrProfile?: LmrProfile; }
 export interface DeterministicSearchOptions {
   /** Exact completed iterative-deepening depth; wall clock is ignored. */
   depth?: number;
@@ -146,6 +153,8 @@ function makeMoveOrderingStats(): MoveOrderingStats {
     [k,{scoreHits:0,firstAfterOrdering:0,updates:0}])) as MoveOrderingStats;
 }
 let activeMoveOrderingStats: MoveOrderingStats | undefined;
+let activeLmrProfile: LmrProfile = DEFAULT_LMR_PROFILE;
+let activeLmrStats: LmrStats | undefined;
 function makeExtensionStats(): ExtensionStats {
   const out={} as ExtensionStats;
   for(const key of Object.keys(DEFAULT_EXTENSION_FEATURES) as (keyof ExtensionFeatureFlags)[]) out[key]={triggers:0,addedDepth:0,rootTriggers:0,rootAddedDepth:0,interiorTriggers:0,interiorAddedDepth:0};
@@ -202,6 +211,18 @@ const LMR: Uint8Array[] = Array.from({ length: 32 }, (_, i) =>
     i < 3 || d < 2 ? 0 : Math.min(3, Math.floor(0.5 + Math.log(i+1) * Math.log(d+1) / 2.2))
   )
 );
+
+function makeLmrPartition():LmrStatsPartition{return {eligibleMoves:0,reducedMoves:0,totalReducedPlies:0,reductionHistogram:[0,0,0,0],fullDepthResearches:0};}
+function makeLmrStats():LmrStats{return {...makeLmrPartition(),root:makeLmrPartition(),interior:makeLmrPartition()};}
+function lmrReduction(moveIndex:number, depth:number):number {
+  const current=LMR[Math.min(31,moveIndex)][Math.min(31,depth)]|0;
+  if(activeLmrProfile==='off')return 0;
+  if(activeLmrProfile==='gentler')return Math.max(0,current-1);
+  if(activeLmrProfile==='aggressive')return Math.min(3,current+1);
+  return current;
+}
+function recordLmr(reduction:number,root:boolean):void { const all=activeLmrStats;if(!all)return;const part=root?all.root:all.interior;for(const c of [all,part]){c.eligibleMoves++;c.reductionHistogram[reduction]++;if(reduction){c.reducedMoves++;c.totalReducedPlies+=reduction;}} }
+function recordLmrResearch(root:boolean):void {const all=activeLmrStats;if(all){all.fullDepthResearches++;(root?all.root:all.interior).fullDepthResearches++;}}
 
 export function moveKey(m: Move) { return (m.from << 5) | m.to; }
 
@@ -879,9 +900,9 @@ function negamax(
     const opHasCaptures = isQ && hasCapturesAvailable(child);
     if (activeFeatures.extensions) d = extendTacticalDepth(depth, d, m, opHasCaptures, ply);
     const fullD = d;
-    if (activeFeatures.lmr && i >= 3 && d >= 2 && isQ && !single && !opHasCaptures) {
-      d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
-    }
+    let reduction=0;
+    const lmrEligible=activeFeatures.lmr && i >= (activeLmrProfile==='delayed'?4:3) && d >= 2 && isQ && !single && !opHasCaptures;
+    if(lmrEligible){reduction=lmrReduction(i,d);recordLmr(reduction,false);d=Math.max(1,d-reduction);}
 
     // Late Move Pruning (LMP): at very shallow depth, stop searching quiet
     // moves beyond a threshold — they're very unlikely to raise alpha.
@@ -895,6 +916,7 @@ function negamax(
     } else {
       score = -negamax(child, d, -(alpha+1), -alpha, tt, deadline, acc, ply+1, rep, true, mk);
       if (score > alpha && score < beta) {
+        if(reduction)recordLmrResearch(false);
         score = -negamax(child, fullD, -beta, -alpha, tt, deadline, acc, ply+1, rep, true, mk);
       }
     }
@@ -990,9 +1012,12 @@ export async function iterativeDeepening(
   activeExtensionStats=makeExtensionStats();
   activeMoveOrderingFeatures={...DEFAULT_MOVE_ORDERING_FEATURES,...moveOrderingOverrides};
   activeMoveOrderingStats=measurementOptions.collectMoveOrderingStats ? makeMoveOrderingStats() : undefined;
+  activeLmrProfile=measurementOptions.lmrProfile??DEFAULT_LMR_PROFILE;
+  if(!['current','off','gentler','delayed','aggressive'].includes(activeLmrProfile))throw new Error(`unknown LMR profile ${activeLmrProfile}`);
+  activeLmrStats=measurementOptions.collectLmrStats?makeLmrStats():undefined;
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}) };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}) };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
@@ -1009,7 +1034,7 @@ export async function iterativeDeepening(
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}) };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}) };
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
@@ -1077,9 +1102,9 @@ export async function iterativeDeepening(
         if (activeFeatures.extensions && activeExtensionFeatures.rootLowMobility && rootLowMobilityExtension > 0) d = addExtension('rootLowMobility',d,rootLowMobilityExtension,depth+rootLowMobilityExtension,0);
         if (activeFeatures.extensions && activeExtensionFeatures.soundForcedTrap && isSoundForcedTrap(root, m)) d = addExtension('soundForcedTrap',d,2,depth+2,0);
         const fullD = d;
-        if (activeFeatures.lmr && i >= 3 && d >= 2 && isQ && !single && !opCapRoot) {
-          d = Math.max(1, d - (LMR[Math.min(31,i)][Math.min(31,d)] | 0));
-        }
+        let reduction=0;
+        const lmrEligible=activeFeatures.lmr && i >= (activeLmrProfile==='delayed'?4:3) && d >= 2 && isQ && !single && !opCapRoot;
+        if(lmrEligible){reduction=lmrReduction(i,d);recordLmr(reduction,true);d=Math.max(1,d-reduction);}
 
         pushRepetition(rep, ch);
         let score: number;
@@ -1087,8 +1112,10 @@ export async function iterativeDeepening(
           score = -negamax(child, d, -beta, -alpha, tt, deadline, acc, 1, rep, true, mk);
         } else {
           score = -negamax(child, d, -(alpha+1), -alpha, tt, deadline, acc, 1, rep, true, mk);
-          if (score > alpha && score < beta)
+          if (score > alpha && score < beta){
+            if(reduction)recordLmrResearch(true);
             score = -negamax(child, fullD, -beta, -alpha, tt, deadline, acc, 1, rep, true, mk);
+          }
         }
         popRepetition(rep, ch);
         rootCandidates.push({ move: m, score });
@@ -1271,7 +1298,7 @@ export async function iterativeDeepening(
     overrideReason,
     rootCandidates: lastRootCandidates,
     extensionStats: activeExtensionStats,
-    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}),
+    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}),
   };
 }
 

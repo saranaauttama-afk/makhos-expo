@@ -96,7 +96,7 @@ Work one hypothesis at a time and keep only measured wins.
 
 - [x] Complete Phase 3A–3C extension ablation and approve Teacher v1: same-corpus robustness at 5k/20k/50k nodes plus a new disjoint-corpus 20k/100 ms confirmation support disabling only `smallEndgame`, with all correctness and verified-position gates passing.
 - [x] Move-ordering ablations: TT move, captures, killers, history, countermove, recapture ordering. Phase 3E selected countermove removal mechanically, but confirmation intervals crossed zero; no production default changed.
-- [ ] Tune LMR based on measured strength, not only speed.
+- [x] Tune LMR based on measured strength, not only speed. Phase 3F gathered controlled screening and untouched confirmation evidence without changing production defaults.
 - [ ] Tune/select pruning thresholds using tournaments and tactical regressions.
 - [ ] Improve time management only after fixed-node/depth strength is understood.
 - [ ] Investigate aspiration windows if absent/useful.

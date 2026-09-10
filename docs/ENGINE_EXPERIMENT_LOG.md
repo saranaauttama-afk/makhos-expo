@@ -1012,3 +1012,32 @@ Targeted quiet/capture tests prove that default ordering, explicit all-enabled
 ordering, and statistics-enabled ordering produce identical best move, score,
 completed depth, PV, nodes, and qnodes; only the optional instrumentation field
 differs.
+
+## EXP-2026-012 — Phase 3F LMR schedule tuning
+
+Phase 3F began at canonical tip `8208f6f68bc16d0df00e68691e8e1b319db6cf00` with Frozen Teacher v1 identity `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`. The source audit, four-profile inventory, mechanical rule, new 64-start corpus, partition, and fingerprint were frozen before outcomes. Production remains the exact `current` LMR schedule.
+
+The new `makhos-phase3f-lmr-starts-v1` corpus uses seed `0x8208f6f6` (`2181625590`), fingerprint `b22433396fe82ec54461f449944cb780fedca7caa4f5fab4a440a0e980972f89`, and is complete-state unique and disjoint from all retained Phase 3A-3E corpora. Starts 1-32 screened; starts 33-64 were untouched until confirmation.
+
+### Screening (5,000 nodes/move, 32 pairs / 64 games)
+
+| profile | W/D/L | score | Elo | pair-bootstrap Elo 95% CI |
+|---|---:|---:|---:|---:|
+| off | 31/6/27 | 53.125% | +21.7 | [-43.7, +88.7] |
+| gentler | 32/6/26 | 54.688% | +32.7 | [-38.2, +106.3] |
+| delayed | 31/7/26 | 53.906% | +27.2 | [-43.7, +100.4] |
+| aggressive | 34/7/23 | 58.594% | +60.3 | [-10.9, +137.0] |
+
+All runs had zero unresolved games and errors. Per the predeclared rule, `aggressive` was selected solely because it had the highest score strictly above 50%. This is selection evidence only.
+
+### Untouched confirmation: aggressive versus current
+
+| budget | W/D/L | score | Elo | pair-bootstrap Elo 95% CI | avg depth current/aggressive | main nodes current/aggressive | qnodes current/aggressive | elapsed ms current/aggressive | NPS current/aggressive |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes | 28/8/28 | 50.000% | 0.0 | [-71.6, +71.6] | 7.710/8.175 | 19,856,212/20,316,278 | 9,139,117/8,732,942 | 245,913/254,507 | 117,909/114,139 |
+| 50,000 nodes | 32/11/21 | 58.594% | +60.3 | [-5.4, +130.7] | 8.287/9.023 | 50,179,502/51,557,690 | 23,426,729/22,382,398 | 552,027/533,324 | 133,338/138,640 |
+| 100 ms | 29/9/26 | 52.344% | +16.3 | [-60.3, +88.7] | 3.790/4.149 | 10,812,640/10,618,394 | 5,737,218/5,285,870 | 134,599/134,058 | 122,957/118,637 |
+
+All confirmation runs had zero unresolved games and errors. The equal-time run deliberately had no LMR instrumentation. Fixed-node counters show the intended mechanism: at 50,000 nodes, current reduced 6,655,725 eligible moves for 8,553,436 plies (histogram 0/1/2/3 = 0/4,869,896/1,673,947/111,882; 40,411 full-depth re-searches), while aggressive reduced 7,610,339 moves for 17,389,894 plies (0/0/5,441,123/2,169,216; 67,757 re-searches). Full root/interior partitions and the equivalent 20,000-node data are retained in the machine-readable artifacts.
+
+The point estimates favor aggressive at two confirmation budgets, but every confirmation CI crosses zero. The result is **inconclusive**, so no production change is promoted. No evaluation, pruning, extension, ordering, TT, or qsearch behavior changed; the replay control and instrumentation remain opt-in.

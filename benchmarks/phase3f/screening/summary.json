@@ -1,0 +1,504 @@
+{
+  "schemaVersion": "makhos-phase3f-screening-v1",
+  "config": {
+    "schemaVersion": "makhos-phase3f-lmr-config-v1",
+    "canonicalTip": "8208f6f68bc16d0df00e68691e8e1b319db6cf00",
+    "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+    "suite": "makhos-phase3f-lmr-starts-v1",
+    "seedHex": "0x8208f6f6",
+    "seed": 2181625590,
+    "fingerprint": "b22433396fe82ec54461f449944cb780fedca7caa4f5fab4a440a0e980972f89",
+    "screening": {
+      "startOffset": 0,
+      "pairedStarts": 32,
+      "nodesPerMove": 5000,
+      "maxDepth": 64,
+      "maxPlies": 160
+    },
+    "confirmation": {
+      "startOffset": 32,
+      "pairedStarts": 32,
+      "nodeBudgets": [
+        20000,
+        50000
+      ],
+      "timeBudgetsMs": [
+        100
+      ],
+      "maxDepth": 64,
+      "maxPlies": 160
+    },
+    "selectionRule": "Select exactly the highest candidate score strictly above 50%; ties use inventory order. Otherwise stop as inconclusive.",
+    "inventory": [
+      "off",
+      "gentler",
+      "delayed",
+      "aggressive"
+    ],
+    "baselineLmrProfile": "current",
+    "baselineSearch": {
+      "reverseFutility": true,
+      "razoring": true,
+      "nullMove": true,
+      "probCut": true,
+      "iid": true,
+      "lmr": true,
+      "lmp": true,
+      "extensions": true
+    },
+    "baselineExtensions": {
+      "singleLegalMove": true,
+      "smallEndgame": false,
+      "tacticalCapture": true,
+      "multiCapture": true,
+      "opponentForcedCapture": true,
+      "singleCaptureRecapture": true,
+      "rootLowMobility": true,
+      "soundForcedTrap": true
+    },
+    "baselineMoveOrdering": {
+      "ttMove": true,
+      "captures": true,
+      "killers": true,
+      "history": true,
+      "countermove": true,
+      "recapture": true
+    }
+  },
+  "selected": "aggressive",
+  "decision": "confirm strongest point estimate",
+  "results": [
+    {
+      "profile": "off",
+      "wdl": {
+        "wins": 31,
+        "draws": 6,
+        "losses": 27
+      },
+      "scorePercent": 53.125,
+      "elo": 21.74306492903707,
+      "scoreCI95": [
+        0.4375,
+        0.625
+      ],
+      "eloCI95": [
+        -43.65778777002721,
+        88.73949984654254
+      ],
+      "baselineMetrics": {
+        "averageDepth": 5.973534971644613,
+        "nodes": 5119617,
+        "qnodes": 2487599,
+        "elapsedMs": 106633,
+        "nps": 71340.16674012736,
+        "moves": 1587,
+        "lmrStats": {
+          "eligibleMoves": 583698,
+          "reducedMoves": 583698,
+          "totalReducedPlies": 735659,
+          "reductionHistogram": [
+            0,
+            439697,
+            136041,
+            7960
+          ],
+          "fullDepthResearches": 7109,
+          "root": {
+            "eligibleMoves": 11748,
+            "reducedMoves": 11748,
+            "totalReducedPlies": 19674,
+            "reductionHistogram": [
+              0,
+              5557,
+              4456,
+              1735
+            ],
+            "fullDepthResearches": 817
+          },
+          "interior": {
+            "eligibleMoves": 571950,
+            "reducedMoves": 571950,
+            "totalReducedPlies": 715985,
+            "reductionHistogram": [
+              0,
+              434140,
+              131585,
+              6225
+            ],
+            "fullDepthResearches": 6292
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 5.845380263984915,
+        "nodes": 5126388,
+        "qnodes": 2474468,
+        "elapsedMs": 105968,
+        "nps": 71727.84236750717,
+        "moves": 1591,
+        "lmrStats": {
+          "eligibleMoves": 575991,
+          "reducedMoves": 0,
+          "totalReducedPlies": 0,
+          "reductionHistogram": [
+            575991,
+            0,
+            0,
+            0
+          ],
+          "fullDepthResearches": 0,
+          "root": {
+            "eligibleMoves": 13910,
+            "reducedMoves": 0,
+            "totalReducedPlies": 0,
+            "reductionHistogram": [
+              13910,
+              0,
+              0,
+              0
+            ],
+            "fullDepthResearches": 0
+          },
+          "interior": {
+            "eligibleMoves": 562081,
+            "reducedMoves": 0,
+            "totalReducedPlies": 0,
+            "reductionHistogram": [
+              562081,
+              0,
+              0,
+              0
+            ],
+            "fullDepthResearches": 0
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "profile": "gentler",
+      "wdl": {
+        "wins": 32,
+        "draws": 6,
+        "losses": 26
+      },
+      "scorePercent": 54.6875,
+      "elo": 32.668018580527814,
+      "scoreCI95": [
+        0.4453125,
+        0.6484375
+      ],
+      "eloCI95": [
+        -38.15339721863354,
+        106.34623144029209
+      ],
+      "baselineMetrics": {
+        "averageDepth": 6.017676767676767,
+        "nodes": 5142486,
+        "qnodes": 2446298,
+        "elapsedMs": 105804,
+        "nps": 71724.92533363578,
+        "moves": 1584,
+        "lmrStats": {
+          "eligibleMoves": 600501,
+          "reducedMoves": 600501,
+          "totalReducedPlies": 756806,
+          "reductionHistogram": [
+            0,
+            451642,
+            141413,
+            7446
+          ],
+          "fullDepthResearches": 5735,
+          "root": {
+            "eligibleMoves": 12495,
+            "reducedMoves": 12495,
+            "totalReducedPlies": 21136,
+            "reductionHistogram": [
+              0,
+              5646,
+              5057,
+              1792
+            ],
+            "fullDepthResearches": 697
+          },
+          "interior": {
+            "eligibleMoves": 588006,
+            "reducedMoves": 588006,
+            "totalReducedPlies": 735670,
+            "reductionHistogram": [
+              0,
+              445996,
+              136356,
+              5654
+            ],
+            "fullDepthResearches": 5038
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 5.892947103274559,
+        "nodes": 5133455,
+        "qnodes": 2459906,
+        "elapsedMs": 103368,
+        "nps": 73459.4942341924,
+        "moves": 1588,
+        "lmrStats": {
+          "eligibleMoves": 572759,
+          "reducedMoves": 131043,
+          "totalReducedPlies": 137463,
+          "reductionHistogram": [
+            441716,
+            124623,
+            6420,
+            0
+          ],
+          "fullDepthResearches": 318,
+          "root": {
+            "eligibleMoves": 12329,
+            "reducedMoves": 7082,
+            "totalReducedPlies": 9246,
+            "reductionHistogram": [
+              5247,
+              4918,
+              2164,
+              0
+            ],
+            "fullDepthResearches": 132
+          },
+          "interior": {
+            "eligibleMoves": 560430,
+            "reducedMoves": 123961,
+            "totalReducedPlies": 128217,
+            "reductionHistogram": [
+              436469,
+              119705,
+              4256,
+              0
+            ],
+            "fullDepthResearches": 186
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "profile": "delayed",
+      "wdl": {
+        "wins": 31,
+        "draws": 7,
+        "losses": 26
+      },
+      "scorePercent": 53.90625,
+      "elo": 27.198831638044446,
+      "scoreCI95": [
+        0.4375,
+        0.640625
+      ],
+      "eloCI95": [
+        -43.65778777002721,
+        100.42240828085703
+      ],
+      "baselineMetrics": {
+        "averageDepth": 6.060049019607843,
+        "nodes": 5259282,
+        "qnodes": 2581270,
+        "elapsedMs": 110619,
+        "nps": 70878.89060649618,
+        "moves": 1632,
+        "lmrStats": {
+          "eligibleMoves": 601557,
+          "reducedMoves": 601557,
+          "totalReducedPlies": 760505,
+          "reductionHistogram": [
+            0,
+            452447,
+            139272,
+            9838
+          ],
+          "fullDepthResearches": 8540,
+          "root": {
+            "eligibleMoves": 16904,
+            "reducedMoves": 16904,
+            "totalReducedPlies": 30828,
+            "reductionHistogram": [
+              0,
+              6471,
+              6942,
+              3491
+            ],
+            "fullDepthResearches": 957
+          },
+          "interior": {
+            "eligibleMoves": 584653,
+            "reducedMoves": 584653,
+            "totalReducedPlies": 729677,
+            "reductionHistogram": [
+              0,
+              445976,
+              132330,
+              6347
+            ],
+            "fullDepthResearches": 7583
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 6.109001837109615,
+        "nodes": 5239081,
+        "qnodes": 2574598,
+        "elapsedMs": 107159,
+        "nps": 72916.68455286071,
+        "moves": 1633,
+        "lmrStats": {
+          "eligibleMoves": 474066,
+          "reducedMoves": 474066,
+          "totalReducedPlies": 619870,
+          "reductionHistogram": [
+            0,
+            336742,
+            128844,
+            8480
+          ],
+          "fullDepthResearches": 6474,
+          "root": {
+            "eligibleMoves": 12896,
+            "reducedMoves": 12896,
+            "totalReducedPlies": 23870,
+            "reductionHistogram": [
+              0,
+              4678,
+              5462,
+              2756
+            ],
+            "fullDepthResearches": 776
+          },
+          "interior": {
+            "eligibleMoves": 461170,
+            "reducedMoves": 461170,
+            "totalReducedPlies": 596000,
+            "reductionHistogram": [
+              0,
+              332064,
+              123382,
+              5724
+            ],
+            "fullDepthResearches": 5698
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "profile": "aggressive",
+      "wdl": {
+        "wins": 34,
+        "draws": 7,
+        "losses": 23
+      },
+      "scorePercent": 58.59375,
+      "elo": 60.31415751636439,
+      "scoreCI95": [
+        0.484375,
+        0.6875
+      ],
+      "eloCI95": [
+        -10.86089841744591,
+        136.9690723288825
+      ],
+      "baselineMetrics": {
+        "averageDepth": 5.980304955527319,
+        "nodes": 5081975,
+        "qnodes": 2458025,
+        "elapsedMs": 101590,
+        "nps": 74219.90353381238,
+        "moves": 1574,
+        "lmrStats": {
+          "eligibleMoves": 571987,
+          "reducedMoves": 571987,
+          "totalReducedPlies": 721197,
+          "reductionHistogram": [
+            0,
+            430264,
+            134236,
+            7487
+          ],
+          "fullDepthResearches": 5870,
+          "root": {
+            "eligibleMoves": 10567,
+            "reducedMoves": 10567,
+            "totalReducedPlies": 17711,
+            "reductionHistogram": [
+              0,
+              4986,
+              4018,
+              1563
+            ],
+            "fullDepthResearches": 857
+          },
+          "interior": {
+            "eligibleMoves": 561420,
+            "reducedMoves": 561420,
+            "totalReducedPlies": 703486,
+            "reductionHistogram": [
+              0,
+              425278,
+              130218,
+              5924
+            ],
+            "fullDepthResearches": 5013
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 6.681846932321315,
+        "nodes": 5214211,
+        "qnodes": 2332901,
+        "elapsedMs": 118853,
+        "nps": 63499.54986411786,
+        "moves": 1581,
+        "lmrStats": {
+          "eligibleMoves": 636433,
+          "reducedMoves": 636433,
+          "totalReducedPlies": 1434791,
+          "reductionHistogram": [
+            0,
+            0,
+            474508,
+            161925
+          ],
+          "fullDepthResearches": 7529,
+          "root": {
+            "eligibleMoves": 17204,
+            "reducedMoves": 17204,
+            "totalReducedPlies": 44417,
+            "reductionHistogram": [
+              0,
+              0,
+              7195,
+              10009
+            ],
+            "fullDepthResearches": 688
+          },
+          "interior": {
+            "eligibleMoves": 619229,
+            "reducedMoves": 619229,
+            "totalReducedPlies": 1390374,
+            "reductionHistogram": [
+              0,
+              0,
+              467313,
+              151916
+            ],
+            "fullDepthResearches": 6841
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    }
+  ]
+}
