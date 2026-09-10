@@ -969,6 +969,8 @@ export function fixedDepthScoreAtPlyForTesting(
   activeExtensionStats = makeExtensionStats();
   activeMoveOrderingFeatures = { ...DEFAULT_MOVE_ORDERING_FEATURES };
   activeMoveOrderingStats = undefined;
+  activeLmrProfile = DEFAULT_LMR_PROFILE;
+  activeLmrStats = undefined;
   return negamax(pos, depth, -INF, INF, tt, Number.POSITIVE_INFINITY, { n: 0, q: 0 }, ply, rep);
 }
 
