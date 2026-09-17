@@ -1075,3 +1075,24 @@ Fixed-node instrumentation confirms the intended behavior. At 20k, current versu
 Every confirmation point estimate favored the selected candidate, but both required 20k and 100 ms intervals cross zero. **Decision: NEEDS MORE DATA.** The strong-promotion rule is not met. Production remains `pruningProfile=current`; no pruning threshold is promoted.
 
 After the decision was frozen, the Phase 3G comparison first emitted a blinded report with holdout rows omitted, then revealed holdout solely as the regression gate. At 5,000 nodes per position, the fully pinned Teacher v1 baseline (`lmrProfile=current`, `pruningProfile=current`) and otherwise-identical `razoring-conservative` candidate both passed development 2/2 and holdout 2/2. All three verified endgame-tagged development/holdout cases passed for both engines. Thus the selected candidate caused no development, holdout, or endgame regression in this gate; the machine-readable baseline/candidate comparison is retained in `benchmarks/phase3g/position-suite-comparison.json`.
+
+## EXP-2026-014 — Phase 3H aspiration-window tuning
+
+Phase 3H began at canonical tip `297105dd7ce17d4815e1805d3edbcadeb96a0e57`, with Frozen Teacher v1 identity `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`. The source audit, four-candidate inventory, baseline pins, mechanical selection rule, new corpus, partition, and fingerprint were frozen in `docs/PHASE3H_ASPIRATION_PROTOCOL.md` before outcomes. Production remains the exact `current` ±150 aspiration schedule.
+
+The `makhos-phase3h-aspiration-starts-v1` corpus uses seed `0x297105dd` (`695272925`), fingerprint `18c227cee03578f11f4b9ecfa86899bbbc00344abe8c84aff2832551bead0098`, and 64 unique complete states disjoint from every retained Phase 3A–3G corpus. Only screening starts 1–32 were inspected.
+
+### Screening — starts 1–32 (5,000 nodes/move)
+
+Each row is 32 color-swapped pairs / 64 games, maxDepth 64 and maxPlies 160. All games completed with zero errors and unresolved results. Aspiration instrumentation was enabled for both engines.
+
+| profile | W/D/L | score | Elo (pair-bootstrap 95% CI) | avg depth B/C | main nodes B/C | qnodes B/C | elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| off | 22/12/30 | 43.750% | -43.7 [-100.4,+10.9] | 6.201/5.753 | 4,890,084/4,756,495 | 2,419,801/2,513,636 | 111,526/84,826 | 65,544/85,706 |
+| narrow-75 | 29/6/29 | 50.000% | 0.0 [-43.7,+49.2] | 6.039/6.318 | 5,028,161/5,010,603 | 2,483,608/2,478,694 | 116,073/119,374 | 64,716/62,738 |
+| narrow-100 | 25/12/27 | 48.438% | -10.9 [-54.7,+32.7] | 5.965/5.963 | 5,189,124/5,191,442 | 2,634,990/2,631,739 | 105,579/108,448 | 74,107/72,138 |
+| wide-300 | 20/13/31 | 41.406% | -60.3 [-124.5,-5.4] | 5.935/5.677 | 5,176,982/5,133,488 | 2,571,589/2,591,909 | 106,025/90,153 | 73,082/85,692 |
+
+The baseline/candidate retry totals and failed-attempt main/qnode costs were: off 5,857/0 retries and 322,712+96,527 / 0 wasted nodes; narrow-75 5,942/6,862 and 360,213+109,438 / 553,722+221,392; narrow-100 5,270/6,377 and 322,806+104,426 / 424,429+153,009; wide-300 5,936/2,306 and 350,405+107,484 / 202,255+39,481. Full fail-low/high counts, retry histograms, maximum retries, and initial/final widths are preserved in the machine-readable artifacts.
+
+No candidate scored **strictly** above 50%; narrow-75 was exactly 50% and therefore did not qualify. The frozen mechanical rule selected no candidate and Phase 3H stopped **inconclusive**. Untouched starts 33–64 were not inspected, no confirmation tournament was run, and no candidate existed for the post-decision holdout comparison. The requested confirmation and position-regression evidence are therefore correctly marked not applicable rather than choosing a candidate post hoc. Production aspiration behavior remains unchanged.

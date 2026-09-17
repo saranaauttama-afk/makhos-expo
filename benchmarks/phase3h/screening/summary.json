@@ -1,0 +1,562 @@
+{
+  "schemaVersion": "makhos-phase3h-screening-v1",
+  "config": {
+    "schemaVersion": "makhos-phase3h-aspiration-config-v1",
+    "canonicalTip": "297105dd7ce17d4815e1805d3edbcadeb96a0e57",
+    "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+    "suite": "makhos-phase3h-aspiration-starts-v1",
+    "seedHex": "0x297105dd",
+    "seed": 695272925,
+    "fingerprint": "18c227cee03578f11f4b9ecfa86899bbbc00344abe8c84aff2832551bead0098",
+    "screening": {
+      "startOffset": 0,
+      "pairedStarts": 32,
+      "nodesPerMove": 5000,
+      "maxDepth": 64,
+      "maxPlies": 160
+    },
+    "confirmation": {
+      "startOffset": 32,
+      "pairedStarts": 32,
+      "nodeBudgets": [
+        20000,
+        50000
+      ],
+      "timeBudgetsMs": [
+        100
+      ],
+      "maxDepth": 64,
+      "maxPlies": 160
+    },
+    "selectionRule": "Select exactly the highest candidate score strictly above 50%; ties use inventory order. Otherwise stop as inconclusive.",
+    "inventory": [
+      "off",
+      "narrow-75",
+      "narrow-100",
+      "wide-300"
+    ],
+    "sourceAudit": {
+      "firstCompletedDepth": "full [-INF,+INF] window",
+      "laterDepths": "centered on the previous completed score",
+      "currentInitialHalfWidth": 150,
+      "failure": "fail-low at score <= lower bound or fail-high at score >= upper bound doubles half-width and retries the same depth",
+      "rootSearch": "first ordered move full alpha-beta window; later moves null-window PVS and full-depth/full-window re-search on an in-window improvement"
+    },
+    "profiles": {
+      "current": {
+        "initialHalfWidth": 150,
+        "retry": "double on fail-low/high"
+      },
+      "off": {
+        "window": "full every depth",
+        "retry": "none"
+      },
+      "narrow-75": {
+        "initialHalfWidth": 75,
+        "retry": "current"
+      },
+      "narrow-100": {
+        "initialHalfWidth": 100,
+        "retry": "current"
+      },
+      "wide-300": {
+        "initialHalfWidth": 300,
+        "retry": "current"
+      }
+    },
+    "baselineLmrProfile": "current",
+    "baselinePruningProfile": "current",
+    "baselineAspirationProfile": "current",
+    "baselineSearch": {
+      "reverseFutility": true,
+      "razoring": true,
+      "nullMove": true,
+      "probCut": true,
+      "iid": true,
+      "lmr": true,
+      "lmp": true,
+      "extensions": true
+    },
+    "baselineExtensions": {
+      "singleLegalMove": true,
+      "smallEndgame": false,
+      "tacticalCapture": true,
+      "multiCapture": true,
+      "opponentForcedCapture": true,
+      "singleCaptureRecapture": true,
+      "rootLowMobility": true,
+      "soundForcedTrap": true
+    },
+    "baselineMoveOrdering": {
+      "ttMove": true,
+      "captures": true,
+      "killers": true,
+      "history": true,
+      "countermove": true,
+      "recapture": true
+    }
+  },
+  "selected": null,
+  "decision": "inconclusive; stop",
+  "results": [
+    {
+      "profile": "off",
+      "wdl": {
+        "wins": 22,
+        "draws": 12,
+        "losses": 30
+      },
+      "scorePercent": 43.75,
+      "elo": -43.65778777002721,
+      "scoreCI95": [
+        0.359375,
+        0.515625
+      ],
+      "eloCI95": [
+        -100.42240828085703,
+        10.86089841744591
+      ],
+      "baselineMetrics": {
+        "averageDepth": 6.2011795543905635,
+        "nodes": 4890084,
+        "qnodes": 2419801,
+        "elapsedMs": 111526,
+        "nps": 65544.22287179671,
+        "moves": 1526,
+        "aspirationStats": {
+          "completedIterations": 9463,
+          "aspirationIterations": 7952,
+          "failLow": 4427,
+          "failHigh": 1430,
+          "retries": 5857,
+          "maxRetriesForOneDepth": 13,
+          "failedAttemptNodes": 322712,
+          "failedAttemptQnodes": 96527,
+          "retryHistogram": [
+            8651,
+            432,
+            155,
+            53,
+            8,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            21,
+            139
+          ],
+          "initialWindowWidthHistogram": {
+            "150": 7952,
+            "full": 1511
+          },
+          "finalWindowWidthHistogram": {
+            "150": 7140,
+            "300": 432,
+            "600": 155,
+            "1200": 53,
+            "2400": 8,
+            "4800": 2,
+            "153600": 2,
+            "614400": 21,
+            "full": 1650
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 5.753289473684211,
+        "nodes": 4756495,
+        "qnodes": 2513636,
+        "elapsedMs": 84826,
+        "nps": 85706.39898144436,
+        "moves": 1520,
+        "aspirationStats": {
+          "completedIterations": 8745,
+          "aspirationIterations": 0,
+          "failLow": 0,
+          "failHigh": 0,
+          "retries": 0,
+          "maxRetriesForOneDepth": 0,
+          "failedAttemptNodes": 0,
+          "failedAttemptQnodes": 0,
+          "retryHistogram": [
+            8745
+          ],
+          "initialWindowWidthHistogram": {
+            "full": 8745
+          },
+          "finalWindowWidthHistogram": {
+            "full": 8745
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "profile": "narrow-75",
+      "wdl": {
+        "wins": 29,
+        "draws": 6,
+        "losses": 29
+      },
+      "scorePercent": 50,
+      "elo": 0,
+      "scoreCI95": [
+        0.4375,
+        0.5703125
+      ],
+      "eloCI95": [
+        -43.65778777002721,
+        49.18406825048483
+      ],
+      "baselineMetrics": {
+        "averageDepth": 6.03946530872056,
+        "nodes": 5028161,
+        "qnodes": 2483608,
+        "elapsedMs": 116073,
+        "nps": 64715.90292316042,
+        "moves": 1571,
+        "aspirationStats": {
+          "completedIterations": 9488,
+          "aspirationIterations": 7945,
+          "failLow": 4658,
+          "failHigh": 1284,
+          "retries": 5942,
+          "maxRetriesForOneDepth": 13,
+          "failedAttemptNodes": 360213,
+          "failedAttemptQnodes": 109438,
+          "retryHistogram": [
+            8655,
+            444,
+            166,
+            39,
+            6,
+            0,
+            1,
+            0,
+            1,
+            1,
+            7,
+            5,
+            20,
+            143
+          ],
+          "initialWindowWidthHistogram": {
+            "150": 7945,
+            "full": 1543
+          },
+          "finalWindowWidthHistogram": {
+            "150": 7112,
+            "300": 444,
+            "600": 166,
+            "1200": 39,
+            "2400": 6,
+            "9600": 1,
+            "38400": 1,
+            "76800": 1,
+            "153600": 7,
+            "307200": 5,
+            "614400": 20,
+            "full": 1686
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 6.318268618714195,
+        "nodes": 5010603,
+        "qnodes": 2478694,
+        "elapsedMs": 119374,
+        "nps": 62738.09204684437,
+        "moves": 1571,
+        "aspirationStats": {
+          "completedIterations": 9926,
+          "aspirationIterations": 8376,
+          "failLow": 4976,
+          "failHigh": 1886,
+          "retries": 6862,
+          "maxRetriesForOneDepth": 14,
+          "failedAttemptNodes": 553722,
+          "failedAttemptQnodes": 221392,
+          "retryHistogram": [
+            8753,
+            584,
+            276,
+            129,
+            25,
+            6,
+            0,
+            0,
+            4,
+            0,
+            0,
+            4,
+            0,
+            15,
+            130
+          ],
+          "initialWindowWidthHistogram": {
+            "75": 8376,
+            "full": 1550
+          },
+          "finalWindowWidthHistogram": {
+            "75": 7203,
+            "150": 584,
+            "300": 276,
+            "600": 129,
+            "1200": 25,
+            "2400": 6,
+            "19200": 4,
+            "153600": 4,
+            "614400": 15,
+            "full": 1680
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "profile": "narrow-100",
+      "wdl": {
+        "wins": 25,
+        "draws": 12,
+        "losses": 27
+      },
+      "scorePercent": 48.4375,
+      "elo": -10.86089841744591,
+      "scoreCI95": [
+        0.421875,
+        0.546875
+      ],
+      "eloCI95": [
+        -54.73518396320307,
+        32.668018580527814
+      ],
+      "baselineMetrics": {
+        "averageDepth": 5.965137614678899,
+        "nodes": 5189124,
+        "qnodes": 2634990,
+        "elapsedMs": 105579,
+        "nps": 74106.72576932913,
+        "moves": 1635,
+        "aspirationStats": {
+          "completedIterations": 9753,
+          "aspirationIterations": 8146,
+          "failLow": 4239,
+          "failHigh": 1031,
+          "retries": 5270,
+          "maxRetriesForOneDepth": 13,
+          "failedAttemptNodes": 322806,
+          "failedAttemptQnodes": 104426,
+          "retryHistogram": [
+            8986,
+            472,
+            125,
+            36,
+            9,
+            0,
+            2,
+            1,
+            0,
+            0,
+            0,
+            1,
+            13,
+            108
+          ],
+          "initialWindowWidthHistogram": {
+            "150": 8146,
+            "full": 1607
+          },
+          "finalWindowWidthHistogram": {
+            "150": 7379,
+            "300": 472,
+            "600": 125,
+            "1200": 36,
+            "2400": 9,
+            "9600": 2,
+            "19200": 1,
+            "307200": 1,
+            "614400": 13,
+            "full": 1715
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 5.962645437844458,
+        "nodes": 5191442,
+        "qnodes": 2631739,
+        "elapsedMs": 108448,
+        "nps": 72137.62356152257,
+        "moves": 1633,
+        "aspirationStats": {
+          "completedIterations": 9737,
+          "aspirationIterations": 8129,
+          "failLow": 5042,
+          "failHigh": 1335,
+          "retries": 6377,
+          "maxRetriesForOneDepth": 14,
+          "failedAttemptNodes": 424429,
+          "failedAttemptQnodes": 153009,
+          "retryHistogram": [
+            8796,
+            493,
+            226,
+            47,
+            7,
+            2,
+            0,
+            0,
+            0,
+            0,
+            5,
+            5,
+            2,
+            2,
+            152
+          ],
+          "initialWindowWidthHistogram": {
+            "100": 8129,
+            "full": 1608
+          },
+          "finalWindowWidthHistogram": {
+            "100": 7188,
+            "200": 493,
+            "400": 226,
+            "800": 47,
+            "1600": 7,
+            "3200": 2,
+            "102400": 5,
+            "204800": 5,
+            "409600": 2,
+            "819200": 2,
+            "full": 1760
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    },
+    {
+      "profile": "wide-300",
+      "wdl": {
+        "wins": 20,
+        "draws": 13,
+        "losses": 31
+      },
+      "scorePercent": 41.40625,
+      "elo": -60.314157516364396,
+      "scoreCI95": [
+        0.328125,
+        0.4921875
+      ],
+      "eloCI95": [
+        -124.49966433826691,
+        -5.429122875709548
+      ],
+      "baselineMetrics": {
+        "averageDepth": 5.934903905765654,
+        "nodes": 5176982,
+        "qnodes": 2571589,
+        "elapsedMs": 106025,
+        "nps": 73082.48997877858,
+        "moves": 1613,
+        "aspirationStats": {
+          "completedIterations": 9573,
+          "aspirationIterations": 7978,
+          "failLow": 4331,
+          "failHigh": 1605,
+          "retries": 5936,
+          "maxRetriesForOneDepth": 13,
+          "failedAttemptNodes": 350405,
+          "failedAttemptQnodes": 107484,
+          "retryHistogram": [
+            8700,
+            467,
+            173,
+            62,
+            9,
+            0,
+            0,
+            0,
+            3,
+            1,
+            3,
+            0,
+            17,
+            138
+          ],
+          "initialWindowWidthHistogram": {
+            "150": 7978,
+            "full": 1595
+          },
+          "finalWindowWidthHistogram": {
+            "150": 7105,
+            "300": 467,
+            "600": 173,
+            "1200": 62,
+            "2400": 9,
+            "38400": 3,
+            "76800": 1,
+            "153600": 3,
+            "614400": 17,
+            "full": 1733
+          }
+        }
+      },
+      "candidateMetrics": {
+        "averageDepth": 5.676836861768368,
+        "nodes": 5133488,
+        "qnodes": 2591909,
+        "elapsedMs": 90153,
+        "nps": 85692.0679289652,
+        "moves": 1606,
+        "aspirationStats": {
+          "completedIterations": 9117,
+          "aspirationIterations": 7533,
+          "failLow": 1397,
+          "failHigh": 909,
+          "retries": 2306,
+          "maxRetriesForOneDepth": 12,
+          "failedAttemptNodes": 202255,
+          "failedAttemptQnodes": 39481,
+          "retryHistogram": [
+            8532,
+            346,
+            69,
+            35,
+            14,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            9,
+            110
+          ],
+          "initialWindowWidthHistogram": {
+            "300": 7533,
+            "full": 1584
+          },
+          "finalWindowWidthHistogram": {
+            "300": 6948,
+            "600": 346,
+            "1200": 69,
+            "2400": 35,
+            "4800": 14,
+            "9600": 1,
+            "153600": 1,
+            "614400": 9,
+            "full": 1694
+          }
+        }
+      },
+      "unresolved": 0,
+      "errors": 0
+    }
+  ]
+}

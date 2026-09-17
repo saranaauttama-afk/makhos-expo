@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "makhos-phase3h-position-comparison-v1",
+  "status": "not-run",
+  "reason": "No screening candidate scored strictly above 50%; the frozen protocol stopped Phase 3H before confirmation and therefore defined no selected candidate for holdout comparison.",
+  "holdoutRevealed": false,
+  "productionDefaultChanged": false
+}
