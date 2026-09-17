@@ -1,0 +1,2341 @@
+{
+  "schemaVersion": "makhos-phase3g-position-comparison-v1",
+  "tournamentDecision": "NEEDS MORE DATA",
+  "search": {
+    "mode": "nodes",
+    "budget": 5000,
+    "maxDepth": 64
+  },
+  "pinned": {
+    "searchFeatures": {
+      "reverseFutility": true,
+      "razoring": true,
+      "nullMove": true,
+      "probCut": true,
+      "iid": true,
+      "lmr": true,
+      "lmp": true,
+      "extensions": true
+    },
+    "extensions": {
+      "singleLegalMove": true,
+      "smallEndgame": false,
+      "tacticalCapture": true,
+      "multiCapture": true,
+      "opponentForcedCapture": true,
+      "singleCaptureRecapture": true,
+      "rootLowMobility": true,
+      "soundForcedTrap": true
+    },
+    "moveOrdering": {
+      "ttMove": true,
+      "captures": true,
+      "killers": true,
+      "history": true,
+      "countermove": true,
+      "recapture": true
+    },
+    "lmrProfile": "current",
+    "pruningProfiles": {
+      "baseline": "current",
+      "candidate": "razoring-conservative"
+    },
+    "pruningInstrumentation": false
+  },
+  "blinded": {
+    "baseline": {
+      "generatedAt": "2026-09-17T04:12:56.258Z",
+      "commit": "test",
+      "suiteVersion": "makhos-position-suite-v1",
+      "suiteFingerprint": "f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30",
+      "search": {
+        "mode": "nodes",
+        "budget": 5000
+      },
+      "revealHoldout": false,
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "diagnostic": {
+        "legacyUnverified": 14,
+        "provisional": 4
+      },
+      "byMotif": {
+        "draw/repetition": {
+          "correct": 1,
+          "total": 1
+        },
+        "endgame conversion": {
+          "correct": 1,
+          "total": 1
+        },
+        "forced capture": {
+          "correct": 2,
+          "total": 2
+        },
+        "king technique": {
+          "correct": 2,
+          "total": 2
+        },
+        "promotion race": {
+          "correct": 0,
+          "total": 0
+        },
+        "sacrifice": {
+          "correct": 0,
+          "total": 0
+        },
+        "tempo": {
+          "correct": 0,
+          "total": 0
+        },
+        "trap": {
+          "correct": 0,
+          "total": 0
+        }
+      },
+      "rows": [
+        {
+          "id": "exact-dev-forced-king-capture-p1",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 145,
+          "nps": 441,
+          "pass": true
+        },
+        {
+          "id": "exact-dev-two-equivalent-captures",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 0,
+            "to": 9,
+            "captured": [
+              5
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":9,\"captured\":[5],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 128,
+          "qnodes": 2,
+          "depth": 64,
+          "elapsedMs": 213,
+          "nps": 610,
+          "pass": true
+        },
+        {
+          "id": "exact-diagnostic-threefold-root",
+          "split": "diagnostic",
+          "validation": "verified-exact",
+          "motifs": [
+            "draw/repetition"
+          ],
+          "score": 0,
+          "nodes": 0,
+          "qnodes": 0,
+          "depth": 0,
+          "elapsedMs": 0,
+          "nps": 0,
+          "pass": true,
+          "wdlEvidence": {
+            "outcome": "draw",
+            "source": "rule-repetition"
+          }
+        },
+        {
+          "id": "legacy-trap-01-bait-sacrifice",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 22,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":22,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 140,
+          "nodes": 3137,
+          "qnodes": 1863,
+          "depth": 6,
+          "elapsedMs": 116,
+          "nps": 43103
+        },
+        {
+          "id": "legacy-trap-02-double-bait",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 23,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":23,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -387,
+          "nodes": 3420,
+          "qnodes": 1580,
+          "depth": 4,
+          "elapsedMs": 52,
+          "nps": 96154
+        },
+        {
+          "id": "legacy-promo-01-race-to-king",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 7,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":7,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 4,
+          "nodes": 3094,
+          "qnodes": 1906,
+          "depth": 4,
+          "elapsedMs": 52,
+          "nps": 96154
+        },
+        {
+          "id": "legacy-promo-02-sacrifice-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 6,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":6,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 104,
+          "nodes": 3042,
+          "qnodes": 1958,
+          "depth": 3,
+          "elapsedMs": 49,
+          "nps": 102041
+        },
+        {
+          "id": "legacy-endgame-01-king-vs-two",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 16,
+            "captured": [
+              14,
+              13
+            ],
+            "promote": false,
+            "path": [
+              9,
+              16
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":16,\"captured\":[14,13],\"path\":[9,16],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 140,
+          "nps": 457
+        },
+        {
+          "id": "legacy-endgame-02-king-vs-three",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 6,
+            "to": 10,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":6,\"to\":10,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 57,
+          "nodes": 3167,
+          "qnodes": 1833,
+          "depth": 5,
+          "elapsedMs": 47,
+          "nps": 106383
+        },
+        {
+          "id": "legacy-sac-01-piece-for-position",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 22,
+            "to": 15,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              15
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":22,\"to\":15,\"captured\":[18],\"path\":[15],\"promote\":false}",
+          "score": -312,
+          "nodes": 2926,
+          "qnodes": 2074,
+          "depth": 1,
+          "elapsedMs": 26,
+          "nps": 192308
+        },
+        {
+          "id": "legacy-sac-02-two-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 1,
+            "captured": [
+              6
+            ],
+            "promote": true,
+            "path": [
+              1
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":1,\"captured\":[6],\"path\":[1],\"promote\":true}",
+          "score": 130,
+          "nodes": 3167,
+          "qnodes": 1833,
+          "depth": 5,
+          "elapsedMs": 33,
+          "nps": 151515
+        },
+        {
+          "id": "legacy-escape-01-find-the-exit",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -41,
+          "nodes": 3136,
+          "qnodes": 1864,
+          "depth": 2,
+          "elapsedMs": 36,
+          "nps": 138889
+        },
+        {
+          "id": "legacy-escape-02-counter-trap",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 21,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":21,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -464,
+          "nodes": 3473,
+          "qnodes": 1527,
+          "depth": 3,
+          "elapsedMs": 43,
+          "nps": 116279
+        },
+        {
+          "id": "legacy-tempo-01-force-response",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 7,
+            "captured": [
+              10
+            ],
+            "promote": false,
+            "path": [
+              7
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":7,\"captured\":[10],\"path\":[7],\"promote\":false}",
+          "score": 142,
+          "nodes": 2842,
+          "qnodes": 2158,
+          "depth": 5,
+          "elapsedMs": 39,
+          "nps": 128205
+        },
+        {
+          "id": "legacy-tempo-02-zugzwang",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 23,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              23
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":23,\"captured\":[18],\"path\":[23],\"promote\":false}",
+          "score": 297,
+          "nodes": 2975,
+          "qnodes": 2025,
+          "depth": 8,
+          "elapsedMs": 39,
+          "nps": 128205
+        },
+        {
+          "id": "legacy-endgame-03-opposition",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 143,
+          "nps": 448
+        },
+        {
+          "id": "legacy-endgame-04-triangulation",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 11,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":11,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 114,
+          "nodes": 3228,
+          "qnodes": 1772,
+          "depth": 6,
+          "elapsedMs": 72,
+          "nps": 69444
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-01",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 13,
+          "nodes": 3220,
+          "qnodes": 1780,
+          "depth": 2,
+          "elapsedMs": 48,
+          "nps": 104167
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-02",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 0,
+            "to": 5,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":5,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -6,
+          "nodes": 3228,
+          "qnodes": 1772,
+          "depth": 3,
+          "elapsedMs": 48,
+          "nps": 104167
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-03",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 20,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":20,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -7,
+          "nodes": 3119,
+          "qnodes": 1881,
+          "depth": 4,
+          "elapsedMs": 59,
+          "nps": 84746
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-04",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 13,
+            "to": 20,
+            "captured": [
+              16
+            ],
+            "promote": false,
+            "path": [
+              20
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":13,\"to\":20,\"captured\":[16],\"path\":[20],\"promote\":false}",
+          "score": 39,
+          "nodes": 3302,
+          "qnodes": 1698,
+          "depth": 3,
+          "elapsedMs": 42,
+          "nps": 119048
+        }
+      ]
+    },
+    "candidate": {
+      "generatedAt": "2026-09-17T04:12:56.259Z",
+      "commit": "test",
+      "suiteVersion": "makhos-position-suite-v1",
+      "suiteFingerprint": "f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30",
+      "search": {
+        "mode": "nodes",
+        "budget": 5000
+      },
+      "revealHoldout": false,
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "diagnostic": {
+        "legacyUnverified": 14,
+        "provisional": 4
+      },
+      "byMotif": {
+        "draw/repetition": {
+          "correct": 1,
+          "total": 1
+        },
+        "endgame conversion": {
+          "correct": 1,
+          "total": 1
+        },
+        "forced capture": {
+          "correct": 2,
+          "total": 2
+        },
+        "king technique": {
+          "correct": 2,
+          "total": 2
+        },
+        "promotion race": {
+          "correct": 0,
+          "total": 0
+        },
+        "sacrifice": {
+          "correct": 0,
+          "total": 0
+        },
+        "tempo": {
+          "correct": 0,
+          "total": 0
+        },
+        "trap": {
+          "correct": 0,
+          "total": 0
+        }
+      },
+      "rows": [
+        {
+          "id": "exact-dev-forced-king-capture-p1",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 140,
+          "nps": 457,
+          "pass": true
+        },
+        {
+          "id": "exact-dev-two-equivalent-captures",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 0,
+            "to": 9,
+            "captured": [
+              5
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":9,\"captured\":[5],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 128,
+          "qnodes": 2,
+          "depth": 64,
+          "elapsedMs": 211,
+          "nps": 616,
+          "pass": true
+        },
+        {
+          "id": "exact-diagnostic-threefold-root",
+          "split": "diagnostic",
+          "validation": "verified-exact",
+          "motifs": [
+            "draw/repetition"
+          ],
+          "score": 0,
+          "nodes": 0,
+          "qnodes": 0,
+          "depth": 0,
+          "elapsedMs": 0,
+          "nps": 0,
+          "pass": true,
+          "wdlEvidence": {
+            "outcome": "draw",
+            "source": "rule-repetition"
+          }
+        },
+        {
+          "id": "legacy-trap-01-bait-sacrifice",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 22,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":22,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 140,
+          "nodes": 3137,
+          "qnodes": 1863,
+          "depth": 6,
+          "elapsedMs": 65,
+          "nps": 76923
+        },
+        {
+          "id": "legacy-trap-02-double-bait",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 23,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":23,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -387,
+          "nodes": 3421,
+          "qnodes": 1579,
+          "depth": 4,
+          "elapsedMs": 44,
+          "nps": 113636
+        },
+        {
+          "id": "legacy-promo-01-race-to-king",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 7,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":7,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 4,
+          "nodes": 3094,
+          "qnodes": 1906,
+          "depth": 4,
+          "elapsedMs": 39,
+          "nps": 128205
+        },
+        {
+          "id": "legacy-promo-02-sacrifice-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 6,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":6,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 104,
+          "nodes": 3042,
+          "qnodes": 1958,
+          "depth": 3,
+          "elapsedMs": 36,
+          "nps": 138889
+        },
+        {
+          "id": "legacy-endgame-01-king-vs-two",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 16,
+            "captured": [
+              14,
+              13
+            ],
+            "promote": false,
+            "path": [
+              9,
+              16
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":16,\"captured\":[14,13],\"path\":[9,16],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 139,
+          "nps": 460
+        },
+        {
+          "id": "legacy-endgame-02-king-vs-three",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 6,
+            "to": 10,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":6,\"to\":10,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 57,
+          "nodes": 3158,
+          "qnodes": 1842,
+          "depth": 5,
+          "elapsedMs": 54,
+          "nps": 92593
+        },
+        {
+          "id": "legacy-sac-01-piece-for-position",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 22,
+            "to": 15,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              15
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":22,\"to\":15,\"captured\":[18],\"path\":[15],\"promote\":false}",
+          "score": -312,
+          "nodes": 2926,
+          "qnodes": 2074,
+          "depth": 1,
+          "elapsedMs": 33,
+          "nps": 151515
+        },
+        {
+          "id": "legacy-sac-02-two-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 1,
+            "captured": [
+              6
+            ],
+            "promote": true,
+            "path": [
+              1
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":1,\"captured\":[6],\"path\":[1],\"promote\":true}",
+          "score": 130,
+          "nodes": 3169,
+          "qnodes": 1831,
+          "depth": 5,
+          "elapsedMs": 41,
+          "nps": 121951
+        },
+        {
+          "id": "legacy-escape-01-find-the-exit",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -41,
+          "nodes": 3118,
+          "qnodes": 1882,
+          "depth": 2,
+          "elapsedMs": 43,
+          "nps": 116279
+        },
+        {
+          "id": "legacy-escape-02-counter-trap",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 21,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":21,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -464,
+          "nodes": 3470,
+          "qnodes": 1530,
+          "depth": 3,
+          "elapsedMs": 49,
+          "nps": 102041
+        },
+        {
+          "id": "legacy-tempo-01-force-response",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 7,
+            "captured": [
+              10
+            ],
+            "promote": false,
+            "path": [
+              7
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":7,\"captured\":[10],\"path\":[7],\"promote\":false}",
+          "score": 142,
+          "nodes": 2841,
+          "qnodes": 2159,
+          "depth": 5,
+          "elapsedMs": 38,
+          "nps": 131579
+        },
+        {
+          "id": "legacy-tempo-02-zugzwang",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 23,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              23
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":23,\"captured\":[18],\"path\":[23],\"promote\":false}",
+          "score": 297,
+          "nodes": 2975,
+          "qnodes": 2025,
+          "depth": 8,
+          "elapsedMs": 38,
+          "nps": 131579
+        },
+        {
+          "id": "legacy-endgame-03-opposition",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 148,
+          "nps": 432
+        },
+        {
+          "id": "legacy-endgame-04-triangulation",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 11,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":11,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 114,
+          "nodes": 3225,
+          "qnodes": 1775,
+          "depth": 6,
+          "elapsedMs": 66,
+          "nps": 75758
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-01",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 13,
+          "nodes": 3198,
+          "qnodes": 1802,
+          "depth": 2,
+          "elapsedMs": 52,
+          "nps": 96154
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-02",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 0,
+            "to": 5,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":5,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -6,
+          "nodes": 3282,
+          "qnodes": 1718,
+          "depth": 3,
+          "elapsedMs": 59,
+          "nps": 84746
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-03",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 20,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":20,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -7,
+          "nodes": 3159,
+          "qnodes": 1841,
+          "depth": 4,
+          "elapsedMs": 61,
+          "nps": 81967
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-04",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 13,
+            "to": 20,
+            "captured": [
+              16
+            ],
+            "promote": false,
+            "path": [
+              20
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":13,\"to\":20,\"captured\":[16],\"path\":[20],\"promote\":false}",
+          "score": 39,
+          "nodes": 3279,
+          "qnodes": 1721,
+          "depth": 3,
+          "elapsedMs": 39,
+          "nps": 128205
+        }
+      ]
+    }
+  },
+  "revealed": {
+    "baseline": {
+      "generatedAt": "2026-09-17T04:12:56.259Z",
+      "commit": "test",
+      "suiteVersion": "makhos-position-suite-v1",
+      "suiteFingerprint": "f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30",
+      "search": {
+        "mode": "nodes",
+        "budget": 5000
+      },
+      "revealHoldout": true,
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "diagnostic": {
+        "legacyUnverified": 14,
+        "provisional": 4
+      },
+      "byMotif": {
+        "draw/repetition": {
+          "correct": 1,
+          "total": 1
+        },
+        "endgame conversion": {
+          "correct": 3,
+          "total": 3
+        },
+        "forced capture": {
+          "correct": 4,
+          "total": 4
+        },
+        "king technique": {
+          "correct": 3,
+          "total": 3
+        },
+        "low mobility": {
+          "correct": 1,
+          "total": 1
+        },
+        "promotion race": {
+          "correct": 0,
+          "total": 0
+        },
+        "sacrifice": {
+          "correct": 0,
+          "total": 0
+        },
+        "tempo": {
+          "correct": 0,
+          "total": 0
+        },
+        "trap": {
+          "correct": 0,
+          "total": 0
+        }
+      },
+      "rows": [
+        {
+          "id": "exact-dev-forced-king-capture-p1",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 145,
+          "nps": 441,
+          "pass": true
+        },
+        {
+          "id": "exact-dev-two-equivalent-captures",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 0,
+            "to": 9,
+            "captured": [
+              5
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":9,\"captured\":[5],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 128,
+          "qnodes": 2,
+          "depth": 64,
+          "elapsedMs": 213,
+          "nps": 610,
+          "pass": true
+        },
+        {
+          "id": "exact-holdout-forced-king-capture-p2",
+          "split": "holdout",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 13,
+            "to": 22,
+            "captured": [
+              17
+            ],
+            "promote": false,
+            "path": [
+              22
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":13,\"to\":22,\"captured\":[17],\"path\":[22],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 142,
+          "nps": 451,
+          "pass": true
+        },
+        {
+          "id": "exact-holdout-forced-edge-capture",
+          "split": "holdout",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "low mobility",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 0,
+            "to": 9,
+            "captured": [
+              5
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":9,\"captured\":[5],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 139,
+          "nps": 460,
+          "pass": true
+        },
+        {
+          "id": "exact-diagnostic-threefold-root",
+          "split": "diagnostic",
+          "validation": "verified-exact",
+          "motifs": [
+            "draw/repetition"
+          ],
+          "score": 0,
+          "nodes": 0,
+          "qnodes": 0,
+          "depth": 0,
+          "elapsedMs": 0,
+          "nps": 0,
+          "pass": true,
+          "wdlEvidence": {
+            "outcome": "draw",
+            "source": "rule-repetition"
+          }
+        },
+        {
+          "id": "legacy-trap-01-bait-sacrifice",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 22,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":22,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 140,
+          "nodes": 3137,
+          "qnodes": 1863,
+          "depth": 6,
+          "elapsedMs": 116,
+          "nps": 43103
+        },
+        {
+          "id": "legacy-trap-02-double-bait",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 23,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":23,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -387,
+          "nodes": 3420,
+          "qnodes": 1580,
+          "depth": 4,
+          "elapsedMs": 52,
+          "nps": 96154
+        },
+        {
+          "id": "legacy-promo-01-race-to-king",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 7,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":7,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 4,
+          "nodes": 3094,
+          "qnodes": 1906,
+          "depth": 4,
+          "elapsedMs": 52,
+          "nps": 96154
+        },
+        {
+          "id": "legacy-promo-02-sacrifice-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 6,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":6,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 104,
+          "nodes": 3042,
+          "qnodes": 1958,
+          "depth": 3,
+          "elapsedMs": 49,
+          "nps": 102041
+        },
+        {
+          "id": "legacy-endgame-01-king-vs-two",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 16,
+            "captured": [
+              14,
+              13
+            ],
+            "promote": false,
+            "path": [
+              9,
+              16
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":16,\"captured\":[14,13],\"path\":[9,16],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 140,
+          "nps": 457
+        },
+        {
+          "id": "legacy-endgame-02-king-vs-three",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 6,
+            "to": 10,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":6,\"to\":10,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 57,
+          "nodes": 3167,
+          "qnodes": 1833,
+          "depth": 5,
+          "elapsedMs": 47,
+          "nps": 106383
+        },
+        {
+          "id": "legacy-sac-01-piece-for-position",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 22,
+            "to": 15,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              15
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":22,\"to\":15,\"captured\":[18],\"path\":[15],\"promote\":false}",
+          "score": -312,
+          "nodes": 2926,
+          "qnodes": 2074,
+          "depth": 1,
+          "elapsedMs": 26,
+          "nps": 192308
+        },
+        {
+          "id": "legacy-sac-02-two-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 1,
+            "captured": [
+              6
+            ],
+            "promote": true,
+            "path": [
+              1
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":1,\"captured\":[6],\"path\":[1],\"promote\":true}",
+          "score": 130,
+          "nodes": 3167,
+          "qnodes": 1833,
+          "depth": 5,
+          "elapsedMs": 33,
+          "nps": 151515
+        },
+        {
+          "id": "legacy-escape-01-find-the-exit",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -41,
+          "nodes": 3136,
+          "qnodes": 1864,
+          "depth": 2,
+          "elapsedMs": 36,
+          "nps": 138889
+        },
+        {
+          "id": "legacy-escape-02-counter-trap",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 21,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":21,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -464,
+          "nodes": 3473,
+          "qnodes": 1527,
+          "depth": 3,
+          "elapsedMs": 43,
+          "nps": 116279
+        },
+        {
+          "id": "legacy-tempo-01-force-response",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 7,
+            "captured": [
+              10
+            ],
+            "promote": false,
+            "path": [
+              7
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":7,\"captured\":[10],\"path\":[7],\"promote\":false}",
+          "score": 142,
+          "nodes": 2842,
+          "qnodes": 2158,
+          "depth": 5,
+          "elapsedMs": 39,
+          "nps": 128205
+        },
+        {
+          "id": "legacy-tempo-02-zugzwang",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 23,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              23
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":23,\"captured\":[18],\"path\":[23],\"promote\":false}",
+          "score": 297,
+          "nodes": 2975,
+          "qnodes": 2025,
+          "depth": 8,
+          "elapsedMs": 39,
+          "nps": 128205
+        },
+        {
+          "id": "legacy-endgame-03-opposition",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 143,
+          "nps": 448
+        },
+        {
+          "id": "legacy-endgame-04-triangulation",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 11,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":11,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 114,
+          "nodes": 3228,
+          "qnodes": 1772,
+          "depth": 6,
+          "elapsedMs": 72,
+          "nps": 69444
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-01",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 13,
+          "nodes": 3220,
+          "qnodes": 1780,
+          "depth": 2,
+          "elapsedMs": 48,
+          "nps": 104167
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-02",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 0,
+            "to": 5,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":5,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -6,
+          "nodes": 3228,
+          "qnodes": 1772,
+          "depth": 3,
+          "elapsedMs": 48,
+          "nps": 104167
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-03",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 20,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":20,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -7,
+          "nodes": 3119,
+          "qnodes": 1881,
+          "depth": 4,
+          "elapsedMs": 59,
+          "nps": 84746
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-04",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 13,
+            "to": 20,
+            "captured": [
+              16
+            ],
+            "promote": false,
+            "path": [
+              20
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":13,\"to\":20,\"captured\":[16],\"path\":[20],\"promote\":false}",
+          "score": 39,
+          "nodes": 3302,
+          "qnodes": 1698,
+          "depth": 3,
+          "elapsedMs": 42,
+          "nps": 119048
+        }
+      ]
+    },
+    "candidate": {
+      "generatedAt": "2026-09-17T04:12:56.259Z",
+      "commit": "test",
+      "suiteVersion": "makhos-position-suite-v1",
+      "suiteFingerprint": "f2d5d8d41275836904750825b60230f283724ac3d97e18305157169d03d5aa30",
+      "search": {
+        "mode": "nodes",
+        "budget": 5000
+      },
+      "revealHoldout": true,
+      "developmentVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "holdoutVerified": {
+        "correct": 2,
+        "total": 2
+      },
+      "diagnostic": {
+        "legacyUnverified": 14,
+        "provisional": 4
+      },
+      "byMotif": {
+        "draw/repetition": {
+          "correct": 1,
+          "total": 1
+        },
+        "endgame conversion": {
+          "correct": 3,
+          "total": 3
+        },
+        "forced capture": {
+          "correct": 4,
+          "total": 4
+        },
+        "king technique": {
+          "correct": 3,
+          "total": 3
+        },
+        "low mobility": {
+          "correct": 1,
+          "total": 1
+        },
+        "promotion race": {
+          "correct": 0,
+          "total": 0
+        },
+        "sacrifice": {
+          "correct": 0,
+          "total": 0
+        },
+        "tempo": {
+          "correct": 0,
+          "total": 0
+        },
+        "trap": {
+          "correct": 0,
+          "total": 0
+        }
+      },
+      "rows": [
+        {
+          "id": "exact-dev-forced-king-capture-p1",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 140,
+          "nps": 457,
+          "pass": true
+        },
+        {
+          "id": "exact-dev-two-equivalent-captures",
+          "split": "development",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 0,
+            "to": 9,
+            "captured": [
+              5
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":9,\"captured\":[5],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 128,
+          "qnodes": 2,
+          "depth": 64,
+          "elapsedMs": 211,
+          "nps": 616,
+          "pass": true
+        },
+        {
+          "id": "exact-holdout-forced-king-capture-p2",
+          "split": "holdout",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "king technique",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 13,
+            "to": 22,
+            "captured": [
+              17
+            ],
+            "promote": false,
+            "path": [
+              22
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":13,\"to\":22,\"captured\":[17],\"path\":[22],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 185,
+          "nps": 346,
+          "pass": true
+        },
+        {
+          "id": "exact-holdout-forced-edge-capture",
+          "split": "holdout",
+          "validation": "verified-exact",
+          "motifs": [
+            "forced capture",
+            "low mobility",
+            "endgame conversion"
+          ],
+          "chosenMove": {
+            "from": 0,
+            "to": 9,
+            "captured": [
+              5
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":9,\"captured\":[5],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 178,
+          "nps": 360,
+          "pass": true
+        },
+        {
+          "id": "exact-diagnostic-threefold-root",
+          "split": "diagnostic",
+          "validation": "verified-exact",
+          "motifs": [
+            "draw/repetition"
+          ],
+          "score": 0,
+          "nodes": 0,
+          "qnodes": 0,
+          "depth": 0,
+          "elapsedMs": 0,
+          "nps": 0,
+          "pass": true,
+          "wdlEvidence": {
+            "outcome": "draw",
+            "source": "rule-repetition"
+          }
+        },
+        {
+          "id": "legacy-trap-01-bait-sacrifice",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 22,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":22,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 140,
+          "nodes": 3137,
+          "qnodes": 1863,
+          "depth": 6,
+          "elapsedMs": 65,
+          "nps": 76923
+        },
+        {
+          "id": "legacy-trap-02-double-bait",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 26,
+            "to": 23,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":26,\"to\":23,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -387,
+          "nodes": 3421,
+          "qnodes": 1579,
+          "depth": 4,
+          "elapsedMs": 44,
+          "nps": 113636
+        },
+        {
+          "id": "legacy-promo-01-race-to-king",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 7,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":7,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 4,
+          "nodes": 3094,
+          "qnodes": 1906,
+          "depth": 4,
+          "elapsedMs": 39,
+          "nps": 128205
+        },
+        {
+          "id": "legacy-promo-02-sacrifice-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "promotion race"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 6,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":6,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 104,
+          "nodes": 3042,
+          "qnodes": 1958,
+          "depth": 3,
+          "elapsedMs": 36,
+          "nps": 138889
+        },
+        {
+          "id": "legacy-endgame-01-king-vs-two",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 16,
+            "captured": [
+              14,
+              13
+            ],
+            "promote": false,
+            "path": [
+              9,
+              16
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":16,\"captured\":[14,13],\"path\":[9,16],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 139,
+          "nps": 460
+        },
+        {
+          "id": "legacy-endgame-02-king-vs-three",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 6,
+            "to": 10,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":6,\"to\":10,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 57,
+          "nodes": 3158,
+          "qnodes": 1842,
+          "depth": 5,
+          "elapsedMs": 54,
+          "nps": 92593
+        },
+        {
+          "id": "legacy-sac-01-piece-for-position",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 22,
+            "to": 15,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              15
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":22,\"to\":15,\"captured\":[18],\"path\":[15],\"promote\":false}",
+          "score": -312,
+          "nodes": 2926,
+          "qnodes": 2074,
+          "depth": 1,
+          "elapsedMs": 33,
+          "nps": 151515
+        },
+        {
+          "id": "legacy-sac-02-two-for-promotion",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "sacrifice"
+          ],
+          "chosenMove": {
+            "from": 10,
+            "to": 1,
+            "captured": [
+              6
+            ],
+            "promote": true,
+            "path": [
+              1
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":10,\"to\":1,\"captured\":[6],\"path\":[1],\"promote\":true}",
+          "score": 130,
+          "nodes": 3169,
+          "qnodes": 1831,
+          "depth": 5,
+          "elapsedMs": 41,
+          "nps": 121951
+        },
+        {
+          "id": "legacy-escape-01-find-the-exit",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -41,
+          "nodes": 3118,
+          "qnodes": 1882,
+          "depth": 2,
+          "elapsedMs": 43,
+          "nps": 116279
+        },
+        {
+          "id": "legacy-escape-02-counter-trap",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "trap"
+          ],
+          "chosenMove": {
+            "from": 21,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":21,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -464,
+          "nodes": 3470,
+          "qnodes": 1530,
+          "depth": 3,
+          "elapsedMs": 49,
+          "nps": 102041
+        },
+        {
+          "id": "legacy-tempo-01-force-response",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 7,
+            "captured": [
+              10
+            ],
+            "promote": false,
+            "path": [
+              7
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":7,\"captured\":[10],\"path\":[7],\"promote\":false}",
+          "score": 142,
+          "nodes": 2841,
+          "qnodes": 2159,
+          "depth": 5,
+          "elapsedMs": 38,
+          "nps": 131579
+        },
+        {
+          "id": "legacy-tempo-02-zugzwang",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "tempo"
+          ],
+          "chosenMove": {
+            "from": 14,
+            "to": 23,
+            "captured": [
+              18
+            ],
+            "promote": false,
+            "path": [
+              23
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":14,\"to\":23,\"captured\":[18],\"path\":[23],\"promote\":false}",
+          "score": 297,
+          "nodes": 2975,
+          "qnodes": 2025,
+          "depth": 8,
+          "elapsedMs": 38,
+          "nps": 131579
+        },
+        {
+          "id": "legacy-endgame-03-opposition",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 9,
+            "captured": [
+              14
+            ],
+            "promote": false,
+            "path": [
+              9
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":9,\"captured\":[14],\"path\":[9],\"promote\":false}",
+          "score": 999999,
+          "nodes": 64,
+          "qnodes": 0,
+          "depth": 64,
+          "elapsedMs": 148,
+          "nps": 432
+        },
+        {
+          "id": "legacy-endgame-04-triangulation",
+          "split": "diagnostic",
+          "validation": "legacy-unverified",
+          "motifs": [
+            "king technique"
+          ],
+          "chosenMove": {
+            "from": 18,
+            "to": 11,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":18,\"to\":11,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 114,
+          "nodes": 3225,
+          "qnodes": 1775,
+          "depth": 6,
+          "elapsedMs": 66,
+          "nps": 75758
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-01",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 25,
+            "to": 21,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":25,\"to\":21,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": 13,
+          "nodes": 3198,
+          "qnodes": 1802,
+          "depth": 2,
+          "elapsedMs": 52,
+          "nps": 96154
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-02",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 0,
+            "to": 5,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":0,\"to\":5,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -6,
+          "nodes": 3282,
+          "qnodes": 1718,
+          "depth": 3,
+          "elapsedMs": 59,
+          "nps": 84746
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-03",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 20,
+            "to": 16,
+            "captured": [],
+            "promote": false
+          },
+          "chosenMoveSignature": "{\"from\":20,\"to\":16,\"captured\":[],\"path\":[],\"promote\":false}",
+          "score": -7,
+          "nodes": 3159,
+          "qnodes": 1841,
+          "depth": 4,
+          "elapsedMs": 61,
+          "nps": 81967
+        },
+        {
+          "id": "strategic-makhos-measurement-v1-04",
+          "split": "diagnostic",
+          "validation": "provisional-engine",
+          "motifs": [],
+          "chosenMove": {
+            "from": 13,
+            "to": 20,
+            "captured": [
+              16
+            ],
+            "promote": false,
+            "path": [
+              20
+            ]
+          },
+          "chosenMoveSignature": "{\"from\":13,\"to\":20,\"captured\":[16],\"path\":[20],\"promote\":false}",
+          "score": 39,
+          "nodes": 3279,
+          "qnodes": 1721,
+          "depth": 3,
+          "elapsedMs": 39,
+          "nps": 128205
+        }
+      ]
+    }
+  }
+}

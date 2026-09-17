@@ -1041,3 +1041,37 @@ All runs had zero unresolved games and errors. Per the predeclared rule, `aggres
 All confirmation runs had zero unresolved games and errors. The equal-time run deliberately had no LMR instrumentation. Fixed-node counters show the intended mechanism: at 50,000 nodes, current reduced 6,655,725 eligible moves for 8,553,436 plies (histogram 0/1/2/3 = 0/4,869,896/1,673,947/111,882; 40,411 full-depth re-searches), while aggressive reduced 7,610,339 moves for 17,389,894 plies (0/0/5,441,123/2,169,216; 67,757 re-searches). Full root/interior partitions and the equivalent 20,000-node data are retained in the machine-readable artifacts.
 
 The point estimates favor aggressive at two confirmation budgets, but every confirmation CI crosses zero. The result is **inconclusive**, so no production change is promoted. No evaluation, pruning, extension, ordering, TT, or qsearch behavior changed; the replay control and instrumentation remain opt-in.
+
+## EXP-2026-013 — Phase 3G pruning threshold selection
+
+The source audit, frozen profiles, corpus identity, baseline pins, instrumentation rules, and outcome protocol are recorded in `docs/PHASE3G_PRUNING_PROTOCOL.md`. Profiles and corpus were frozen before outcomes. Production pruning remains `current` regardless of the decision.
+
+### Screening — starts 1–32 (5,000 nodes/move)
+
+All rows are 32 paired starts / 64 games; all games completed with zero errors or unresolved results. Instrumentation was enabled for both engines.
+
+| profile | W/D/L | score | Elo (pair-bootstrap 95% CI) | avg depth B/C | main nodes B/C | qnodes B/C | elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| rfp-conservative | 27/11/26 | 50.781% | +5.4 [-54.7,+65.9] | 5.857/5.847 | 5,177,736/5,112,337 | 2,574,008/2,656,998 | 106,665/108,168 | 72,674/71,827 |
+| razoring-conservative | 34/6/24 | 57.813% | +54.7 [+10.9,+106.3] | 6.264/6.250 | 5,021,475/5,031,679 | 2,439,289/2,456,924 | 100,214/102,798 | 74,448/72,848 |
+| null-delayed | 23/13/28 | 46.094% | -27.2 [-106.3,+49.2] | 6.237/5.695 | 5,331,476/5,672,245 | 2,644,192/2,307,140 | 114,917/108,967 | 69,404/73,228 |
+| probcut-conservative | 26/8/30 | 46.875% | -21.7 [-83.0,+38.2] | 5.944/5.804 | 4,972,879/5,003,383 | 2,428,572/2,393,990 | 98,124/98,316 | 75,430/75,241 |
+| lmp-conservative | 30/8/26 | 53.125% | +21.7 [-32.7,+77.2] | 5.907/5.986 | 5,187,370/5,067,339 | 2,514,633/2,607,638 | 104,954/101,462 | 73,385/75,644 |
+
+The frozen rule mechanically selected **razoring-conservative**, the highest score strictly above 50%. Starts 33–64 were not inspected before selection was written.
+
+### Confirmation — untouched starts 33–64
+
+Only `razoring-conservative` was run. Each row is 32 paired starts / 64 games, with zero errors and unresolved results.
+
+| budget | W/D/L | score | Elo (pair-bootstrap 95% CI) | avg depth B/C | main nodes B/C | qnodes B/C | elapsed ms B/C | NPS B/C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20,000 nodes | 31/7/26 | 53.906% | +27.2 [-38.2,+94.6] | 7.440/7.474 | 20,150,962/20,040,974 | 9,287,865/9,386,453 | 243,493/245,935 | 120,902/119,655 |
+| 50,000 nodes | 32/12/20 | 59.375% | +65.9 [-5.4,+137.0] | 8.026/8.050 | 55,447,745/55,635,663 | 26,226,866/26,447,653 | 544,168/553,300 | 150,091/148,352 |
+| 100 ms | 27/15/22 | 53.906% | +27.2 [-32.7,+88.7] | 3.914/3.725 | 12,797,550/12,626,235 | 6,822,601/6,808,211 | 151,411/151,410 | 129,582/128,356 |
+
+Fixed-node instrumentation confirms the intended behavior. At 20k, current versus conservative razoring recorded 3,703,659/3,606,912 eligible nodes and 617,789/451,452 verified cutoffs (depth-1 eligible 2,397,802/2,349,627; depth-2 1,305,857/1,257,285). At 50k the corresponding counts were 10,471,138/10,164,806 eligible and 1,634,447/1,236,763 cutoffs (depth-1 6,845,261/6,636,225; depth-2 3,625,877/3,528,581). The 100 ms run had instrumentation disabled.
+
+Every confirmation point estimate favored the selected candidate, but both required 20k and 100 ms intervals cross zero. **Decision: NEEDS MORE DATA.** The strong-promotion rule is not met. Production remains `pruningProfile=current`; no pruning threshold is promoted.
+
+After the decision was frozen, the Phase 3G comparison first emitted a blinded report with holdout rows omitted, then revealed holdout solely as the regression gate. At 5,000 nodes per position, the fully pinned Teacher v1 baseline (`lmrProfile=current`, `pruningProfile=current`) and otherwise-identical `razoring-conservative` candidate both passed development 2/2 and holdout 2/2. All three verified endgame-tagged development/holdout cases passed for both engines. Thus the selected candidate caused no development, holdout, or endgame regression in this gate; the machine-readable baseline/candidate comparison is retained in `benchmarks/phase3g/position-suite-comparison.json`.

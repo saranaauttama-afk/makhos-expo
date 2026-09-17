@@ -214,3 +214,20 @@ export const PHASE3F_LMR_START_SUITE: TournamentStartSuite = (() => {
     starts:independent.map((s,i)=>({...s,id:`phase3f-lmr-v1-${String(i+1).padStart(2,'0')}`}))};
 })();
 export const PHASE3F_LMR_V1_FINGERPRINT=searchAblationSuiteFingerprint(PHASE3F_LMR_START_SUITE);
+
+/** Phase 3G pruning corpus frozen before outcomes, using the audited Phase 3A
+ * generator and complete-state filtering through every retained Phase 3A-3F suite. */
+export const PHASE3G_PRUNING_SEED=0xfa6106a6;
+export const PHASE3G_PRUNING_START_SUITE:TournamentStartSuite=(()=>{
+  const priorStates=new Set([...SEARCH_ABLATION_START_SUITE.starts,...EXTENSION_CONFIRMATION_START_SUITE.starts,
+    ...PHASE3C_CONFIRMATION_START_SUITE.starts,...PHASE3C_FINAL_CONFIRMATION_START_SUITE.starts,
+    ...PHASE3D_CONFIRMATION_START_SUITE.starts,...PHASE3E_MOVE_ORDERING_START_SUITE.starts,
+    ...PHASE3F_LMR_START_SUITE.starts].map(s=>positionKey(s.position)));
+  const raw=generateSearchAblationStartSuite(PHASE3G_PRUNING_SEED,512);
+  const independent=raw.starts.filter(s=>!priorStates.has(positionKey(s.position))).slice(0,64);
+  if(independent.length!==64)throw new Error('could not generate 64 Phase 3G states disjoint from all Phase 3A-3F suites');
+  return {...raw,version:'makhos-phase3g-pruning-starts-v1',
+    generator:'xorshift32/legal-sorted/diverse-plies-2-17/v1; complete state includes side, all four bitboards, and halfmove clock; seed=first8hex(canonical engine-mainline tip fa6106a6...)',
+    starts:independent.map((s,i)=>({...s,id:`phase3g-pruning-v1-${String(i+1).padStart(2,'0')}`}))};
+})();
+export const PHASE3G_PRUNING_V1_FINGERPRINT=searchAblationSuiteFingerprint(PHASE3G_PRUNING_START_SUITE);

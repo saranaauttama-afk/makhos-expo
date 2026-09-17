@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { applyMove, generateMoves, Move } from '../src/coreClaude/movegen';
 import { initialPosition, isDrawByInactivity, Position, Side } from '../src/coreClaude/position';
 import { DEFAULT_SEARCH_FEATURES, fixedDepthSearch, fixedNodeSearch, iterativeDeepening,
-  ExtensionFeatureFlags, ExtensionStats, LmrStats, MoveOrderingFeatureFlags, MoveOrderingStats, SearchMeasurementOptions, resetSearchHeuristicsForMeasurement, SearchFeatureFlags, SearchResult } from '../src/coreClaude/search/alphabeta';
+  ExtensionFeatureFlags, ExtensionStats, LmrStats, MoveOrderingFeatureFlags, MoveOrderingStats, PruningStats, SearchMeasurementOptions, resetSearchHeuristicsForMeasurement, SearchFeatureFlags, SearchResult } from '../src/coreClaude/search/alphabeta';
 import { buildRepetitionCounts, isThreefoldRepetition } from '../src/coreClaude/search/repetition';
 import { TT } from '../src/coreClaude/search/tt';
 import { hashPosition } from '../src/coreClaude/search/zobrist';
@@ -15,11 +15,11 @@ export type SearchControl = { mode: 'nodes'; budget: number; maxDepth?: number }
   | { mode: 'depth'; budget: number }
   | { mode: 'time'; budget: number; maxDepth?: number };
 export interface EngineConfig { id: string; name: string; search: SearchControl; featureOverrides?: Partial<SearchFeatureFlags>; extensionOverrides?: Partial<ExtensionFeatureFlags>; moveOrderingOverrides?: Partial<MoveOrderingFeatureFlags>; measurementOptions?: SearchMeasurementOptions }
-export interface MoveMetric { ply: number; engineId: string; side: Side; move: Move; nodes: number; qnodes: number; depth: number; elapsedMs: number; nps: number; extensionStats?: ExtensionStats; moveOrderingStats?: MoveOrderingStats; lmrStats?:LmrStats }
+export interface MoveMetric { ply: number; engineId: string; side: Side; move: Move; nodes: number; qnodes: number; depth: number; elapsedMs: number; nps: number; extensionStats?: ExtensionStats; moveOrderingStats?: MoveOrderingStats; lmrStats?:LmrStats; pruningStats?:PruningStats }
 export type GameStatus = 'normal' | 'unresolved' | 'error';
 export interface GameRecord { pairId: string; startId: string; gameInPair: 1 | 2; p1EngineId: string; p2EngineId: string; winnerEngineId?: string; status: GameStatus; result: 'p1-win'|'p2-win'|'draw'|'unresolved'|'error'; reason: string; plies: number; moves: Move[]; moveMetrics: MoveMetric[] }
 export interface PairRecord { pairId: string; startId: string; games: GameRecord[]; candidateScore?: number }
-export interface EngineTotals { wins: number; draws: number; nodes: number; qnodes: number; elapsedMs: number; moves: number; averageDepth: number; nps: number; extensionStats?: ExtensionStats; moveOrderingStats?: MoveOrderingStats; lmrStats?:LmrStats }
+export interface EngineTotals { wins: number; draws: number; nodes: number; qnodes: number; elapsedMs: number; moves: number; averageDepth: number; nps: number; extensionStats?: ExtensionStats; moveOrderingStats?: MoveOrderingStats; lmrStats?:LmrStats; pruningStats?:PruningStats }
 export type EloValue = { kind: 'finite'; value: number } | { kind: 'negativeInfinity' } | { kind: 'positiveInfinity' };
 export interface ComparabilityAssessment { computeComparable: boolean; canonical: boolean; status: 'canonical'|'nonCanonical'|'nonComparable'; reason: string }
 export interface TournamentSummary { baselineWins: number; candidateWins: number; draws: number; unresolved: number; errors: number; games: number; scoreEligibleBaselineWins: number; scoreEligibleCandidateWins: number; scoreEligibleDraws: number; completedPairs: number; completedGames: number; pairedStarts: number; candidateScorePercent: number|null; scoreConfidenceInterval95: [number|null, number|null]; eloDifference: EloValue|null; eloConfidenceInterval95: [EloValue|null, EloValue|null]; confidenceMethod: string }
@@ -64,7 +64,7 @@ export async function playTournamentGame(start: TournamentStart, pairId: string,
     if (!legalMove) return finish('error', 'error', 'search-returned-illegal-move');
     const totalNodes = found.nodes + found.qnodes;
     moveMetrics.push({ ply, engineId: engine.id, side: pos.side, move: legalMove, nodes: found.nodes, qnodes: found.qnodes,
-      depth: found.depth, elapsedMs: found.elapsedMs, nps: found.elapsedMs > 0 ? totalNodes * 1000 / found.elapsedMs : 0, extensionStats:found.extensionStats, moveOrderingStats:found.moveOrderingStats, lmrStats:found.lmrStats });
+      depth: found.depth, elapsedMs: found.elapsedMs, nps: found.elapsedMs > 0 ? totalNodes * 1000 / found.elapsedMs : 0, extensionStats:found.extensionStats, moveOrderingStats:found.moveOrderingStats, lmrStats:found.lmrStats, pruningStats:found.pruningStats });
     moves.push(legalMove); pos = applyMove(pos, legalMove); history.push(hashPosition(pos));
   }
   return finish('unresolved', 'unresolved', 'maxPlies');
@@ -81,14 +81,17 @@ function totals(id: string, games: GameRecord[]): EngineTotals {
   const ms=games.flatMap(g=>g.moveMetrics).filter(m=>m.engineId===id);
   const nodes=ms.reduce((s,m)=>s+m.nodes,0),qnodes=ms.reduce((s,m)=>s+m.qnodes,0),elapsedMs=ms.reduce((s,m)=>s+m.elapsedMs,0);
   const stats={} as ExtensionStats,ordering={} as MoveOrderingStats;
-  let lmr:LmrStats|undefined;
+  let lmr:LmrStats|undefined, pruning:PruningStats|undefined;
   for(const m of ms){
     for(const [k,v] of Object.entries(m.extensionStats??{})){const x=stats[k as keyof ExtensionStats]??={triggers:0,addedDepth:0,rootTriggers:0,rootAddedDepth:0,interiorTriggers:0,interiorAddedDepth:0};for(const field of Object.keys(x) as (keyof typeof x)[])x[field]+=v[field];}
     for(const [k,v] of Object.entries(m.moveOrderingStats??{})){const x=ordering[k as keyof MoveOrderingStats]??={scoreHits:0,firstAfterOrdering:0,updates:0};for(const field of Object.keys(x) as (keyof typeof x)[])x[field]+=v[field];}
     if(m.lmrStats){lmr??={eligibleMoves:0,reducedMoves:0,totalReducedPlies:0,reductionHistogram:[0,0,0,0],fullDepthResearches:0,root:{eligibleMoves:0,reducedMoves:0,totalReducedPlies:0,reductionHistogram:[0,0,0,0],fullDepthResearches:0},interior:{eligibleMoves:0,reducedMoves:0,totalReducedPlies:0,reductionHistogram:[0,0,0,0],fullDepthResearches:0}};for(const part of [undefined,'root','interior'] as const){const to=part?lmr[part]:lmr,from=part?m.lmrStats[part]:m.lmrStats;to.eligibleMoves+=from.eligibleMoves;to.reducedMoves+=from.reducedMoves;to.totalReducedPlies+=from.totalReducedPlies;to.fullDepthResearches+=from.fullDepthResearches;for(let i=0;i<4;i++)to.reductionHistogram[i]+=from.reductionHistogram[i];}}
+    if(m.pruningStats){pruning??=makeEmptyPruningStats();for(const family of Object.keys(pruning) as (keyof PruningStats)[]){const to=pruning[family] as any,from=m.pruningStats[family] as any;for(const field of ['eligibleNodes','attempted','cutoffs','nullSearches','capturesTried','successfulCutoffs','breakEvents','estimatedMovesSkipped'])if(from[field]!==undefined)to[field]+=from[field];for(let i=0;i<65;i++)to.depthHistogram[i]+=from.depthHistogram[i];}}
   }
-  return {wins:games.filter(g=>g.winnerEngineId===id).length,draws:games.filter(g=>g.result==='draw').length,nodes,qnodes,elapsedMs,moves:ms.length,averageDepth:ms.length?ms.reduce((s,m)=>s+m.depth,0)/ms.length:0,nps:elapsedMs?(nodes+qnodes)*1000/elapsedMs:0,extensionStats:stats,moveOrderingStats:ordering,...(lmr?{lmrStats:lmr}:{})};
+  return {wins:games.filter(g=>g.winnerEngineId===id).length,draws:games.filter(g=>g.result==='draw').length,nodes,qnodes,elapsedMs,moves:ms.length,averageDepth:ms.length?ms.reduce((s,m)=>s+m.depth,0)/ms.length:0,nps:elapsedMs?(nodes+qnodes)*1000/elapsedMs:0,extensionStats:stats,moveOrderingStats:ordering,...(lmr?{lmrStats:lmr}:{}),...(pruning?{pruningStats:pruning}:{})};
 }
+
+function makeEmptyPruningStats():PruningStats{const c=()=>({eligibleNodes:0,attempted:0,cutoffs:0,depthHistogram:Array(65).fill(0)});return {reverseFutility:c(),razoring:c(),nullMove:{...c(),nullSearches:0},probCut:{...c(),capturesTried:0,successfulCutoffs:0},lmp:{...c(),breakEvents:0,estimatedMovesSkipped:0}};}
 
 export function assessComparability(a: SearchControl, b: SearchControl): ComparabilityAssessment {
   if (a.mode !== b.mode) return {computeComparable:false,canonical:false,status:'nonComparable',reason:`search modes differ (${a.mode} vs ${b.mode})`};

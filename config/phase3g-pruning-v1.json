@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "makhos-phase3g-pruning-config-v1",
+  "canonicalTip": "fa6106a6850dc16fd4ea0a071b7f956317bd0952",
+  "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+  "suite": "makhos-phase3g-pruning-starts-v1",
+  "seedHex": "0xfa6106a6",
+  "seed": 4200662694,
+  "fingerprint": "8bc0ad868e0ffa58d8449dad8c5428f7dc7ddd81af2ecc497faeb31754844967",
+  "screening": { "startOffset": 0, "pairedStarts": 32, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 160 },
+  "confirmation": { "startOffset": 32, "pairedStarts": 32, "nodeBudgets": [20000, 50000], "timeBudgetsMs": [100], "maxDepth": 64, "maxPlies": 160 },
+  "selectionRule": "Select exactly the highest candidate score strictly above 50%; ties use inventory order. Otherwise stop as inconclusive.",
+  "inventory": ["rfp-conservative", "razoring-conservative", "null-delayed", "probcut-conservative", "lmp-conservative"],
+  "sourceAudit": {
+    "reverseFutility": "quiet, non-root, unrepeated; depth <= 4; se - 120 * depth >= beta",
+    "razoring": "quiet, non-root, unrepeated; depth <= 2; margins depth1=350, depth2=550; confirm with null-window qsearch",
+    "nullMove": "quiet, non-root, unrepeated; depth >= 3; R=2 at depth 3-5, R=3 at depth >=6; nullOk, inactivity, mate-window and se>=beta guards retained",
+    "probCut": "capture, non-root, unrepeated; depth >= 5; pcBeta=beta+200 capped below mate; pcDepth=depth-4; top 3 captures",
+    "lmp": "quiet, non-single moves; depth <= 2; depth1 threshold=6, depth2 threshold=10; valid alpha guard"
+  },
+  "baselineLmrProfile": "current",
+  "baselinePruningProfile": "current",
+  "baselineSearch": { "reverseFutility": true, "razoring": true, "nullMove": true, "probCut": true, "iid": true, "lmr": true, "lmp": true, "extensions": true },
+  "baselineExtensions": { "singleLegalMove": true, "smallEndgame": false, "tacticalCapture": true, "multiCapture": true, "opponentForcedCapture": true, "singleCaptureRecapture": true, "rootLowMobility": true, "soundForcedTrap": true },
+  "baselineMoveOrdering": { "ttMove": true, "captures": true, "killers": true, "history": true, "countermove": true, "recapture": true }
+}
