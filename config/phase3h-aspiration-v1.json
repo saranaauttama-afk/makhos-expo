@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "makhos-phase3h-aspiration-config-v1",
+  "canonicalTip": "297105dd7ce17d4815e1805d3edbcadeb96a0e57",
+  "teacherIdentity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
+  "suite": "makhos-phase3h-aspiration-starts-v1",
+  "seedHex": "0x297105dd",
+  "seed": 695272925,
+  "fingerprint": "18c227cee03578f11f4b9ecfa86899bbbc00344abe8c84aff2832551bead0098",
+  "screening": { "startOffset": 0, "pairedStarts": 32, "nodesPerMove": 5000, "maxDepth": 64, "maxPlies": 160 },
+  "confirmation": { "startOffset": 32, "pairedStarts": 32, "nodeBudgets": [20000, 50000], "timeBudgetsMs": [100], "maxDepth": 64, "maxPlies": 160 },
+  "selectionRule": "Select exactly the highest candidate score strictly above 50%; ties use inventory order. Otherwise stop as inconclusive.",
+  "inventory": ["off", "narrow-75", "narrow-100", "wide-300"],
+  "sourceAudit": {
+    "firstCompletedDepth": "full [-INF,+INF] window",
+    "laterDepths": "centered on the previous completed score",
+    "currentInitialHalfWidth": 150,
+    "failure": "fail-low at score <= lower bound or fail-high at score >= upper bound doubles half-width and retries the same depth",
+    "rootSearch": "first ordered move full alpha-beta window; later moves null-window PVS and full-depth/full-window re-search on an in-window improvement"
+  },
+  "profiles": {
+    "current": { "initialHalfWidth": 150, "retry": "double on fail-low/high" },
+    "off": { "window": "full every depth", "retry": "none" },
+    "narrow-75": { "initialHalfWidth": 75, "retry": "current" },
+    "narrow-100": { "initialHalfWidth": 100, "retry": "current" },
+    "wide-300": { "initialHalfWidth": 300, "retry": "current" }
+  },
+  "baselineLmrProfile": "current",
+  "baselinePruningProfile": "current",
+  "baselineAspirationProfile": "current",
+  "baselineSearch": { "reverseFutility": true, "razoring": true, "nullMove": true, "probCut": true, "iid": true, "lmr": true, "lmp": true, "extensions": true },
+  "baselineExtensions": { "singleLegalMove": true, "smallEndgame": false, "tacticalCapture": true, "multiCapture": true, "opponentForcedCapture": true, "singleCaptureRecapture": true, "rootLowMobility": true, "soundForcedTrap": true },
+  "baselineMoveOrdering": { "ttMove": true, "captures": true, "killers": true, "history": true, "countermove": true, "recapture": true }
+}

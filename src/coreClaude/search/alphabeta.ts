@@ -38,6 +38,7 @@ export interface SearchResult {
   moveOrderingStats?: MoveOrderingStats;
   lmrStats?: LmrStats;
   pruningStats?: PruningStats;
+  aspirationStats?: AspirationStats;
 }
 export interface CancelToken  { cancelled: boolean; }
 export type LmrProfile = 'current' | 'off' | 'gentler' | 'delayed' | 'aggressive';
@@ -48,6 +49,23 @@ export interface LmrStats extends LmrStatsPartition { root:LmrStatsPartition; in
  * schedule; counter objects are not created or touched unless collection is requested. */
 export type PruningProfile = 'current' | 'rfp-conservative' | 'razoring-conservative' | 'null-delayed' | 'probcut-conservative' | 'lmp-conservative';
 export const DEFAULT_PRUNING_PROFILE: PruningProfile = 'current';
+/** Measurement-only aspiration schedules. `current` is the unchanged
+ * production schedule. */
+export type AspirationProfile = 'current' | 'off' | 'narrow-75' | 'narrow-100' | 'wide-300';
+export const DEFAULT_ASPIRATION_PROFILE: AspirationProfile = 'current';
+export interface AspirationStats {
+  completedIterations: number;
+  aspirationIterations: number;
+  failLow: number;
+  failHigh: number;
+  retries: number;
+  maxRetriesForOneDepth: number;
+  failedAttemptNodes: number;
+  failedAttemptQnodes: number;
+  retryHistogram: number[];
+  initialWindowWidthHistogram: Record<string, number>;
+  finalWindowWidthHistogram: Record<string, number>;
+}
 export interface PruningCounter { eligibleNodes:number; attempted:number; cutoffs:number; depthHistogram:number[] }
 export interface PruningStats {
   reverseFutility: PruningCounter;
@@ -56,7 +74,7 @@ export interface PruningStats {
   probCut: PruningCounter & { capturesTried:number; successfulCutoffs:number };
   lmp: PruningCounter & { breakEvents:number; estimatedMovesSkipped:number };
 }
-export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; collectLmrStats?: boolean; collectPruningStats?:boolean; lmrProfile?: LmrProfile; pruningProfile?:PruningProfile; }
+export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; collectLmrStats?: boolean; collectPruningStats?:boolean; collectAspirationStats?:boolean; lmrProfile?: LmrProfile; pruningProfile?:PruningProfile; aspirationProfile?:AspirationProfile; }
 export interface DeterministicSearchOptions {
   /** Exact completed iterative-deepening depth; wall clock is ignored. */
   depth?: number;
@@ -168,6 +186,11 @@ let activeLmrProfile: LmrProfile = DEFAULT_LMR_PROFILE;
 let activeLmrStats: LmrStats | undefined;
 let activePruningProfile:PruningProfile=DEFAULT_PRUNING_PROFILE;
 let activePruningStats:PruningStats|undefined;
+let activeAspirationProfile:AspirationProfile=DEFAULT_ASPIRATION_PROFILE;
+let activeAspirationStats:AspirationStats|undefined;
+function makeAspirationStats():AspirationStats{return {completedIterations:0,aspirationIterations:0,failLow:0,failHigh:0,retries:0,maxRetriesForOneDepth:0,failedAttemptNodes:0,failedAttemptQnodes:0,retryHistogram:[],initialWindowWidthHistogram:{},finalWindowWidthHistogram:{}};}
+function aspirationWidth(profile:AspirationProfile):number{return profile==='narrow-75'?75:profile==='narrow-100'?100:profile==='wide-300'?300:150;}
+function incrementHistogram(histogram:Record<string,number>,width:number):void{const key=width>=INF?'full':String(width);histogram[key]=(histogram[key]??0)+1;}
 function pruningCounter():PruningCounter{return {eligibleNodes:0,attempted:0,cutoffs:0,depthHistogram:Array(65).fill(0)};}
 function makePruningStats():PruningStats{return {
   reverseFutility:pruningCounter(),razoring:pruningCounter(),
@@ -1010,6 +1033,8 @@ export function fixedDepthScoreAtPlyForTesting(
   activeLmrStats = undefined;
   activePruningProfile=DEFAULT_PRUNING_PROFILE;
   activePruningStats=undefined;
+  activeAspirationProfile=DEFAULT_ASPIRATION_PROFILE;
+  activeAspirationStats=undefined;
   return negamax(pos, depth, -INF, INF, tt, Number.POSITIVE_INFINITY, { n: 0, q: 0 }, ply, rep);
 }
 
@@ -1059,9 +1084,12 @@ export async function iterativeDeepening(
   activePruningProfile=measurementOptions.pruningProfile??DEFAULT_PRUNING_PROFILE;
   if(!['current','rfp-conservative','razoring-conservative','null-delayed','probcut-conservative','lmp-conservative'].includes(activePruningProfile))throw new Error(`unknown pruning profile ${activePruningProfile}`);
   activePruningStats=measurementOptions.collectPruningStats?makePruningStats():undefined;
+  activeAspirationProfile=measurementOptions.aspirationProfile??DEFAULT_ASPIRATION_PROFILE;
+  if(!['current','off','narrow-75','narrow-100','wide-300'].includes(activeAspirationProfile))throw new Error(`unknown aspiration profile ${activeAspirationProfile}`);
+  activeAspirationStats=measurementOptions.collectAspirationStats?makeAspirationStats():undefined;
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}) };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}), ...(activeAspirationStats ? { aspirationStats:activeAspirationStats } : {}) };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
@@ -1078,7 +1106,7 @@ export async function iterativeDeepening(
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}) };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}), ...(activeAspirationStats ? { aspirationStats:activeAspirationStats } : {}) };
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
@@ -1097,9 +1125,12 @@ export async function iterativeDeepening(
     await new Promise<void>(r => setTimeout(r, 0));
     if (cancel?.cancelled || Date.now() > deadline) break;
 
-    let winSize = haveLast ? 150 : INF;
-    let alpha   = haveLast ? lastScore - winSize : -INF;
-    let beta    = haveLast ? lastScore + winSize : INF;
+    const useAspiration=haveLast&&activeAspirationProfile!=='off';
+    let winSize = useAspiration ? aspirationWidth(activeAspirationProfile) : INF;
+    let alpha   = useAspiration ? lastScore - winSize : -INF;
+    let beta    = useAspiration ? lastScore + winSize : INF;
+    const initialWinSize=winSize;
+    let depthRetries=0;
     let result: { move?: Move; score: number; candidates?: RootCandidate[] } = { score: 0 };
 
     while (true) {
@@ -1186,16 +1217,19 @@ export async function iterativeDeepening(
       result = { move: rootMove, score: rootBest, candidates: rootCandidates };
 
       if (cancel?.cancelled || stop.flag || Date.now() > deadline) break;
-      if (rootBest <= (haveLast ? lastScore - winSize : -INF)) {
-        winSize = Math.min(INF, winSize * 2); alpha = Math.max(-INF, (haveLast ? lastScore : 0) - winSize); continue;
+      if (rootBest <= (useAspiration ? lastScore - winSize : -INF)) {
+        if(activeAspirationStats){activeAspirationStats.failLow++;activeAspirationStats.retries++;activeAspirationStats.failedAttemptNodes+=acc.n;activeAspirationStats.failedAttemptQnodes+=acc.q;}
+        depthRetries++; winSize = Math.min(INF, winSize * 2); alpha = Math.max(-INF, lastScore - winSize); continue;
       }
-      if (rootBest >= (haveLast ? lastScore + winSize : INF)) {
-        winSize = Math.min(INF, winSize * 2); beta = Math.min(INF, (haveLast ? lastScore : 0) + winSize); continue;
+      if (rootBest >= (useAspiration ? lastScore + winSize : INF)) {
+        if(activeAspirationStats){activeAspirationStats.failHigh++;activeAspirationStats.retries++;activeAspirationStats.failedAttemptNodes+=acc.n;activeAspirationStats.failedAttemptQnodes+=acc.q;}
+        depthRetries++; winSize = Math.min(INF, winSize * 2); beta = Math.min(INF, lastScore + winSize); continue;
       }
       break;
     }
 
     if (cancel?.cancelled || stop.flag || Date.now() > deadline) break;
+    if(activeAspirationStats){activeAspirationStats.completedIterations++;if(useAspiration)activeAspirationStats.aspirationIterations++;activeAspirationStats.maxRetriesForOneDepth=Math.max(activeAspirationStats.maxRetriesForOneDepth,depthRetries);activeAspirationStats.retryHistogram[depthRetries]=(activeAspirationStats.retryHistogram[depthRetries]??0)+1;incrementHistogram(activeAspirationStats.initialWindowWidthHistogram,initialWinSize);incrementHistogram(activeAspirationStats.finalWindowWidthHistogram,winSize);}
     if (result.move) { best = result.move; bestScore = result.score; reached = depth; }
     if (result.candidates?.length) {
       lastRootCandidates = result.candidates;
@@ -1342,7 +1376,7 @@ export async function iterativeDeepening(
     overrideReason,
     rootCandidates: lastRootCandidates,
     extensionStats: activeExtensionStats,
-    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}),
+    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}), ...(activeAspirationStats ? { aspirationStats:activeAspirationStats } : {}),
   };
 }
 
