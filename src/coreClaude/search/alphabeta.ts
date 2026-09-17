@@ -37,6 +37,7 @@ export interface SearchResult {
   extensionStats?: ExtensionStats;
   moveOrderingStats?: MoveOrderingStats;
   lmrStats?: LmrStats;
+  pruningStats?: PruningStats;
 }
 export interface CancelToken  { cancelled: boolean; }
 export type LmrProfile = 'current' | 'off' | 'gentler' | 'delayed' | 'aggressive';
@@ -45,7 +46,17 @@ export interface LmrStatsPartition { eligibleMoves:number; reducedMoves:number; 
 export interface LmrStats extends LmrStatsPartition { root:LmrStatsPartition; interior:LmrStatsPartition }
 /** Both controls are opt-in. The profile defaults to the exact production
  * schedule; counter objects are not created or touched unless collection is requested. */
-export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; collectLmrStats?: boolean; lmrProfile?: LmrProfile; }
+export type PruningProfile = 'current' | 'rfp-conservative' | 'razoring-conservative' | 'null-delayed' | 'probcut-conservative' | 'lmp-conservative';
+export const DEFAULT_PRUNING_PROFILE: PruningProfile = 'current';
+export interface PruningCounter { eligibleNodes:number; attempted:number; cutoffs:number; depthHistogram:number[] }
+export interface PruningStats {
+  reverseFutility: PruningCounter;
+  razoring: PruningCounter;
+  nullMove: PruningCounter & { nullSearches:number };
+  probCut: PruningCounter & { capturesTried:number; successfulCutoffs:number };
+  lmp: PruningCounter & { breakEvents:number; estimatedMovesSkipped:number };
+}
+export interface SearchMeasurementOptions { collectMoveOrderingStats?: boolean; collectLmrStats?: boolean; collectPruningStats?:boolean; lmrProfile?: LmrProfile; pruningProfile?:PruningProfile; }
 export interface DeterministicSearchOptions {
   /** Exact completed iterative-deepening depth; wall clock is ignored. */
   depth?: number;
@@ -155,6 +166,16 @@ function makeMoveOrderingStats(): MoveOrderingStats {
 let activeMoveOrderingStats: MoveOrderingStats | undefined;
 let activeLmrProfile: LmrProfile = DEFAULT_LMR_PROFILE;
 let activeLmrStats: LmrStats | undefined;
+let activePruningProfile:PruningProfile=DEFAULT_PRUNING_PROFILE;
+let activePruningStats:PruningStats|undefined;
+function pruningCounter():PruningCounter{return {eligibleNodes:0,attempted:0,cutoffs:0,depthHistogram:Array(65).fill(0)};}
+function makePruningStats():PruningStats{return {
+  reverseFutility:pruningCounter(),razoring:pruningCounter(),
+  nullMove:{...pruningCounter(),nullSearches:0},
+  probCut:{...pruningCounter(),capturesTried:0,successfulCutoffs:0},
+  lmp:{...pruningCounter(),breakEvents:0,estimatedMovesSkipped:0},
+};}
+function pruningEligible<K extends keyof PruningStats>(kind:K,depth:number):PruningStats[K]|undefined{const c=activePruningStats?.[kind];if(c){c.eligibleNodes++;c.depthHistogram[Math.min(64,depth)]++;}return c;}
 function makeExtensionStats(): ExtensionStats {
   const out={} as ExtensionStats;
   for(const key of Object.keys(DEFAULT_EXTENSION_FEATURES) as (keyof ExtensionFeatureFlags)[]) out[key]={triggers:0,addedDepth:0,rootTriggers:0,rootAddedDepth:0,interiorTriggers:0,interiorAddedDepth:0};
@@ -802,16 +823,23 @@ function negamax(
       // Reverse Futility Pruning (Static Null Move):
       // If static eval is way above beta even after subtracting a depth-scaled
       // margin, our position is so good the opponent will avoid this line.
-      if (activeFeatures.reverseFutility && depth <= 4 && se - 120 * depth >= beta) return se;
+      if (activeFeatures.reverseFutility && depth <= 4) {
+        const stats=pruningEligible('reverseFutility',depth);
+        const margin=activePruningProfile==='rfp-conservative'?160:120;
+        if(se-margin*depth>=beta){if(stats){stats.attempted++;stats.cutoffs++;}return se;}
+      }
 
       // Razoring:
       // If static eval is way below alpha even after adding a generous margin,
       // drop to quiescence — the position is likely a dead loss for us.
       if (activeFeatures.razoring && depth <= 2) {
-        const margin = depth === 1 ? 350 : 550;
+        const stats=pruningEligible('razoring',depth);
+        const conservative=activePruningProfile==='razoring-conservative';
+        const margin = depth === 1 ? (conservative?450:350) : (conservative?700:550);
         if (se + margin < alpha) {
+          if(stats)stats.attempted++;
           const q = quiesce(pos, alpha - 1, alpha, deadline, acc, ply, rep);
-          if (q < alpha) return q;
+          if (q < alpha){if(stats)stats.cutoffs++;return q;}
         }
       }
 
@@ -821,12 +849,14 @@ function negamax(
       // Only in quiet nodes (can't pass on forced captures), not near mate.
       const inactivityLimit = pos.p1Men === 0 && pos.p2Men === 0 ? 16 : 32;
       const nullMoveDrawSafe = pos.halfmoveClock + 2 < inactivityLimit;
-      if (activeFeatures.nullMove && nullMoveDrawSafe && nullOk && depth >= 3 && beta < INF - MAX_PLY && se >= beta) {
+      const nullMinDepth=activePruningProfile==='null-delayed'?4:3;
+      if (activeFeatures.nullMove && nullMoveDrawSafe && nullOk && depth >= nullMinDepth && beta < INF - MAX_PLY && se >= beta) {
+        const stats=pruningEligible('nullMove',depth);if(stats){stats.attempted++;stats.nullSearches++;}
         const R = depth >= 6 ? 3 : 2;
         const nullPos: Position = { ...pos, side: (-pos.side) as 1 | -1 };
         // Don't push nullPos to rep — it's a synthetic position, not a real game state
         const s = -negamax(nullPos, depth - R - 1, -beta, -(beta - 1), tt, deadline, acc, ply + 1, rep, false);
-        if (s >= beta) return beta;
+        if (s >= beta){if(stats)stats.cutoffs++;return beta;}
       }
     }
 
@@ -835,7 +865,8 @@ function negamax(
     // shallower depth with a wide beta.  If any scores >= pcBeta, we can
     // safely apply a full beta cutoff without searching deeper.
     if (activeFeatures.probCut && !isQuiet && depth >= 5) {
-      const pcBeta  = Math.min(INF - ply, beta + 200);
+      const stats=pruningEligible('probCut',depth);if(stats)stats.attempted++;
+      const pcBeta  = Math.min(INF - ply, beta + (activePruningProfile==='probcut-conservative'?300:200));
       const pcDepth = depth - 4;
       // Linear top-3 scan — no allocation, no sort
       let tried = 0;
@@ -855,9 +886,10 @@ function negamax(
         const ch    = hashPosition(child);
         pushRepetition(rep, ch);
         tried++;
+        if(stats)stats.capturesTried++;
         const s = -negamax(child, pcDepth, -pcBeta, -(pcBeta - 1), tt, deadline, acc, ply + 1, rep, true, moveKey(m));
         popRepetition(rep, ch);
-        if (s >= pcBeta) return beta; // Probcut — fail high
+        if (s >= pcBeta){if(stats){stats.cutoffs++;stats.successfulCutoffs++;}return beta;} // Probcut — fail high
       }
     }
   }
@@ -879,6 +911,8 @@ function negamax(
   const ordered = orderMoves(pos, moves, ttMove, ply, prevMoveKey);
   let best = -INF, bestKey = -1;
   const a0 = alpha, b0 = beta;
+  const lmpNodeStats=activeFeatures.lmp && isQuiet && ordered.length>1 && depth<=2
+    ? pruningEligible('lmp',depth) : undefined;
 
   for (let i = 0; i < ordered.length; i++) {
     if (stop.flag) break;
@@ -906,7 +940,10 @@ function negamax(
 
     // Late Move Pruning (LMP): at very shallow depth, stop searching quiet
     // moves beyond a threshold — they're very unlikely to raise alpha.
-    if (activeFeatures.lmp && isQ && !single && depth <= 2 && i >= (depth === 1 ? 6 : 10) && alpha > -INF + MAX_PLY) break;
+    const lmpThreshold=depth===1?(activePruningProfile==='lmp-conservative'?8:6):(activePruningProfile==='lmp-conservative'?12:10);
+    if (activeFeatures.lmp && isQ && !single && depth <= 2 && i >= lmpThreshold && alpha > -INF + MAX_PLY) {
+      if(lmpNodeStats){lmpNodeStats.attempted++;lmpNodeStats.cutoffs++;lmpNodeStats.breakEvents++;lmpNodeStats.estimatedMovesSkipped+=ordered.length-i;}break;
+    }
 
     pushRepetition(rep, ch);
     const mk = moveKey(m); // move key — passed as prevMoveKey to child nodes
@@ -971,6 +1008,8 @@ export function fixedDepthScoreAtPlyForTesting(
   activeMoveOrderingStats = undefined;
   activeLmrProfile = DEFAULT_LMR_PROFILE;
   activeLmrStats = undefined;
+  activePruningProfile=DEFAULT_PRUNING_PROFILE;
+  activePruningStats=undefined;
   return negamax(pos, depth, -INF, INF, tt, Number.POSITIVE_INFINITY, { n: 0, q: 0 }, ply, rep);
 }
 
@@ -1017,9 +1056,12 @@ export async function iterativeDeepening(
   activeLmrProfile=measurementOptions.lmrProfile??DEFAULT_LMR_PROFILE;
   if(!['current','off','gentler','delayed','aggressive'].includes(activeLmrProfile))throw new Error(`unknown LMR profile ${activeLmrProfile}`);
   activeLmrStats=measurementOptions.collectLmrStats?makeLmrStats():undefined;
+  activePruningProfile=measurementOptions.pruningProfile??DEFAULT_PRUNING_PROFILE;
+  if(!['current','rfp-conservative','razoring-conservative','null-delayed','probcut-conservative','lmp-conservative'].includes(activePruningProfile))throw new Error(`unknown pruning profile ${activePruningProfile}`);
+  activePruningStats=measurementOptions.collectPruningStats?makePruningStats():undefined;
 
   if (isThreefoldRepetition(rep, rootHash))
-    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}) };
+    return { best: undefined, score: 0, nodes: 0, qnodes: 0, depth: 0, elapsedMs: Date.now() - startTime, timedOut: false, pv: [], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}) };
 
   // Cap probe so it never eats into the search budget.
   // Default maxMs=3000 could exceed timeMs entirely, leaving no time for search.
@@ -1036,7 +1078,7 @@ export async function iterativeDeepening(
   // Fall through to regular search so the engine still picks a legal move.
   if (eg?.best) {
     onInfo?.({ depth: eg.dtm, score: eg.score, nodes: 0, pv: [eg.best] });
-    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}) };
+    return { best: eg.best, score: eg.score, nodes: 0, qnodes: 0, depth: eg.dtm, elapsedMs: Date.now() - startTime, timedOut: false, pv: [eg.best], extensionStats:activeExtensionStats, ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}) };
   }
 
   let best: Move | undefined, bestScore = 0, nodes = 0, qnodes = 0, reached = 0;
@@ -1300,7 +1342,7 @@ export async function iterativeDeepening(
     overrideReason,
     rootCandidates: lastRootCandidates,
     extensionStats: activeExtensionStats,
-    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}),
+    ...(activeMoveOrderingStats ? { moveOrderingStats:activeMoveOrderingStats } : {}), ...(activeLmrStats ? { lmrStats:activeLmrStats } : {}), ...(activePruningStats ? { pruningStats:activePruningStats } : {}),
   };
 }
 

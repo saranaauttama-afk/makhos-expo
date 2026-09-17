@@ -48,7 +48,9 @@
     "test:phase3e": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3e-test scripts/phase3eMoveOrderingTest.ts && node .tmp/phase3e-test/scripts/phase3eMoveOrderingTest.js",
     "experiment:phase3e": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3e-build scripts/phase3eMoveOrderingRunner.ts && node .tmp/phase3e-build/scripts/phase3eMoveOrderingRunner.js",
     "test:phase3f": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3f-test scripts/phase3fLmrTest.ts && node .tmp/phase3f-test/scripts/phase3fLmrTest.js",
-    "experiment:phase3f": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3f-build scripts/phase3fLmrRunner.ts && node .tmp/phase3f-build/scripts/phase3fLmrRunner.js"
+    "experiment:phase3f": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3f-build scripts/phase3fLmrRunner.ts && node .tmp/phase3f-build/scripts/phase3fLmrRunner.js",
+    "test:phase3g": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3g-test scripts/phase3gPruningTest.ts && node .tmp/phase3g-test/scripts/phase3gPruningTest.js",
+    "experiment:phase3g": "tsc --target ES2022 --module CommonJS --moduleResolution node --strict --esModuleInterop --skipLibCheck --outDir .tmp/phase3g-build scripts/phase3gPruningRunner.ts && node .tmp/phase3g-build/scripts/phase3gPruningRunner.js"
   },
   "dependencies": {
     "@expo-google-fonts/kanit": "^0.4.1",
