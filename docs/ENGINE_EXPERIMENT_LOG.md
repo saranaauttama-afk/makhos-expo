@@ -1096,3 +1096,30 @@ Each row is 32 color-swapped pairs / 64 games, maxDepth 64 and maxPlies 160. All
 The baseline/candidate retry totals and failed-attempt main/qnode costs were: off 5,857/0 retries and 322,712+96,527 / 0 wasted nodes; narrow-75 5,942/6,862 and 360,213+109,438 / 553,722+221,392; narrow-100 5,270/6,377 and 322,806+104,426 / 424,429+153,009; wide-300 5,936/2,306 and 350,405+107,484 / 202,255+39,481. Full fail-low/high counts, retry histograms, maximum retries, and initial/final widths are preserved in the machine-readable artifacts.
 
 No candidate scored **strictly** above 50%; narrow-75 was exactly 50% and therefore did not qualify. The frozen mechanical rule selected no candidate and Phase 3H stopped **inconclusive**. Untouched starts 33–64 were not inspected, no confirmation tournament was run, and no candidate existed for the post-decision holdout comparison. The requested confirmation and position-regression evidence are therefore correctly marked not applicable rather than choosing a candidate post hoc. Production aspiration behavior remains unchanged.
+
+## EXP-2026-015 — Phase 5A exact 2/3-piece endgame foundation
+
+Phase 5A began from `bf1dd419d51e281b1ce3e94e51d24790cf3c0eaa`; Frozen Teacher v1 remains
+`b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`. It adds an isolated,
+versioned board-theoretic canonical tablebase for every legal two- and
+three-piece board and the lower-material terminal sinks required for graph
+closure. It does not import the tablebase into production search and makes no
+production-strength change.
+
+The solver enumerates the complete graph through production move generation,
+performs retrograde fixed-point classification, stores all deterministic
+DTM-optimal moves, and leaves only post-fixed-point states as draws. Symmetry is
+not used. The full result is **402,646 stored states** (the requested domain plus
+terminal sinks): **211,198 WIN, 37,114 DRAW, 154,334 LOSS**, maximum DTM **50**,
+fingerprint `f318cbb50ad1ee88ad5ef7869010b17dfd64f2e33e51f906ed160f53088d6b18`.
+The frozen audit JSON contains material counts, build/storage measurements,
+and Teacher comparison metrics.
+
+The independent verification covers all two-piece states and a deterministic
+100,000-state three-piece sample, while structural Bellman/DTM and stored-move
+legality checks cover all 402,646 states. Repeated full builds produced the same
+fingerprint. The separate live-history API proves only current rule draws,
+terminal loss, and mate in one; otherwise it returns UNKNOWN rather than
+borrowing board-only truth across clocks or repetition histories. See
+`docs/PHASE5A_EXACT_ENDGAME_AUDIT.md` for the source/rules audit and exactness
+boundary. Phase 5 remains in progress.

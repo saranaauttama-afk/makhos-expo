@@ -97,9 +97,9 @@ Work one hypothesis at a time and keep only measured wins.
 - [x] Complete Phase 3A–3C extension ablation and approve Teacher v1: same-corpus robustness at 5k/20k/50k nodes plus a new disjoint-corpus 20k/100 ms confirmation support disabling only `smallEndgame`, with all correctness and verified-position gates passing.
 - [x] Move-ordering ablations: TT move, captures, killers, history, countermove, recapture ordering. Phase 3E selected countermove removal mechanically, but confirmation intervals crossed zero; no production default changed.
 - [x] Tune LMR based on measured strength, not only speed. Phase 3F gathered controlled screening and untouched confirmation evidence without changing production defaults.
-- [ ] Tune/select pruning thresholds using tournaments and tactical regressions.
+- [x] Tune/select pruning thresholds using tournaments and tactical regressions. Phase 3G completed its frozen screen and confirmation; the candidate remained inconclusive and production stayed unchanged.
 - [ ] Improve time management only after fixed-node/depth strength is understood.
-- [ ] Investigate aspiration windows if absent/useful.
+- [x] Investigate aspiration windows if absent/useful. Phase 3H completed its frozen screen; no candidate exceeded the selection threshold and production stayed unchanged.
 - [ ] Investigate singular/forced-line extensions only if tactical evidence supports them.
 
 ## Evaluation
@@ -121,6 +121,11 @@ Potential features to test individually or in small groups:
 Use self-play/position data for parameter tuning where appropriate, but confirm tuned parameters in holdout games.
 
 **Exit gate:** **MET.** PR #11 merge commit `b2e6a35db6a50ea294a10f6b76a90b4e70e0689f` **is the frozen Teacher v1 release identity**; corpus provenance uses GitHub-resolvable PR #11 historical commit `b59570adb3e94dc629fc5a9af262b96b9d030498`.
+
+The current Phase 3 search-tuning cycle is closed for now. Phase 5A starts
+before Phase 4 because exact endgame truth is needed for competitive strength
+measurement, tablebase-agreement metrics, future Teacher/data labels, and
+future ML training truth.
 
 ---
 
@@ -151,13 +156,17 @@ Goal: add knowledge search alone learns inefficiently.
 
 Goal: approach perfect play where exact solving is tractable.
 
-- [ ] Audit existing tablebase implementation and coverage.
-- [ ] Verify all stored results against exhaustive small-material search.
-- [ ] Define canonical position encoding and symmetry reductions.
+- [x] Audit existing tablebase implementation and coverage (Phase 5A; production probe remains unchanged).
+- [x] Verify the isolated board-theoretic 2/3-piece results with full Bellman checks, complete two-piece cross-check, and a deterministic 100k three-piece cross-check.
+- [x] Define versioned canonical position encoding; Phase 5A deliberately uses no symmetry reduction pending a move-equivariance proof.
 - [ ] Expand solved material counts progressively subject to storage/time feasibility.
 - [ ] Track W/D/L agreement between engine and tablebase.
 - [ ] Use tablebase distances (if available) to prefer technically correct conversions.
 - [ ] Feed exact solved positions into evaluation/training datasets with explicit labels.
+
+**Phase 5 status:** **IN PROGRESS.** Phase 5A provides canonical 2/3-piece
+infrastructure and a conservative history-aware API, not production handoff or
+complete Phase 5 delivery.
 
 **Exit gate:** 100% agreement on the verified tablebase domain and reliable handoff between search and tablebase.
 
