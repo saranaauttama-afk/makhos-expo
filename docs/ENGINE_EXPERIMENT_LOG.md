@@ -1096,3 +1096,27 @@ Each row is 32 color-swapped pairs / 64 games, maxDepth 64 and maxPlies 160. All
 The baseline/candidate retry totals and failed-attempt main/qnode costs were: off 5,857/0 retries and 322,712+96,527 / 0 wasted nodes; narrow-75 5,942/6,862 and 360,213+109,438 / 553,722+221,392; narrow-100 5,270/6,377 and 322,806+104,426 / 424,429+153,009; wide-300 5,936/2,306 and 350,405+107,484 / 202,255+39,481. Full fail-low/high counts, retry histograms, maximum retries, and initial/final widths are preserved in the machine-readable artifacts.
 
 No candidate scored **strictly** above 50%; narrow-75 was exactly 50% and therefore did not qualify. The frozen mechanical rule selected no candidate and Phase 3H stopped **inconclusive**. Untouched starts 33–64 were not inspected, no confirmation tournament was run, and no candidate existed for the post-decision holdout comparison. The requested confirmation and position-regression evidence are therefore correctly marked not applicable rather than choosing a candidate post hoc. Production aspiration behavior remains unchanged.
+
+## EXP-2026-015 — Phase 5A exact 2/3-piece endgame foundation
+
+Phase 5A began from `bf1dd419d51e281b1ce3e94e51d24790cf3c0eaa`; Frozen Teacher v1 remains
+`b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`. Production probing and search are
+unchanged.
+
+The first retrograde graph is retained and explicitly labeled board-theoretic
+only. The verified current-rule result is a separate fresh-history solver whose
+root occurs once at clock zero. It propagates quiet clocks, resets only after
+captures, and adjudicates 16/32-ply inactivity before terminal loss. Repetition
+W/D/L equivalence follows from the monotone-material/monotone-clock proof in the
+audit: any repeat is a quiet cycle returning to identical choices at a worse
+clock, so it can only realize the DRAW already represented by inactivity.
+
+The current-rule table contains **402,646 stored states**, including 399,040
+requested states and 3,606 closed terminal sinks. Its frozen W/D/L, DTM,
+fingerprint, build/storage measurements, and 4,096-position Teacher sample are
+in `benchmarks/phase5a/tablebase-audit-v1.json`. A separate top-down reference
+solver derives truth before reading candidate entries, then compares all 6,976
+requested two-piece states, 100,000 deterministic three-piece states, and the
+in-scope legacy tiny-endgame fixture. The gate rebuilds twice in one invocation.
+History fixtures prove draw-before-mate child adjudication. Phase 5 remains in
+progress and no production integration is included.
