@@ -1100,26 +1100,23 @@ No candidate scored **strictly** above 50%; narrow-75 was exactly 50% and theref
 ## EXP-2026-015 — Phase 5A exact 2/3-piece endgame foundation
 
 Phase 5A began from `bf1dd419d51e281b1ce3e94e51d24790cf3c0eaa`; Frozen Teacher v1 remains
-`b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`. It adds an isolated,
-versioned board-theoretic canonical tablebase for every legal two- and
-three-piece board and the lower-material terminal sinks required for graph
-closure. It does not import the tablebase into production search and makes no
-production-strength change.
+`b2e6a35db6a50ea294a10f6b76a90b4e70e0689f`. Production probing and search are
+unchanged.
 
-The solver enumerates the complete graph through production move generation,
-performs retrograde fixed-point classification, stores all deterministic
-DTM-optimal moves, and leaves only post-fixed-point states as draws. Symmetry is
-not used. The full result is **402,646 stored states** (the requested domain plus
-terminal sinks): **211,198 WIN, 37,114 DRAW, 154,334 LOSS**, maximum DTM **50**,
-fingerprint `f318cbb50ad1ee88ad5ef7869010b17dfd64f2e33e51f906ed160f53088d6b18`.
-The frozen audit JSON contains material counts, build/storage measurements,
-and Teacher comparison metrics.
+The first retrograde graph is retained and explicitly labeled board-theoretic
+only. The verified current-rule result is a separate fresh-history solver whose
+root occurs once at clock zero. It propagates quiet clocks, resets only after
+captures, and adjudicates 16/32-ply inactivity before terminal loss. Repetition
+W/D/L equivalence follows from the monotone-material/monotone-clock proof in the
+audit: any repeat is a quiet cycle returning to identical choices at a worse
+clock, so it can only realize the DRAW already represented by inactivity.
 
-The independent verification covers all two-piece states and a deterministic
-100,000-state three-piece sample, while structural Bellman/DTM and stored-move
-legality checks cover all 402,646 states. Repeated full builds produced the same
-fingerprint. The separate live-history API proves only current rule draws,
-terminal loss, and mate in one; otherwise it returns UNKNOWN rather than
-borrowing board-only truth across clocks or repetition histories. See
-`docs/PHASE5A_EXACT_ENDGAME_AUDIT.md` for the source/rules audit and exactness
-boundary. Phase 5 remains in progress.
+The current-rule table contains **402,646 stored states**, including 399,040
+requested states and 3,606 closed terminal sinks. Its frozen W/D/L, DTM,
+fingerprint, build/storage measurements, and 4,096-position Teacher sample are
+in `benchmarks/phase5a/tablebase-audit-v1.json`. A separate top-down reference
+solver derives truth before reading candidate entries, then compares all 6,976
+requested two-piece states, 100,000 deterministic three-piece states, and the
+in-scope legacy tiny-endgame fixture. The gate rebuilds twice in one invocation.
+History fixtures prove draw-before-mate child adjudication. Phase 5 remains in
+progress and no production integration is included.

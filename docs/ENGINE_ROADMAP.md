@@ -157,15 +157,15 @@ Goal: add knowledge search alone learns inefficiently.
 Goal: approach perfect play where exact solving is tractable.
 
 - [x] Audit existing tablebase implementation and coverage (Phase 5A; production probe remains unchanged).
-- [x] Verify the isolated board-theoretic 2/3-piece results with full Bellman checks, complete two-piece cross-check, and a deterministic 100k three-piece cross-check.
+- [x] Verify both the board-theoretic baseline and fresh-history current-rule 2/3-piece tablebase with full structural checks plus a separately derived complete two-piece / deterministic 100k three-piece reference cross-check.
 - [x] Define versioned canonical position encoding; Phase 5A deliberately uses no symmetry reduction pending a move-equivariance proof.
 - [ ] Expand solved material counts progressively subject to storage/time feasibility.
 - [ ] Track W/D/L agreement between engine and tablebase.
 - [ ] Use tablebase distances (if available) to prefer technically correct conversions.
 - [ ] Feed exact solved positions into evaluation/training datasets with explicit labels.
 
-**Phase 5 status:** **IN PROGRESS.** Phase 5A provides canonical 2/3-piece
-infrastructure and a conservative history-aware API, not production handoff or
+**Phase 5 status:** **IN PROGRESS.** Phase 5A provides exact fresh-history current-rule 2/3-piece
+infrastructure, retains the separately labeled board-only baseline, and provides a conservative arbitrary-history API, not production handoff or
 complete Phase 5 delivery.
 
 **Exit gate:** 100% agreement on the verified tablebase domain and reliable handoff between search and tablebase.

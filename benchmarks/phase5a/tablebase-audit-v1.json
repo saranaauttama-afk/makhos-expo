@@ -1,6 +1,6 @@
 {
   "schemaVersion": "phase5a-audit-v1",
-  "solverVersion": "makhos-board-theoretic-2-3-v1",
+  "solverVersion": "makhos-fresh-history-rules-2-3-v1",
   "canonicalEncodingVersion": "makhos-board-v1",
   "sourceCommit": "bf1dd419d51e281b1ce3e94e51d24790cf3c0eaa",
   "teacherV1Identity": "b2e6a35db6a50ea294a10f6b76a90b4e70e0689f",
@@ -66,11 +66,11 @@
     "P1:2M0K-P2:1M0K": 19872
   },
   "wdlTotals": {
-    "WIN": 211198,
-    "DRAW": 37114,
-    "LOSS": 154334
+    "WIN": 172398,
+    "DRAW": 119920,
+    "LOSS": 110328
   },
-  "maxDtm": 50,
+  "maxDtm": 25,
   "exactCanonicalCoverage": {
     "pieces": [
       2,
@@ -81,6 +81,9 @@
       -1
     ],
     "unknown": 0,
+    "rootSemantics": "current position occurs once; halfmoveClock=0",
+    "inactivityClockCarried": true,
+    "repetitionJustification": "quiet-cycle-draw-equivalence-v1",
     "symmetryReduction": false,
     "productionMoveGenerationAuthority": true
   },
@@ -90,34 +93,40 @@
     "one ply before threshold",
     "second/third occurrence",
     "unproven cycle remains UNKNOWN",
-    "node/depth/cycle incomplete remains UNKNOWN (legacy deterministic oracle)"
+    "child draw adjudication before mate-in-one"
   ],
   "verifier": {
-    "exhaustiveStructuralBellmanStates": 402646,
-    "exhaustiveTwoPiece": true,
-    "deterministicThreePieceSample": 100000
+    "boardOnlyStructuralBellmanStates": 402646,
+    "independentAlgorithm": "top-down memoized material/clock solver; candidate entries unread until truth derived",
+    "exhaustiveRequestedTwoPieceStates": 6976,
+    "deterministicThreePieceSample": 100000,
+    "existingInScopeTinyEndgameFixtures": 1
   },
   "teacherAgreement": {
-    "sampleSize": 512,
-    "searchNodeBudget": 1000,
-    "wdlAgreementCount": 216,
-    "wdlAgreementPercent": 42.188,
-    "outcomePreservingMoveCount": 499,
-    "outcomePreservingMovePercent": 97.461,
-    "dtmOptimalMoveCount": 408,
-    "dtmOptimalMovePercent": 79.688,
-    "canonicalBestMoveIdentityCount": 311,
-    "canonicalBestMoveIdentityPercent": 60.742,
-    "equalOutcomeOptimalAlternativeCount": 168
+    "sampleSize": 4096,
+    "searchNodeBudget": 500,
+    "wdlMetricKind": "heuristic score-sign classification; abs(score) <= 1000 is labeled DRAW",
+    "wdlAgreementCount": 2356,
+    "wdlAgreementPercent": 57.52,
+    "outcomePreservingMoveCount": 3922,
+    "outcomePreservingMovePercent": 95.752,
+    "dtmOptimalMoveCount": 2156,
+    "dtmOptimalMoveDenominator": 2866,
+    "dtmOptimalMovePercent": 75.227,
+    "canonicalBestMoveIdentityCount": 1764,
+    "canonicalBestMoveIdentityDenominator": 2866,
+    "canonicalBestMoveIdentityPercent": 61.549,
+    "equalOutcomeOptimalAlternativeCount": 717
   },
   "performance": {
-    "canonicalBuildMilliseconds": 15603,
+    "canonicalBuildMilliseconds": 34537,
     "lookupModel": "Map.get O(1)",
     "lookupCount": 1000000,
-    "lookupNanosecondsPerProbe": 155.8,
+    "lookupNanosecondsPerProbe": 229,
     "estimatedInMemoryBytes": 144952560,
-    "estimatedCompactSerializedBytes": 25556435,
+    "estimatedCompactSerializedBytes": 28169108,
     "timingAndMemoryAreExcludedFromFingerprint": true
   },
-  "fingerprint": "f318cbb50ad1ee88ad5ef7869010b17dfd64f2e33e51f906ed160f53088d6b18"
+  "fingerprint": "6ffb0445f53c06d9188046dfba2bd95db7e27127488fd6c780c301ee7489e6b9",
+  "boardTheoreticOnlyFingerprint": "f318cbb50ad1ee88ad5ef7869010b17dfd64f2e33e51f906ed160f53088d6b18"
 }

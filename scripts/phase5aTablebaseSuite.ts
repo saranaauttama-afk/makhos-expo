@@ -1,5 +1,5 @@
 import { writeFileSync } from 'fs';
-import { buildCanonicalTablebase, canonicalMoveKey, canonicalStateKey } from '../src/coreClaude/search/exactEndgameTablebase';
+import { buildCanonicalTablebase, buildFreshRuleTablebase, canonicalMoveKey, canonicalStateKey } from '../src/coreClaude/search/exactEndgameTablebase';
 import { applyMove, generateMoves } from '../src/coreClaude/movegen';
 
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
@@ -28,13 +28,25 @@ for (const [key, entry] of first.entries) {
 }
 assert(checked === first.entries.size, 'not all entries checked');
 assert(first.counts.WIN + first.counts.DRAW + first.counts.LOSS === first.entries.size, 'classification incomplete');
+// Determinism is a gate in one invocation, not an inference from two manual runs.
+const freshFirst = buildFreshRuleTablebase();
+const freshSecond = buildFreshRuleTablebase();
+assert(freshFirst.fingerprint === freshSecond.fingerprint,
+  `fresh-rule fingerprint changed: ${freshFirst.fingerprint} != ${freshSecond.fingerprint}`);
+assert(freshFirst.fingerprint !== first.fingerprint,
+  'fresh-rule result unexpectedly collapsed to the clock-reset board-only result');
+assert(freshFirst.entries.size === freshSecond.entries.size, 'fresh-rule state count changed');
+assert(freshFirst.counts.WIN + freshFirst.counts.DRAW + freshFirst.counts.LOSS === freshFirst.entries.size,
+  'fresh-rule classification incomplete');
 
 if (process.argv.includes('--artifact')) {
   writeFileSync('.tmp/phase5a-summary.json', JSON.stringify({
-    stateCount: first.entries.size, counts: first.counts, materialCounts: first.materialCounts,
-    maxDtm: first.maxDtm, fingerprint: first.fingerprint, generationMs: first.generationMs,
-    estimatedCompactBytes: first.estimatedCompactBytes,
+    stateCount: freshFirst.entries.size, counts: freshFirst.counts, materialCounts: freshFirst.materialCounts,
+    maxDtm: freshFirst.maxDtm, fingerprint: freshFirst.fingerprint, generationMs: freshFirst.generationMs,
+    estimatedCompactBytes: freshFirst.estimatedCompactBytes, boardTheoreticFingerprint: first.fingerprint,
   }, null, 2) + '\n');
 }
-console.log(JSON.stringify({ checked, counts: first.counts, maxDtm: first.maxDtm, fingerprint: first.fingerprint,
-  generationMs: first.generationMs, estimatedCompactBytes: first.estimatedCompactBytes }));
+console.log(JSON.stringify({ checked, freshRuleCounts: freshFirst.counts, maxDtm: freshFirst.maxDtm,
+  fingerprint: freshFirst.fingerprint, repeatFingerprint: freshSecond.fingerprint,
+  generationMs: freshFirst.generationMs, estimatedCompactBytes: freshFirst.estimatedCompactBytes,
+  boardTheoreticFingerprint: first.fingerprint }));
